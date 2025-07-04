@@ -1,0 +1,9 @@
+plotly
+pandas
+flask
+flask-cors
+requests
+python-dotenv
+pydub
+librosa
+soundfile

@@ -1,0 +1,791 @@
+Gemini Developer API
+Get a Gemini API Key
+Get a Gemini API key and make your first API request in minutes.
+
+
+Python example: 
+
+from google import genai
+
+client = genai.Client(api_key="YOUR_API_KEY")
+
+response = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents="Explain how AI works in a few words",
+)
+
+print(response.text)
+
+Document understanding
+
+Python JavaScript Go REST
+
+The Gemini API supports PDF input, including long documents (up to 3600 pages). Gemini models process PDFs with native vision, and are therefore able to understand both text and image contents inside documents. With native PDF vision support, Gemini models are able to:
+
+Analyze diagrams, charts, and tables inside documents
+Extract information into structured output formats
+Answer questions about visual and text contents in documents
+Summarize documents
+Transcribe document content (e.g. to HTML) preserving layouts and formatting, for use in downstream applications
+This tutorial demonstrates some possible ways to use the Gemini API to process PDF documents.
+
+PDF input
+For PDF payloads under 20MB, you can choose between uploading base64 encoded documents or directly uploading locally stored files.
+
+As inline data
+You can process PDF documents directly from URLs. Here's a code snippet showing how to do this:
+
+
+from google import genai
+from google.genai import types
+import httpx
+
+client = genai.Client()
+
+doc_url = "https://discovery.ucl.ac.uk/id/eprint/10089234/1/343019_3_art_0_py4t4l_convrt.pdf"
+
+# Retrieve and encode the PDF byte
+doc_data = httpx.get(doc_url).content
+
+prompt = "Summarize this document"
+response = client.models.generate_content(
+  model="gemini-2.0-flash",
+  contents=[
+      types.Part.from_bytes(
+        data=doc_data,
+        mime_type='application/pdf',
+      ),
+      prompt])
+print(response.text)
+Technical details
+Gemini 1.5 Pro and 1.5 Flash support a maximum of 3,600 document pages. Document pages must be in one of the following text data MIME types:
+
+PDF - application/pdf
+JavaScript - application/x-javascript, text/javascript
+Python - application/x-python, text/x-python
+TXT - text/plain
+HTML - text/html
+CSS - text/css
+Markdown - text/md
+CSV - text/csv
+XML - text/xml
+RTF - text/rtf
+Each document page is equivalent to 258 tokens.
+
+While there are no specific limits to the number of pixels in a document besides the model's context window, larger pages are scaled down to a maximum resolution of 3072x3072 while preserving their original aspect ratio, while smaller pages are scaled up to 768x768 pixels. There is no cost reduction for pages at lower sizes, other than bandwidth, or performance improvement for pages at higher resolution.
+
+For best results:
+
+Rotate pages to the correct orientation before uploading.
+Avoid blurry pages.
+If using a single page, place the text prompt after the page.
+Locally stored PDFs
+For locally stored PDFs, you can use the following approach:
+
+
+from google import genai
+from google.genai import types
+import pathlib
+import httpx
+
+client = genai.Client()
+
+doc_url = "https://discovery.ucl.ac.uk/id/eprint/10089234/1/343019_3_art_0_py4t4l_convrt.pdf"
+
+# Retrieve and encode the PDF byte
+filepath = pathlib.Path('file.pdf')
+filepath.write_bytes(httpx.get(doc_url).content)
+
+prompt = "Summarize this document"
+response = client.models.generate_content(
+  model="gemini-2.0-flash",
+  contents=[
+      types.Part.from_bytes(
+        data=filepath.read_bytes(),
+        mime_type='application/pdf',
+      ),
+      prompt])
+print(response.text)
+Large PDFs
+You can use the File API to upload a document of any size. Always use the File API when the total request size (including the files, text prompt, system instructions, etc.) is larger than 20 MB.
+
+Note: The File API lets you store up to 20 GB of files per project, with a per-file maximum size of 2 GB. Files are stored for 48 hours. They can be accessed in that period with your API key, but cannot be downloaded from the API. The File API is available at no cost in all regions where the Gemini API is available.
+Call media.upload to upload a file using the File API. The following code uploads a document file and then uses the file in a call to models.generateContent.
+
+Large PDFs from URLs
+Use the File API for large PDF files available from URLs, simplifying the process of uploading and processing these documents directly through their URLs:
+
+
+from google import genai
+from google.genai import types
+import io
+import httpx
+
+client = genai.Client()
+
+long_context_pdf_path = "https://www.nasa.gov/wp-content/uploads/static/history/alsj/a17/A17_FlightPlan.pdf"
+
+# Retrieve and upload the PDF using the File API
+doc_io = io.BytesIO(httpx.get(long_context_pdf_path).content)
+
+sample_doc = client.files.upload(
+  # You can pass a path or a file-like object here
+  file=doc_io,
+  config=dict(
+    mime_type='application/pdf')
+)
+
+prompt = "Summarize this document"
+
+response = client.models.generate_content(
+  model="gemini-2.0-flash",
+  contents=[sample_doc, prompt])
+print(response.text)
+Large PDFs stored locally
+
+from google import genai
+from google.genai import types
+import pathlib
+import httpx
+
+client = genai.Client()
+
+long_context_pdf_path = "https://www.nasa.gov/wp-content/uploads/static/history/alsj/a17/A17_FlightPlan.pdf"
+
+# Retrieve the PDF
+file_path = pathlib.Path('A17.pdf')
+file_path.write_bytes(httpx.get(long_context_pdf_path).content)
+
+# Upload the PDF using the File API
+sample_file = client.files.upload(
+  file=file_path,
+)
+
+prompt="Summarize this document"
+
+response = client.models.generate_content(
+  model="gemini-2.0-flash",
+  contents=[sample_file, "Summarize this document"])
+print(response.text)
+You can verify the API successfully stored the uploaded file and get its metadata by calling files.get. Only the name (and by extension, the uri) are unique.
+
+
+from google import genai
+import pathlib
+
+client = genai.Client()
+
+fpath = pathlib.Path('example.txt')
+fpath.write_text('hello')
+
+file = client.files.upload('example.txt')
+
+file_info = client.files.get(file.name)
+print(file_info.model_dump_json(indent=4))
+Multiple PDFs
+The Gemini API is capable of processing multiple PDF documents in a single request, as long as the combined size of the documents and the text prompt stays within the model's context window.
+
+
+from google import genai
+import io
+import httpx
+
+client = genai.Client()
+
+doc_url_1 = "https://arxiv.org/pdf/2312.11805"
+doc_url_2 = "https://arxiv.org/pdf/2403.05530"
+
+# Retrieve and upload both PDFs using the File API
+doc_data_1 = io.BytesIO(httpx.get(doc_url_1).content)
+doc_data_2 = io.BytesIO(httpx.get(doc_url_2).content)
+
+sample_pdf_1 = client.files.upload(
+  file=doc_data_1,
+  config=dict(mime_type='application/pdf')
+)
+sample_pdf_2 = client.files.upload(
+  file=doc_data_2,
+  config=dict(mime_type='application/pdf')
+)
+
+prompt = "What is the difference between each of the main benchmarks between these two papers? Output these in a table."
+
+response = client.models.generate_content(
+  model="gemini-2.0-flash",
+  contents=[sample_pdf_1, sample_pdf_2, prompt])
+print(response.text)
+What's next
+
+
+Using files
+
+
+The Gemini API supports uploading media files separately from the prompt input, allowing your media to be reused across multiple requests and multiple prompts. For more details, check out the Prompting with media guide.
+
+Method: media.upload
+Creates a File.
+
+Endpoint
+Upload URI, for media upload requests:
+post
+https://generativelanguage.googleapis.com/upload/v1beta/files
+Metadata URI, for metadata-only requests:
+post
+https://generativelanguage.googleapis.com/v1beta/files
+Request body
+The request body contains data with the following structure:
+
+Fields
+file
+object (File)
+Optional. Metadata for the file to create.
+
+Example request
+Image
+Audio
+Text
+Video
+PDF
+Python
+Node.js
+Go
+Shell
+
+from google import genai
+
+client = genai.Client()
+myfile = client.files.upload(file=media / "Cajun_instruments.jpg")
+print(f"{myfile=}")
+
+result = client.models.generate_content(
+    model="gemini-2.0-flash",
+    contents=[
+        myfile,
+        "\n\n",
+        "Can you tell me about the instruments in this photo?",
+    ],
+)
+print(f"{result.text=}")
+Response body
+Response for media.upload.
+
+If successful, the response body contains data with the following structure:
+
+Fields
+file
+object (File)
+Metadata for the created file.
+
+JSON representation
+
+{
+  "file": {
+    object (File)
+  }
+}
+Method: files.get
+Gets the metadata for the given File.
+
+Endpoint
+get
+https://generativelanguage.googleapis.com/v1beta/{name=files/*}
+
+Path parameters
+name
+string
+Required. The name of the File to get. Example: files/abc-123 It takes the form files/{file}.
+
+Request body
+The request body must be empty.
+
+Example request
+Python
+Node.js
+Go
+Shell
+
+from google import genai
+
+client = genai.Client()
+myfile = client.files.upload(file=media / "poem.txt")
+file_name = myfile.name
+print(file_name)  # "files/*"
+
+myfile = client.files.get(name=file_name)
+print(myfile)
+Response body
+If successful, the response body contains an instance of File.
+
+Method: files.list
+Lists the metadata for Files owned by the requesting project.
+
+Endpoint
+get
+https://generativelanguage.googleapis.com/v1beta/files
+
+Query parameters
+pageSize
+integer
+Optional. Maximum number of Files to return per page. If unspecified, defaults to 10. Maximum pageSize is 100.
+
+pageToken
+string
+Optional. A page token from a previous files.list call.
+
+Request body
+The request body must be empty.
+
+Example request
+Python
+Node.js
+Go
+Shell
+
+from google import genai
+
+client = genai.Client()
+print("My files:")
+for f in client.files.list():
+    print("  ", f.name)
+Response body
+Response for files.list.
+
+If successful, the response body contains data with the following structure:
+
+Fields
+files[]
+object (File)
+The list of Files.
+
+nextPageToken
+string
+A token that can be sent as a pageToken into a subsequent files.list call.
+
+JSON representation
+
+{
+  "files": [
+    {
+      object (File)
+    }
+  ],
+  "nextPageToken": string
+}
+Method: files.delete
+Deletes the File.
+
+Endpoint
+delete
+https://generativelanguage.googleapis.com/v1beta/{name=files/*}
+
+Path parameters
+name
+string
+Required. The name of the File to delete. Example: files/abc-123 It takes the form files/{file}.
+
+Request body
+The request body must be empty.
+
+Example request
+Python
+Node.js
+Go
+Shell
+
+from google import genai
+
+client = genai.Client()
+myfile = client.files.upload(file=media / "poem.txt")
+
+client.files.delete(name=myfile.name)
+
+try:
+    result = client.models.generate_content(
+        model="gemini-2.0-flash", contents=[myfile, "Describe this file."]
+    )
+    print(result)
+except genai.errors.ClientError:
+    pass
+Response body
+If successful, the response body is an empty JSON object.
+
+REST Resource: files
+Resource: File
+A file uploaded to the API. Next ID: 15
+
+Fields
+name
+string
+Immutable. Identifier. The File resource name. The ID (name excluding the "files/" prefix) can contain up to 40 characters that are lowercase alphanumeric or dashes (-). The ID cannot start or end with a dash. If the name is empty on create, a unique name will be generated. Example: files/123-456
+
+displayName
+string
+Optional. The human-readable display name for the File. The display name must be no more than 512 characters in length, including spaces. Example: "Welcome Image"
+
+mimeType
+string
+Output only. MIME type of the file.
+
+sizeBytes
+string (int64 format)
+Output only. Size of the file in bytes.
+
+createTime
+string (Timestamp format)
+Output only. The timestamp of when the File was created.
+
+Uses RFC 3339, where generated output will always be Z-normalized and uses 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: "2014-10-02T15:01:23Z", "2014-10-02T15:01:23.045123456Z" or "2014-10-02T15:01:23+05:30".
+
+updateTime
+string (Timestamp format)
+Output only. The timestamp of when the File was last updated.
+
+Uses RFC 3339, where generated output will always be Z-normalized and uses 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: "2014-10-02T15:01:23Z", "2014-10-02T15:01:23.045123456Z" or "2014-10-02T15:01:23+05:30".
+
+expirationTime
+string (Timestamp format)
+Output only. The timestamp of when the File will be deleted. Only set if the File is scheduled to expire.
+
+Uses RFC 3339, where generated output will always be Z-normalized and uses 0, 3, 6 or 9 fractional digits. Offsets other than "Z" are also accepted. Examples: "2014-10-02T15:01:23Z", "2014-10-02T15:01:23.045123456Z" or "2014-10-02T15:01:23+05:30".
+
+sha256Hash
+string (bytes format)
+Output only. SHA-256 hash of the uploaded bytes.
+
+A base64-encoded string.
+
+uri
+string
+Output only. The uri of the File.
+
+downloadUri
+string
+Output only. The download uri of the File.
+
+state
+enum (State)
+Output only. Processing state of the File.
+
+source
+enum (Source)
+Source of the File.
+
+error
+object (Status)
+Output only. Error status if File processing failed.
+
+metadata
+Union type
+Metadata for the File. metadata can be only one of the following:
+videoMetadata
+object (VideoMetadata)
+Output only. Metadata for a video.
+
+JSON representation
+
+{
+  "name": string,
+  "displayName": string,
+  "mimeType": string,
+  "sizeBytes": string,
+  "createTime": string,
+  "updateTime": string,
+  "expirationTime": string,
+  "sha256Hash": string,
+  "uri": string,
+  "downloadUri": string,
+  "state": enum (State),
+  "source": enum (Source),
+  "error": {
+    object (Status)
+  },
+
+  // metadata
+  "videoMetadata": {
+    object (VideoMetadata)
+  }
+  // Union type
+}
+VideoMetadata
+Metadata for a video File.
+
+Fields
+videoDuration
+string (Duration format)
+Duration of the video.
+
+A duration in seconds with up to nine fractional digits, ending with 's'. Example: "3.5s".
+
+JSON representation
+
+{
+  "videoDuration": string
+}
+State
+States for the lifecycle of a File.
+
+Enums
+STATE_UNSPECIFIED	The default value. This value is used if the state is omitted.
+PROCESSING	File is being processed and cannot be used for inference yet.
+ACTIVE	File is processed and available for inference.
+FAILED	File failed processing.
+Source
+Enums
+SOURCE_UNSPECIFIED	Used if source is not specified.
+UPLOADED	Indicates the file is uploaded by the user.
+GENERATED	Indicates the file is generated by Google.
+Status
+The Status type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by gRPC. Each Status message contains three pieces of data: error code, error message, and error details.
+
+You can find out more about this error model and how to work with it in the API Design Guide.
+
+Fields
+code
+integer
+The status code, which should be an enum value of google.rpc.Code.
+
+message
+string
+A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the google.rpc.Status.details field, or localized by the client.
+
+details[]
+object
+A list of messages that carry the error details. There is a common set of message types for APIs to use.
+
+An object containing fields of an arbitrary type. An additional field "@type" contains a URI identifying the type. Example: { "id": 1234, "@type": "types.example.com/standard/id" }.
+
+JSON representation
+
+{
+  "code": integer,
+  "message": string,
+  "details": [
+    {
+      "@type": string,
+      field1: ...,
+      ...
+    }
+  ]
+}
+
+
+Context caching
+
+Python JavaScript Go REST
+
+In a typical AI workflow, you might pass the same input tokens over and over to a model. The Gemini API offers two different caching mechanisms:
+
+Implicit caching (automatic, no cost saving guarantee)
+Explicit caching (manual, cost saving guarantee)
+Implicit caching is enabled on Gemini 2.5 models by default. If a request contains content that is a cache hit, we automatically pass the cost savings back to you.
+
+Explicit caching is useful in cases where you want to guarantee cost savings, but with some added developer work.
+
+Implicit caching
+Implicit caching is enabled by default for all Gemini 2.5 models. We automatically pass on cost savings if your request hits caches. There is nothing you need to do in order to enable this. It is effective as of May 8th, 2025. The minimum input token count for context caching is 1,024 for 2.5 Flash and 2,048 for 2.5 Pro.
+
+To increase the chance of an implicit cache hit:
+
+Try putting large and common contents at the beginning of your prompt
+Try to send requests with similar prefix in a short amount of time
+You can see the number of tokens which were cache hits in the response object's usage_metadata field.
+
+Explicit caching
+Using the Gemini API explicit caching feature, you can pass some content to the model once, cache the input tokens, and then refer to the cached tokens for subsequent requests. At certain volumes, using cached tokens is lower cost than passing in the same corpus of tokens repeatedly.
+
+When you cache a set of tokens, you can choose how long you want the cache to exist before the tokens are automatically deleted. This caching duration is called the time to live (TTL). If not set, the TTL defaults to 1 hour. The cost for caching depends on the input token size and how long you want the tokens to persist.
+
+This section assumes that you've installed a Gemini SDK (or have curl installed) and that you've configured an API key, as shown in the quickstart.
+
+Generate content using a cache
+The following example shows how to generate content using a cached system instruction and video file.
+
+Videos
+PDFs
+
+import os
+import pathlib
+import requests
+import time
+
+from google import genai
+from google.genai import types
+
+client = genai.Client()
+
+# Download video file
+url = 'https://storage.googleapis.com/generativeai-downloads/data/SherlockJr._10min.mp4'
+path_to_video_file = pathlib.Path('SherlockJr._10min.mp4')
+if not path_to_video_file.exists():
+  with path_to_video_file.open('wb') as wf:
+    response = requests.get(url, stream=True)
+    for chunk in response.iter_content(chunk_size=32768):
+      wf.write(chunk)
+
+# Upload the video using the Files API
+video_file = client.files.upload(file=path_to_video_file)
+
+# Wait for the file to finish processing
+while video_file.state.name == 'PROCESSING':
+  print('Waiting for video to be processed.')
+  time.sleep(2)
+  video_file = client.files.get(name=video_file.name)
+
+print(f'Video processing complete: {video_file.uri}')
+
+# You must use an explicit version suffix: "-flash-001", not just "-flash".
+model='models/gemini-2.0-flash-001'
+
+# Create a cache with a 5 minute TTL
+cache = client.caches.create(
+    model=model,
+    config=types.CreateCachedContentConfig(
+      display_name='sherlock jr movie', # used to identify the cache
+      system_instruction=(
+          'You are an expert video analyzer, and your job is to answer '
+          'the user\'s query based on the video file you have access to.'
+      ),
+      contents=[video_file],
+      ttl="300s",
+  )
+)
+
+# Construct a GenerativeModel which uses the created cache.
+response = client.models.generate_content(
+  model = model,
+  contents= (
+    'Introduce different characters in the movie by describing '
+    'their personality, looks, and names. Also list the timestamps '
+    'they were introduced for the first time.'),
+  config=types.GenerateContentConfig(cached_content=cache.name)
+)
+
+print(response.usage_metadata)
+
+# The output should look something like this:
+#
+# prompt_token_count: 696219
+# cached_content_token_count: 696190
+# candidates_token_count: 214
+# total_token_count: 696433
+
+print(response.text)
+List caches
+It's not possible to retrieve or view cached content, but you can retrieve cache metadata (name, model, display_name, usage_metadata, create_time, update_time, and expire_time).
+
+To list metadata for all uploaded caches, use CachedContent.list():
+
+
+for cache in client.caches.list():
+  print(cache)
+To fetch the metadata for one cache object, if you know its name, use get:
+
+
+client.caches.get(name=name)
+Update a cache
+You can set a new ttl or expire_time for a cache. Changing anything else about the cache isn't supported.
+
+The following example shows how to update the ttl of a cache using client.caches.update().
+
+
+from google import genai
+from google.genai import types
+
+client.caches.update(
+  name = cache.name,
+  config  = types.UpdateCachedContentConfig(
+      ttl='300s'
+  )
+)
+To set the expiry time, it will accepts either a datetime object or an ISO-formatted datetime string (dt.isoformat(), like 2025-01-27T16:02:36.473528+00:00). Your time must include a time zone (datetime.utcnow() doesn't attach a time zone, datetime.now(datetime.timezone.utc) does attach a time zone).
+
+
+from google import genai
+from google.genai import types
+import datetime
+
+# You must use a time zone-aware time.
+in10min = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)
+
+client.caches.update(
+  name = cache.name,
+  config  = types.UpdateCachedContentConfig(
+      expire_time=in10min
+  )
+)
+Delete a cache
+The caching service provides a delete operation for manually removing content from the cache. The following example shows how to delete a cache:
+
+
+client.caches.delete(cache.name)
+Explicit caching using the OpenAI library
+If you're using an OpenAI library, you can enable explicit caching using the cached_content property on extra_body.
+
+When to use explicit caching
+Context caching is particularly well suited to scenarios where a substantial initial context is referenced repeatedly by shorter requests. Consider using context caching for use cases such as:
+
+Chatbots with extensive system instructions
+Repetitive analysis of lengthy video files
+Recurring queries against large document sets
+Frequent code repository analysis or bug fixing
+How explicit caching reduces costs
+Context caching is a paid feature designed to reduce overall operational costs. Billing is based on the following factors:
+
+Cache token count: The number of input tokens cached, billed at a reduced rate when included in subsequent prompts.
+Storage duration: The amount of time cached tokens are stored (TTL), billed based on the TTL duration of cached token count. There are no minimum or maximum bounds on the TTL.
+Other factors: Other charges apply, such as for non-cached input tokens and output tokens.
+For up-to-date pricing details, refer to the Gemini API pricing page. To learn how to count tokens, see the Token guide.
+
+Additional considerations
+Keep the following considerations in mind when using context caching:
+
+The minimum input token count for context caching is 1,024 for 2.5 Flash and 2,048 for 2.5 Pro. The maximum is the same as the maximum for the given model. (For more on counting tokens, see the Token guide).
+The model doesn't make any distinction between cached tokens and regular input tokens. Cached content is a prefix to the prompt.
+There are no special rate or usage limits on context caching; the standard rate limits for GenerateContent apply, and token limits include cached tokens.
+The number of cached tokens is returned in the usage_metadata from the create, get, and list operations of the cache service, and also in GenerateContent when using the cache.
+
+Generate streaming text by using Gemini and the Chat Completions API 
+
+bookmark_border
+Generate streaming text by using the Chat Completions API, which lets you send requests to Vertex AI models by using the OpenAI libraries.
+
+Explore further
+For detailed documentation that includes this code sample, see the following:
+
+Examples
+Generate content with the Vertex AI Gemini API
+Code sample
+Python
+Before trying this sample, follow the Python setup instructions in the Vertex AI quickstart using client libraries. For more information, see the Vertex AI Python API reference documentation.
+
+To authenticate to Vertex AI, set up Application Default Credentials. For more information, see Set up authentication for a local development environment.
+
+
+
+
+from google.auth import default
+import google.auth.transport.requests
+
+import openai
+
+# TODO(developer): Update and un-comment below lines
+# project_id = "PROJECT_ID"
+# location = "us-central1"
+
+# Programmatically get an access token
+credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+credentials.refresh(google.auth.transport.requests.Request())
+
+# OpenAI Client
+client = openai.OpenAI(
+    base_url=f"https://{location}-aiplatform.googleapis.com/v1/projects/{project_id}/locations/{location}/endpoints/openapi",
+    api_key=credentials.token,
+)
+
+response = client.chat.completions.create(
+    model="google/gemini-2.0-flash-001",
+    messages=[{"role": "user", "content": "Why is the sky blue?"}],
+    stream=True,
+)
+for chunk in response:
+    print(chunk)

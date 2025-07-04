@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhisPad - Smart Notes</title>
+    <link rel="icon" type="image/png" href="logos/logo.png">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="app-brand">
+            <img src="logos/logo.png" alt="WhisPad Logo" class="app-logo">
+            <h1 class="app-title">WhisPad</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn--outline btn--sm" id="download-all-btn" title="Download all notes">
+                <i class="fas fa-file-zipper"></i>&nbsp;Download All
+            </button>
+            <button class="btn btn--outline btn--sm" id="restore-btn" title="Restore notes from files">
+                <i class="fas fa-upload"></i>&nbsp;Restore
+            </button>
+            <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+    
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>My Notes</h2>
+                <button class="btn btn--primary btn--sm" id="new-note-btn">
+                    <i class="fas fa-plus"></i>&nbsp;New Note
+                </button>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" class="form-control" id="search-input" placeholder="Search notes...">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+
+            <div class="tag-filter-bar" id="tag-filter-bar"></div>
+
+            <div class="notes-list" id="notes-list">
+                <!-- Notes will be inserted here dynamically -->
+            </div>
+        </div>
+        
+        <!-- Main area -->
+        <div class="main-content">
+            <!-- Top toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-section">
+                <h3>Transcription Tools</h3>
+                <div class="transcription-controls">
+                    <button class="btn btn--primary" id="record-btn">
+                        <i class="fas fa-microphone" id="record-icon"></i>&nbsp;<span id="record-text">Record</span>
+                    </button>
+                    <div class="recording-status" id="recording-status">
+                        <span class="status-text">Ready to record</span>
+                        <div class="recording-indicator" id="recording-indicator"></div>
+                    </div>
+                    <button class="btn btn--outline btn--sm" id="config-btn" title="Configure providers">
+                        <i class="fas fa-cog"></i>&nbsp;Config
+                    </button>
+                    <button class="btn btn--outline btn--sm" id="styles-config-btn" title="Configure enhancement styles">
+                        <i class="fas fa-palette"></i>&nbsp;Styles
+                    </button>
+                </div>
+            </div>
+                
+                <div class="toolbar-section">
+                    <h3>AI Enhancement</h3>
+                    <div class="ai-controls" id="ai-controls">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="claridad" title="Improve text clarity">
+                            <span class="ai-icon">✨</span>&nbsp;Clarity
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academico_v2" title="Academic improvement with minimal changes, preserving author's words">
+                            <span class="ai-icon">🔍</span>&nbsp;Academic v2
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expandir" title="Expand ideas and add details">
+                            <span class="ai-icon">🔍</span>&nbsp;Expand
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="undo-ai-btn" title="Undo last AI change" disabled>
+                            <span class="ai-icon">↶</span>&nbsp;Undo
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Editing area -->
+            <div class="editor-container">
+                <div class="editor-header">
+                    <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
+                    <div class="editor-actions">
+                        <button class="btn btn--outline btn--sm" id="save-btn">
+                            <i class="fas fa-save"></i>&nbsp;Save
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="download-btn">
+                            <i class="fas fa-download"></i>&nbsp;Download
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="delete-btn">
+                            <i class="fas fa-trash"></i>&nbsp;Delete
+                        </button>
+                    </div>
+                </div>
+
+                <div class="note-tags" id="note-tags"></div>
+
+                <div class="formatting-toolbar">
+                    <button class="format-btn" data-format="h1" title="Heading 1">
+                        <span class="header-text">H1</span>
+                    </button>
+                    <button class="format-btn" data-format="h2" title="Heading 2">
+                        <span class="header-text">H2</span>
+                    </button>
+                    <button class="format-btn" data-format="h3" title="Heading 3">
+                        <span class="header-text">H3</span>
+                    </button>
+                    <div class="format-separator"></div>
+                    <button class="format-btn" data-format="bold" title="Bold">
+                        <i class="fas fa-bold"></i>
+                    </button>
+                    <button class="format-btn" data-format="italic" title="Italic">
+                        <i class="fas fa-italic"></i>
+                    </button>
+                    <button class="format-btn" data-format="underline" title="Underline">
+                        <i class="fas fa-underline"></i>
+                    </button>
+                    <div class="format-separator"></div>
+                    <button class="format-btn" data-format="ul" title="Bullet list">
+                        <i class="fas fa-list-ul"></i>
+                    </button>
+                    <button class="format-btn" data-format="ol" title="Numbered list">
+                        <i class="fas fa-list-ol"></i>
+                    </button>
+                </div>
+                
+                <div class="editor-content">
+                    <div class="editor" id="editor" contenteditable="true" placeholder="Start writing your note here..."></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation modal -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <h3>Confirm deletion</h3>
+            <p>Are you sure you want to delete this note? This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-delete">Cancel</button>
+                <button class="btn btn--primary" id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Processing overlay -->
+    <div class="processing-overlay" id="processing-overlay">
+        <div class="processing-content">
+            <div class="spinner"></div>
+            <p id="processing-text">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Configuration modal -->
+    <div class="modal" id="config-modal">
+        <div class="modal-content">
+            <h3>Provider Configuration</h3>
+            <div class="modal-body">
+                <div class="config-section">
+                    <h4>Transcription Provider</h4>
+                    <select class="form-control" id="transcription-provider">
+                        <option value="openai">OpenAI Whisper</option>
+                        <option value="local">Local Whisper (whisper.cpp)</option>
+                        <option value="google">Google Speech-to-Text</option>
+                    </select>
+                    <small class="form-text text-muted">
+                        Local Whisper provides complete privacy - no data leaves your device
+                    </small>
+                </div>
+                <div class="config-section">
+                    <h4>Post-processing Provider</h4>
+                    <select class="form-control" id="postprocess-provider">
+                        <option value="openai">OpenAI GPT</option>
+                        <option value="google">Google Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                    </select>
+                </div>
+                <div class="config-section">
+                    <h4>Model Configuration</h4>
+                    <div class="model-config">
+                        <label class="form-label">Transcription Model</label>
+                        <select class="form-control" id="transcription-model">
+                            <option value="whisper-1">Whisper-1 (Legacy) - Complete</option>
+                            <option value="gpt-4o-mini-transcribe" selected>GPT-4o Mini - Fast</option>
+                            <option value="gpt-4o-transcribe">GPT-4o - High Precision</option>
+                        </select>
+                    </div>
+                    <div class="model-config">
+                        <label class="form-label">Transcription Options</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="streaming-enabled" checked>
+                                <span class="checkmark"></span>
+                                Real-time streaming (for text enhancement only)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="model-config">
+                        <label class="form-label">Transcription Context (GPT-4o)</label>
+                        <textarea class="form-control" id="transcription-prompt" placeholder="E.g.: Technical conversation about artificial intelligence..." rows="2"></textarea>
+                    </div>
+                    <div class="model-config">
+                        <label class="form-label">Transcription Language</label>
+                        <select class="form-control" id="transcription-language">
+                            <option value="auto">Auto-detect</option>
+                            <option value="es">Spanish</option>
+                            <option value="en">English</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                            <option value="it">Italian</option>
+                            <option value="pt">Portuguese</option>
+                            <option value="ru">Russian</option>
+                            <option value="ja">Japanese</option>
+                            <option value="ko">Korean</option>
+                            <option value="zh">Chinese</option>
+                            <option value="ar">Arabic</option>
+                            <option value="hi">Hindi</option>
+                            <option value="tr">Turkish</option>
+                            <option value="pl">Polish</option>
+                            <option value="nl">Dutch</option>
+                            <option value="sv">Swedish</option>
+                            <option value="da">Danish</option>
+                            <option value="no">Norwegian</option>
+                            <option value="fi">Finnish</option>
+                        </select>
+                        <small>Select the language you will speak to improve accuracy</small>
+                    </div>
+                    <div class="model-config">
+                        <label class="form-label">Post-processing Model</label>
+                        <select class="form-control" id="postprocess-model">
+                            <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
+                            <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                            <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>
+                            <option value="gpt-4.1-mini">GPT-4.1 Mini (OpenAI)</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="config-section">
+                    <h4>Advanced Post-processing Configuration</h4>
+                    <div class="advanced-config">
+                        <div class="config-row">
+                            <div class="config-col">
+                                <label class="form-label">Temperature (Creativity)</label>
+                                <input type="range" class="range-control" id="temperature-range" min="0" max="1" step="0.1" value="0.3">
+                                <span class="range-value" id="temperature-value">0.3</span>
+                                <small>0.0 = More conservative, 1.0 = More creative</small>
+                            </div>
+                            <div class="config-col">
+                                <label class="form-label">Maximum Tokens</label>
+                                <select class="form-control" id="max-tokens">
+                                    <option value="500">500 tokens (Short responses)</option>
+                                    <option value="1000" selected>1000 tokens (Medium responses)</option>
+                                    <option value="2000">2000 tokens (Long responses)</option>
+                                    <option value="4000">4000 tokens (Very long responses)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="config-row">
+                            <div class="config-col">
+                                <label class="form-label">Top P (Nucleus Sampling)</label>
+                                <input type="range" class="range-control" id="top-p-range" min="0.1" max="1" step="0.05" value="0.95">
+                                <span class="range-value" id="top-p-value">0.95</span>
+                                <small>Controls vocabulary diversity</small>
+                            </div>
+                            <div class="config-col">
+                                <label class="form-label">Response Type</label>
+                                <select class="form-control" id="response-style">
+                                    <option value="factual">Factual (T:0.2, P:0.9)</option>
+                                    <option value="balanced" selected>Balanced (T:0.3, P:0.95)</option>
+                                    <option value="creative">Creative (T:0.7, P:0.95)</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-config">Cancel</button>
+                <button class="btn btn--primary" id="save-config">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Styles configuration modal -->
+    <div class="modal" id="styles-config-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>Enhancement Styles Configuration</h3>
+            <div class="modal-body">
+                <p class="modal-description">Select which styles to show in the AI enhancement interface and add new custom styles</p>
+                
+                <div class="styles-config-container">
+                    <!-- Add new style form -->
+                    <div class="add-style-form" id="add-style-form">
+                        <h4>Add New Style</h4>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label class="form-label" for="new-style-name">Style name:</label>
+                                <input type="text" class="form-control" id="new-style-name" placeholder="E.g.: Technical, Poetic, etc.">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label" for="new-style-icon">Icon (emoji):</label>
+                                <input type="text" class="form-control" id="new-style-icon" placeholder="🔧" maxlength="2">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-style-description">Description:</label>
+                            <input type="text" class="form-control" id="new-style-description" placeholder="Describe what this style does...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="new-style-prompt">AI Prompt:</label>
+                            <textarea class="form-control" id="new-style-prompt" rows="3" placeholder="Rewrite the following text using a style..."></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn--primary btn--sm" id="add-style-btn">
+                                <i class="fas fa-plus"></i>&nbsp;Add Style
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="styles-divider"></div>
+                    
+                    <div class="styles-grid" id="styles-grid">
+                        <!-- Styles will be generated dynamically here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-styles-config">Cancel</button>
+                <button class="btn btn--primary" id="save-styles-config">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restore notes modal -->
+    <div class="modal" id="restore-modal">
+        <div class="modal-content">
+            <h3>Restore Notes</h3>
+            <p>Drag and drop individual .md or .meta files below</p>
+            <div class="drop-zone" id="restore-drop-zone">Drop files here</div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-restore">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="backend-api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhisPad - Notas Inteligentes</title>
+    <link rel="icon" type="image/png" href="../logos/logo.png">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="app-brand">
+            <img src="../logos/logo.png" alt="WhisPad Logo" class="app-logo">
+            <h1 class="app-title">WhisPad</h1>
+        </div>
+    </header>
+    
+    <div class="app-container">
+        <!-- Barra lateral -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Mis Notas</h2>
+                <button class="btn btn--primary btn--sm" id="new-note-btn">
+                    <i class="fas fa-plus"></i>
+                    Nueva Nota
+                </button>
+            </div>
+            
+            <div class="search-container">
+                <input type="text" class="form-control" id="search-input" placeholder="Buscar notas...">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            
+            <div class="notes-list" id="notes-list">
+                <!-- Las notas se insertarán aquí dinámicamente -->
+            </div>
+        </div>
+        
+        <!-- Área principal -->
+        <div class="main-content">
+            <!-- Panel superior de herramientas -->
+            <div class="toolbar">
+                <div class="toolbar-section">
+                <h3>Herramientas de Transcripción</h3>
+                <div class="transcription-controls">
+                    <button class="btn btn--primary" id="record-btn">
+                        <i class="fas fa-microphone" id="record-icon"></i>
+                        <span id="record-text">Grabar</span>
+                    </button>
+                    <div class="recording-status" id="recording-status">
+                        <span class="status-text">Listo para grabar</span>
+                        <div class="recording-indicator" id="recording-indicator"></div>
+                    </div>
+                    <button class="btn btn--outline btn--sm" id="config-btn" title="Configurar proveedores">
+                        <i class="fas fa-cog"></i>
+                        Config
+                    </button>
+                </div>
+            </div>
+                
+                <div class="toolbar-section">
+                    <h3>Mejora con IA</h3>
+                    <div class="ai-controls">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="claridad" title="Mejorar claridad del texto">
+                            <span class="ai-icon">✨</span>
+                            Claridad
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academico_v2" title="Mejora académica con cambios mínimos, preservando palabras del autor">
+                            <span class="ai-icon">🎓</span>
+                            Académico v2
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expandir" title="Expandir ideas y añadir detalles">
+                            <span class="ai-icon">✚</span>
+                            Expandir
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="undo-ai-btn" title="Deshacer último cambio de IA" disabled>
+                            <span class="ai-icon">↶</span>
+                            Deshacer
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Área de edición -->
+            <div class="editor-container">
+                <div class="editor-header">
+                    <input type="text" class="form-control note-title" id="note-title" placeholder="Título de la nota...">
+                    <div class="editor-actions">
+                        <button class="btn btn--outline btn--sm" id="save-btn">
+                            <i class="fas fa-save"></i>
+                            Guardar
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="delete-btn">
+                            <i class="fas fa-trash"></i>
+                            Eliminar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="formatting-toolbar">
+                    <button class="format-btn" data-format="h1" title="Título 1">
+                        <span class="header-text">H1</span>
+                    </button>
+                    <button class="format-btn" data-format="h2" title="Título 2">
+                        <span class="header-text">H2</span>
+                    </button>
+                    <button class="format-btn" data-format="h3" title="Título 3">
+                        <span class="header-text">H3</span>
+                    </button>
+                    <div class="format-separator"></div>
+                    <button class="format-btn" data-format="bold" title="Negrita">
+                        <i class="fas fa-bold"></i>
+                    </button>
+                    <button class="format-btn" data-format="italic" title="Cursiva">
+                        <i class="fas fa-italic"></i>
+                    </button>
+                    <button class="format-btn" data-format="underline" title="Subrayado">
+                        <i class="fas fa-underline"></i>
+                    </button>
+                    <div class="format-separator"></div>
+                    <button class="format-btn" data-format="ul" title="Lista con viñetas">
+                        <i class="fas fa-list-ul"></i>
+                    </button>
+                    <button class="format-btn" data-format="ol" title="Lista numerada">
+                        <i class="fas fa-list-ol"></i>
+                    </button>
+                </div>
+                
+                <div class="editor-content">
+                    <div class="editor" id="editor" contenteditable="true" placeholder="Comienza a escribir tu nota aquí..."></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de confirmación -->
+    <div class="modal" id="delete-modal">
+        <div class="modal-content">
+            <h3>Confirmar eliminación</h3>
+            <p>¿Estás seguro de que quieres eliminar esta nota? Esta acción no se puede deshacer.</p>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-delete">Cancelar</button>
+                <button class="btn btn--primary" id="confirm-delete">Eliminar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Overlay de procesamiento -->
+    <div class="processing-overlay" id="processing-overlay">
+        <div class="processing-content">
+            <div class="spinner"></div>
+            <p id="processing-text">Procesando...</p>
+        </div>
+    </div>
+
+    <!-- Modal de configuración -->
+    <div class="modal" id="config-modal">
+        <div class="modal-content">
+            <h3>Configuración de Proveedores</h3>
+            <div class="config-section">
+                <h4>Proveedor de Transcripción</h4>
+                <select class="form-control" id="transcription-provider">
+                    <option value="openai">OpenAI Whisper</option>
+                    <option value="google">Google Speech-to-Text</option>
+                </select>
+            </div>
+            <div class="config-section">
+                <h4>Proveedor de Post-procesamiento</h4>
+                <select class="form-control" id="postprocess-provider">
+                    <option value="openai">OpenAI GPT</option>
+                    <option value="google">Google Gemini</option>
+                    <option value="openrouter">OpenRouter</option>
+                </select>
+            </div>
+            <div class="config-section">
+                <h4>Configuración de Modelos</h4>
+                <div class="model-config">
+                    <label class="form-label">Modelo de Transcripción</label>
+                    <select class="form-control" id="transcription-model">
+                        <option value="whisper-1">Whisper-1 (OpenAI)</option>
+                    </select>
+                </div>
+                <div class="model-config">
+                    <label class="form-label">Modelo de Post-procesamiento</label>
+                    <select class="form-control" id="postprocess-model">
+                        <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
+                        <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                        <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>
+                        <option value="gpt-4.1-mini">GPT-4.1 Mini (OpenAI)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="config-section">
+                <h4>Configuración Avanzada de Post-procesamiento</h4>
+                <div class="advanced-config">
+                    <div class="config-row">
+                        <div class="config-col">
+                            <label class="form-label">Temperatura (Creatividad)</label>
+                            <input type="range" class="range-control" id="temperature-range" min="0" max="1" step="0.1" value="0.3">
+                            <span class="range-value" id="temperature-value">0.3</span>
+                            <small>0.0 = Más conservador, 1.0 = Más creativo</small>
+                        </div>
+                        <div class="config-col">
+                            <label class="form-label">Máximo de Tokens</label>
+                            <select class="form-control" id="max-tokens">
+                                <option value="500">500 tokens (Respuestas cortas)</option>
+                                <option value="1000" selected>1000 tokens (Respuestas medianas)</option>
+                                <option value="2000">2000 tokens (Respuestas largas)</option>
+                                <option value="4000">4000 tokens (Respuestas muy largas)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="config-row">
+                        <div class="config-col">
+                            <label class="form-label">Top P (Nucleus Sampling)</label>
+                            <input type="range" class="range-control" id="top-p-range" min="0.1" max="1" step="0.05" value="0.95">
+                            <span class="range-value" id="top-p-value">0.95</span>
+                            <small>Controla la diversidad del vocabulario</small>
+                        </div>
+                        <div class="config-col">
+                            <label class="form-label">Tipo de Respuesta</label>
+                            <select class="form-control" id="response-style">
+                                <option value="factual">Factual (T:0.2, P:0.9)</option>
+                                <option value="balanced" selected>Balanceado (T:0.3, P:0.95)</option>
+                                <option value="creative">Creativo (T:0.7, P:0.95)</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="config-section">
+                <h4>API Keys</h4>
+                <div class="api-key-group">
+                    <label class="form-label">OpenAI API Key</label>
+                    <input type="password" class="form-control" id="openai-api-key" placeholder="sk-...">
+                </div>
+                <div class="api-key-group">
+                    <label class="form-label">Google AI API Key</label>
+                    <input type="password" class="form-control" id="google-api-key" placeholder="AI...">
+                </div>
+                <small>Tus API keys se guardan localmente en tu navegador</small>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-config">Cancelar</button>
+                <button class="btn btn--primary" id="save-config">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="backend-api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  whispad:
+    build: .
+    ports:
+      - "5037:5037"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - BACKEND_PORT=8000
+      - CORS_ORIGINS=http://localhost:5037,http://127.0.0.1:5037
+      - DEBUG=False
+    volumes:
+      - ./logs:/var/log/nginx
+      - ./saved_notes:/app/saved_notes
+      - ./whisper-cpp-models:/app/whisper-cpp-models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5037/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

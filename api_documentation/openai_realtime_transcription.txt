@@ -1,0 +1,246 @@
+Realtime transcription
+
+Beta
+
+==============================
+
+Learn how to transcribe audio in real-time with the Realtime API.
+
+You can use the Realtime API for transcription-only use cases, either with input from a microphone or from a file. For example, you can use it to generate subtitles or transcripts in real-time. With the transcription-only mode, the model will not generate responses.
+
+If you want the model to produce responses, you can use the Realtime API in [speech-to-speech conversation mode](/docs/guides/realtime-conversations).
+
+Realtime transcription sessions
+-------------------------------
+
+To use the Realtime API for transcription, you need to create a transcription session, connecting via [WebSockets](/docs/guides/realtime?use-case=transcription#connect-with-websockets) or [WebRTC](/docs/guides/realtime?use-case=transcription#connect-with-webrtc).
+
+Unlike the regular Realtime API sessions for conversations, the transcription sessions typically don't contain responses from the model.
+
+The transcription session object is also different from regular Realtime API sessions:
+
+```json
+{
+  object: "realtime.transcription_session",
+  id: string,
+  input_audio_format: string,
+  input_audio_transcription: [{
+    model: string,
+    prompt: string,
+    language: string
+  }],
+  turn_detection: {
+    type: "server_vad",
+    threshold: float,
+    prefix_padding_ms: integer,
+    silence_duration_ms: integer,
+  } | null,
+  input_audio_noise_reduction: {
+    type: "near_field" | "far_field"
+  },
+  include: list[string] | null
+}
+```
+
+Some of the additional properties transcription sessions support are:
+
+*   `input_audio_transcription.model`: The transcription model to use, currently `gpt-4o-transcribe`, `gpt-4o-mini-transcribe`, and `whisper-1` are supported
+*   `input_audio_transcription.prompt`: The prompt to use for the transcription, to guide the model (e.g. "Expect words related to technology")
+*   `input_audio_transcription.language`: The language to use for the transcription, ideally in ISO-639-1 format (e.g. "en", "fr"...) to improve accuracy and latency
+*   `input_audio_noise_reduction`: The noise reduction configuration to use for the transcription
+*   `include`: The list of properties to include in the transcription events
+
+Possible values for the input audio format are: `pcm16` (default), `g711_ulaw` and `g711_alaw`.
+
+You can find more information about the transcription session object in the [API reference](/docs/api-reference/realtime-sessions/transcription_session_object).
+
+Handling transcriptions
+-----------------------
+
+When using the Realtime API for transcription, you can listen for the `conversation.item.input_audio_transcription.delta` and `conversation.item.input_audio_transcription.completed` events.
+
+For `whisper-1` the `delta` event will contain full turn transcript, same as `completed` event. For `gpt-4o-transcribe` and `gpt-4o-mini-transcribe` the `delta` event will contain incremental transcripts as they are streamed out from the model.
+
+Here is an example transcription delta event:
+
+```json
+{
+  "event_id": "event_2122",
+  "type": "conversation.item.input_audio_transcription.delta",
+  "item_id": "item_003",
+  "content_index": 0,
+  "delta": "Hello,"
+}
+```
+
+Here is an example transcription completion event:
+
+```json
+{
+  "event_id": "event_2122",
+  "type": "conversation.item.input_audio_transcription.completed",
+  "item_id": "item_003",
+  "content_index": 0,
+  "transcript": "Hello, how are you?"
+}
+```
+
+Note that ordering between completion events from different speech turns is not guaranteed. You should use `item_id` to match these events to the `input_audio_buffer.committed` events and use `input_audio_buffer.committed.previous_item_id` to handle the ordering.
+
+To send audio data to the transcription session, you can use the `input_audio_buffer.append` event.
+
+You have 2 options:
+
+*   Use a streaming microphone input
+*   Stream data from a wav file
+
+Voice activity detection
+------------------------
+
+The Realtime API supports automatic voice activity detection (VAD). Enabled by default, VAD will control when the input audio buffer is committed, therefore when transcription begins.
+
+Read more about configuring VAD in our [Voice Activity Detection](/docs/guides/realtime-vad) guide.
+
+You can also disable VAD by setting the `turn_detection` property to `null`, and control when to commit the input audio on your end.
+
+Additional configurations
+-------------------------
+
+### Noise reduction
+
+You can use the `input_audio_noise_reduction` property to configure how to handle noise reduction in the audio stream.
+
+The possible values are:
+
+*   `near_field`: Use near-field noise reduction.
+*   `far_field`: Use far-field noise reduction.
+*   `null`: Disable noise reduction.
+
+The default value is `near_field`, and you can disable noise reduction by setting the property to `null`.
+
+### Using logprobs
+
+You can use the `include` property to include logprobs in the transcription events, using `item.input_audio_transcription.logprobs`.
+
+Those logprobs can be used to calculate the confidence score of the transcription.
+
+```json
+{
+  "type": "transcription_session.update",
+  "input_audio_format": "pcm16",
+  "input_audio_transcription": {
+    "model": "gpt-4o-transcribe",
+    "prompt": "",
+    "language": ""
+  },
+  "turn_detection": {
+    "type": "server_vad",
+    "threshold": 0.5,
+    "prefix_padding_ms": 300,
+    "silence_duration_ms": 500,
+  },
+  "input_audio_noise_reduction": {
+    "type": "near_field"
+  },
+  "include": [ 
+    "item.input_audio_transcription.logprobs",
+  ],
+}
+```
+
+
+
+Voice activity detection (VAD)
+
+Beta
+
+======================================
+
+Learn about automatic voice activity detection in the Realtime API.
+
+Voice activity detection (VAD) is a feature available in the Realtime API allowing to automatically detect when the user has started or stopped speaking. It is enabled by default in [speech-to-speech](/docs/guides/realtime-conversations) or [transcription](/docs/guides/realtime-transcription) Realtime sessions, but is optional and can be turned off.
+
+Overview
+--------
+
+When VAD is enabled, the audio is chunked automatically and the Realtime API sends events to indicate when the user has started or stopped speaking:
+
+*   `input_audio_buffer.speech_started`: The start of a speech turn
+*   `input_audio_buffer.speech_stopped`: The end of a speech turn
+
+You can use these events to handle speech turns in your application. For example, you can use them to manage conversation state or process transcripts in chunks.
+
+You can use the `turn_detection` property of the `session.update` event to configure how audio is chunked within each speech-to-text sample.
+
+There are two modes for VAD:
+
+*   `server_vad`: Automatically chunks the audio based on periods of silence.
+*   `semantic_vad`: Chunks the audio when the model believes based on the words said by the user that they have completed their utterance.
+
+The default value is `server_vad`.
+
+Read below to learn more about the different modes.
+
+Server VAD
+----------
+
+Server VAD is the default mode for Realtime sessions, and uses periods of silence to automatically chunk the audio.
+
+You can adjust the following properties to fine-tune the VAD settings:
+
+*   `threshold`: Activation threshold (0 to 1). A higher threshold will require louder audio to activate the model, and thus might perform better in noisy environments.
+*   `prefix_padding_ms`: Amount of audio (in milliseconds) to include before the VAD detected speech.
+*   `silence_duration_ms`: Duration of silence (in milliseconds) to detect speech stop. With shorter values turns will be detected more quickly.
+
+Here is an example VAD configuration:
+
+```json
+{
+  "type": "session.update",
+  "session": {
+    "turn_detection": {
+      "type": "server_vad",
+      "threshold": 0.5,
+      "prefix_padding_ms": 300,
+      "silence_duration_ms": 500,
+      "create_response": true, // only in conversation mode
+      "interrupt_response": true, // only in conversation mode
+    }
+  }
+}
+```
+
+Semantic VAD
+------------
+
+Semantic VAD is a new mode that uses a semantic classifier to detect when the user has finished speaking, based on the words they have uttered. This classifier scores the input audio based on the probability that the user is done speaking. When the probability is low, the model will wait for a timeout, whereas when it is high, there is no need to wait. For example, user audio that trails off with an "ummm..." would result in a longer timeout than a definitive statement.
+
+With this mode, the model is less likely to interrupt the user during a speech-to-speech conversation, or chunk a transcript before the user is done speaking.
+
+Semantic VAD can be activated by setting `turn_detection.type` to `semantic_vad` in a [`session.update`](/docs/api-reference/realtime-client-events/session/update) event.
+
+It can be configured like this:
+
+```json
+{
+  "type": "session.update",
+  "session": {
+    "turn_detection": {
+      "type": "semantic_vad",
+      "eagerness": "low" | "medium" | "high" | "auto", // optional
+      "create_response": true, // only in conversation mode
+      "interrupt_response": true, // only in conversation mode
+    }
+  }
+}
+```
+
+The optional `eagerness` property is a way to control how eager the model is to interrupt the user, tuning the maximum wait timeout. In transcription mode, even if the model doesn't reply, it affects how the audio is chunked.
+
+*   `auto` is the default value, and is equivalent to `medium`.
+*   `low` will let the user take their time to speak.
+*   `high` will chunk the audio as soon as possible.
+
+If you want the model to respond more often in conversation mode, or to return transcription events faster in transcription mode, you can set `eagerness` to `high`.
+
+On the other hand, if you want to let the user speak uninterrupted in conversation mode, or if you would like larger transcript chunks in transcription mode, you can set `eagerness` to `low`.
