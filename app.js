@@ -2273,59 +2273,53 @@ class NotesApp {
             
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            
+            let buffer = '';
+
             let improvedText = '';
             let chunkCount = 0;
-            
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
                     console.log('Stream completed. Total chunks:', chunkCount);
                     break;
                 }
-                
+
                 chunkCount++;
-                const chunk = decoder.decode(value);
-                console.log('Received chunk:', chunkCount, chunk);
-                const lines = chunk.split('\n');
-                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
                             const dataStr = line.slice(6).trim();
                             if (dataStr === '[DONE]') {
                                 console.log('Received [DONE] signal');
-                                break;
+                                const finalText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
                             }
-                            
+
                             const data = JSON.parse(dataStr);
                             console.log('Parsed data:', data);
-                            
+
                             if (data.content) {
                                 improvedText += data.content;
-                                // Limpiar y actualizar el texto en tiempo real
                                 const cleanedText = this.cleanAIResponse(improvedText);
                                 tempElement.textContent = cleanedText;
                                 console.log('Updated temp element with:', cleanedText.substring(0, 50) + '...');
-                                
-                                // Mantener la clase de generación durante el streaming
+
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
                                 console.log('Stream marked as done');
-                                // Asegurar que el texto final esté limpio
                                 const finalText = this.cleanAIResponse(improvedText);
                                 tempElement.textContent = finalText;
-                                console.log('Final text set:', finalText);
-                                
-                                // Cambiar a clase de texto completado
                                 tempElement.className = 'ai-generated-text';
-                                
-                                // Después de la transición, quitar todas las clases
-                                setTimeout(() => {
-                                    tempElement.className = '';
-                                }, 1000);
-                                
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
                                 return finalText;
                             }
                             if (data.error) {
@@ -2334,7 +2328,6 @@ class NotesApp {
                             }
                         } catch (parseError) {
                             console.warn('Failed to parse JSON:', parseError, 'Line:', line);
-                            // Ignorar errores de parsing de JSON
                             continue;
                         }
                     }
@@ -2379,54 +2372,53 @@ class NotesApp {
             
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            
+            let buffer = '';
+
             let improvedText = '';
             let chunkCount = 0;
-            
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
                     console.log('Gemini stream completed. Total chunks:', chunkCount);
                     break;
                 }
-                
+
                 chunkCount++;
-                const chunk = decoder.decode(value);
-                console.log('Received Gemini chunk:', chunkCount, chunk);
-                const lines = chunk.split('\n');
-                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
                             const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                console.log('Received Gemini [DONE] signal');
+                                const finalText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
+                            }
+
                             const data = JSON.parse(dataStr);
                             console.log('Parsed Gemini data:', data);
-                            
+
                             if (data.content) {
                                 improvedText += data.content;
-                                // Limpiar y actualizar el texto en tiempo real
                                 const cleanedText = this.cleanAIResponse(improvedText);
                                 tempElement.textContent = cleanedText;
                                 console.log('Updated Gemini temp element with:', cleanedText.substring(0, 50) + '...');
-                                
-                                // Mantener la clase de generación durante el streaming
+
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
                                 console.log('Gemini stream marked as done');
-                                // Asegurar que el texto final esté limpio
                                 const finalText = this.cleanAIResponse(improvedText);
                                 tempElement.textContent = finalText;
-                                console.log('Final Gemini text set:', finalText);
-                                
-                                // Cambiar a clase de texto completado
                                 tempElement.className = 'ai-generated-text';
-                                
-                                // Después de la transición, quitar todas las clases
-                                setTimeout(() => {
-                                    tempElement.className = '';
-                                }, 1000);
-                                
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
                                 return finalText;
                             }
                             if (data.error) {
@@ -2435,7 +2427,6 @@ class NotesApp {
                             }
                         } catch (parseError) {
                             console.warn('Failed to parse Gemini JSON:', parseError, 'Line:', line);
-                            // Ignorar errores de parsing de JSON
                             continue;
                         }
                     }
@@ -2481,59 +2472,53 @@ class NotesApp {
             
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            
+            let buffer = '';
+
             let improvedText = '';
             let chunkCount = 0;
-            
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) {
                     console.log('OpenRouter stream completed. Total chunks:', chunkCount);
                     break;
                 }
-                
+
                 chunkCount++;
-                const chunk = decoder.decode(value);
-                console.log('Received OpenRouter chunk:', chunkCount, chunk);
-                const lines = chunk.split('\n');
-                
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
                             const dataStr = line.slice(6).trim();
                             if (dataStr === '[DONE]') {
                                 console.log('Received OpenRouter [DONE] signal');
-                                break;
+                                const finalText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
                             }
-                            
+
                             const data = JSON.parse(dataStr);
                             console.log('Parsed OpenRouter data:', data);
-                            
+
                             if (data.content) {
                                 improvedText += data.content;
-                                // Limpiar y actualizar el texto en tiempo real
                                 const cleanedText = this.cleanAIResponse(improvedText);
                                 tempElement.textContent = cleanedText;
                                 console.log('Updated OpenRouter temp element with:', cleanedText.substring(0, 50) + '...');
-                                
-                                // Mantener la clase de generación durante el streaming
+
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
                                 console.log('OpenRouter stream marked as done');
-                                // Asegurar que el texto final esté limpio
                                 const finalText = this.cleanAIResponse(improvedText);
                                 tempElement.textContent = finalText;
-                                console.log('Final OpenRouter text set:', finalText);
-                                
-                                // Cambiar a clase de texto completado
                                 tempElement.className = 'ai-generated-text';
-                                
-                                // Después de la transición, quitar todas las clases
-                                setTimeout(() => {
-                                    tempElement.className = '';
-                                }, 1000);
-                                
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
                                 return finalText;
                             }
                             if (data.error) {
@@ -2542,7 +2527,6 @@ class NotesApp {
                             }
                         } catch (parseError) {
                             console.warn('Failed to parse OpenRouter JSON:', parseError, 'Line:', line);
-                            // Ignorar errores de parsing de JSON
                             continue;
                         }
                     }
