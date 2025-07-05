@@ -223,15 +223,20 @@ class NotesApp {
         
         // Recording
         document.getElementById('record-btn').addEventListener('click', () => {
+            if (!this.isRecording) {
+                this.captureInsertionRange();
+            }
             this.toggleRecording();
         });
         const mobileFab = document.getElementById('mobile-record-fab');
         if (mobileFab) {
             const handleMobileFab = () => {
+                if (!this.isRecording) {
+                    this.captureInsertionRange();
+                }
                 this.toggleRecording();
             };
             mobileFab.addEventListener('click', handleMobileFab);
-            mobileFab.addEventListener('touchstart', handleMobileFab);
         }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
@@ -418,6 +423,19 @@ class NotesApp {
         editorContent.appendChild(marker);
     }
 
+    captureInsertionRange() {
+        const editor = document.getElementById('editor');
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0 && editor.contains(selection.getRangeAt(0).startContainer)) {
+            this.insertionRange = selection.getRangeAt(0).cloneRange();
+        } else if (!this.insertionRange) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            this.insertionRange = range.cloneRange();
+        }
+    }
+
     // Show or hide the editor depending on whether a note is selected
     updateEditorVisibility() {
         const container = document.querySelector('.editor-container');
@@ -584,25 +602,29 @@ class NotesApp {
         
         // Mostrar/ocultar opciones GPT-4o según el modelo seleccionado
         this.updateTranscriptionOptions();
-        
+
         const modal = document.getElementById('config-modal');
+        this.hideMobileFab();
         modal.classList.add('active');
     }
 
     hideConfigModal() {
         const modal = document.getElementById('config-modal');
         modal.classList.remove('active');
+        this.showMobileFab();
     }
     
     showStylesConfigModal() {
         this.renderStylesConfig();
         const modal = document.getElementById('styles-config-modal');
+        this.hideMobileFab();
         modal.classList.add('active');
     }
 
     hideStylesConfigModal() {
         const modal = document.getElementById('styles-config-modal');
         modal.classList.remove('active');
+        this.showMobileFab();
         
         // Limpiar formulario de nuevo estilo
         document.getElementById('new-style-name').value = '';
@@ -1029,23 +1051,27 @@ class NotesApp {
 
     showRestoreModal() {
         const modal = document.getElementById('restore-modal');
+        this.hideMobileFab();
         modal.classList.add('active');
     }
 
     hideRestoreModal() {
         const modal = document.getElementById('restore-modal');
         modal.classList.remove('active');
+        this.showMobileFab();
     }
 
     showUploadModelsModal() {
         const modal = document.getElementById('upload-model-modal');
+        this.hideMobileFab();
         modal.classList.add('active');
     }
 
     hideUploadModelsModal() {
         const modal = document.getElementById('upload-model-modal');
         modal.classList.remove('active');
-        
+        this.showMobileFab();
+
         // Reset the progress section
         const progressSection = document.getElementById('upload-progress-section');
         const fileUploadList = document.getElementById('file-upload-list');
@@ -2825,12 +2851,14 @@ class NotesApp {
     // Modales y overlays
     showDeleteModal() {
         const modal = document.getElementById('delete-modal');
+        this.hideMobileFab();
         modal.classList.add('active');
     }
-    
+
     hideDeleteModal() {
         const modal = document.getElementById('delete-modal');
         modal.classList.remove('active');
+        this.showMobileFab();
     }
     
     showProcessingOverlay(text) {
@@ -3141,6 +3169,15 @@ class NotesApp {
 
         const shouldShow = this.config.showMobileRecordButton !== false && window.innerWidth <= 768;
         mobileFab.classList.toggle('hidden', !shouldShow);
+    }
+
+    hideMobileFab() {
+        const mobileFab = document.getElementById('mobile-record-fab');
+        if (mobileFab) mobileFab.classList.add('hidden');
+    }
+
+    showMobileFab() {
+        this.updateMobileFabVisibility();
     }
 }
 
