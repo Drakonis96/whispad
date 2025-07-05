@@ -190,8 +190,10 @@ class NotesApp {
         const moveButtons = () => {
             if (window.innerWidth <= 900) {
                 buttons.forEach(btn => mobileContainer.appendChild(btn));
+                mobileContainer.style.display = 'flex';
             } else {
                 buttons.forEach(btn => headerActions.insertBefore(btn, hamburger));
+                mobileContainer.style.display = 'none';
             }
         };
 
@@ -1615,17 +1617,15 @@ class NotesApp {
     }
     
     async setupDefaultNote() {
-        if (this.notes.length > 0) {
-            await this.selectNote(this.notes[0].id);
-        } else {
-            document.getElementById('note-title').value = '';
-            document.getElementById('editor').innerHTML = '';
-            document.getElementById('save-btn').disabled = true;
-            document.getElementById('download-btn').disabled = true;
-            document.getElementById('delete-btn').disabled = true;
-            this.currentNote = null;
-            this.updateEditorVisibility();
-        }
+        // Do not auto select any note. Keep the editor hidden until the user
+        // chooses one.
+        document.getElementById('note-title').value = '';
+        document.getElementById('editor').innerHTML = '';
+        document.getElementById('save-btn').disabled = true;
+        document.getElementById('download-btn').disabled = true;
+        document.getElementById('delete-btn').disabled = true;
+        this.currentNote = null;
+        this.updateEditorVisibility();
     }
     
     // Renderizado de lista
