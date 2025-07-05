@@ -1159,6 +1159,31 @@ def upload_note():
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
 
+@app.route('/api/upload-model', methods=['POST'])
+def upload_model():
+    """Upload a whisper.cpp model file to the whisper-cpp-models directory"""
+    try:
+        if 'model' not in request.files:
+            return jsonify({"error": "No se recibió archivo"}), 400
+
+        model_file = request.files['model']
+        if model_file.filename == '':
+            return jsonify({"error": "Tipo de archivo no válido"}), 400
+
+        ext = os.path.splitext(model_file.filename)[1].lower()
+        if ext != '.bin':
+            return jsonify({"error": "Tipo de archivo no válido"}), 400
+
+        models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+        os.makedirs(models_dir, exist_ok=True)
+        filepath = os.path.join(models_dir, model_file.filename)
+        overwritten = os.path.exists(filepath)
+        model_file.save(filepath)
+
+        return jsonify({"success": True, "filename": model_file.filename, "overwritten": overwritten})
+    except Exception as e:
+        return jsonify({"error": f"Error al subir modelo: {str(e)}"}), 500
+
 @app.route('/api/get-note', methods=['GET'])
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""

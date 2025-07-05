@@ -86,10 +86,10 @@ class NotesApp {
         
         // Provider configuration
         this.config = {
-            transcriptionProvider: 'openai',
-            postprocessProvider: 'openai',
-            transcriptionModel: 'gpt-4o-mini-transcribe', // Cambiar a GPT-4o mini por defecto
-            postprocessModel: 'gpt-4o-mini',
+            transcriptionProvider: '',
+            postprocessProvider: '',
+            transcriptionModel: '',
+            postprocessModel: '',
             transcriptionLanguage: 'auto', // auto-detectar por defecto
             // Nuevas opciones para GPT-4o transcription
             streamingEnabled: true,
@@ -263,7 +263,16 @@ class NotesApp {
             this.hideRestoreModal();
         });
 
+        document.getElementById('upload-models-btn').addEventListener('click', () => {
+            this.showUploadModelsModal();
+        });
+
+        document.getElementById('cancel-upload-models').addEventListener('click', () => {
+            this.hideUploadModelsModal();
+        });
+
         this.setupRestoreDropZone();
+        this.setupUploadModelsDropZone();
         
         // Modal de confirmación
         document.getElementById('cancel-delete').addEventListener('click', () => {
@@ -465,8 +474,8 @@ class NotesApp {
     showConfigModal() {
         document.getElementById('transcription-provider').value = this.config.transcriptionProvider;
         document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
-        document.getElementById('transcription-model').value = this.config.transcriptionModel || 'gpt-4o-mini-transcribe';
-        document.getElementById('postprocess-model').value = this.config.postprocessModel || 'gpt-4o-mini';
+        document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
+        document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
         
         // Nuevas opciones para GPT-4o
@@ -937,8 +946,19 @@ class NotesApp {
         modal.classList.remove('active');
     }
 
+    showUploadModelsModal() {
+        const modal = document.getElementById('upload-model-modal');
+        modal.classList.add('active');
+    }
+
+    hideUploadModelsModal() {
+        const modal = document.getElementById('upload-model-modal');
+        modal.classList.remove('active');
+    }
+
     setupRestoreDropZone() {
         const dropZone = document.getElementById('restore-drop-zone');
+        const fileInput = document.getElementById('restore-file-input');
         if (!dropZone) return;
         ['dragenter', 'dragover'].forEach(evt => {
             dropZone.addEventListener(evt, e => {
@@ -952,11 +972,50 @@ class NotesApp {
                 dropZone.classList.remove('highlight');
             });
         });
-        dropZone.addEventListener('drop', e => this.handleRestoreDrop(e));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            this.handleRestoreFiles(e.dataTransfer.files);
+        });
+        if (fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', e => {
+                this.handleRestoreFiles(e.target.files);
+                fileInput.value = '';
+            });
+        }
     }
 
-    async handleRestoreDrop(e) {
-        const files = Array.from(e.dataTransfer.files);
+    setupUploadModelsDropZone() {
+        const dropZone = document.getElementById('upload-model-drop-zone');
+        const fileInput = document.getElementById('upload-model-file-input');
+        if (!dropZone) return;
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                dropZone.classList.add('highlight');
+            });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                dropZone.classList.remove('highlight');
+            });
+        });
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            this.handleModelFiles(e.dataTransfer.files);
+        });
+        if (fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', e => {
+                this.handleModelFiles(e.target.files);
+                fileInput.value = '';
+            });
+        }
+    }
+
+    async handleRestoreFiles(fileList) {
+        const files = Array.from(fileList);
         if (!files.length) return;
 
         const mdFiles = files.filter(f => f.name.toLowerCase().endsWith('.md') || f.name.toLowerCase().endsWith('.meta'));
@@ -992,6 +1051,43 @@ class NotesApp {
         const formData = new FormData();
         formData.append('note', file, file.name);
         const response = await fetch('/api/upload-note', { method: 'POST', body: formData });
+        if (!response.ok) {
+            throw new Error('Upload failed');
+        }
+        return await response.json();
+    }
+
+    async handleModelFiles(fileList) {
+        const files = Array.from(fileList);
+        if (!files.length) return;
+
+        const modelFiles = files.filter(f => f.name.toLowerCase().endsWith('.bin'));
+        const invalid = files.filter(f => !f.name.toLowerCase().endsWith('.bin'));
+        invalid.forEach(f => this.showNotification(`${f.name} rejected`, 'error'));
+
+        for (const file of modelFiles) {
+            try {
+                const result = await this.uploadModelFile(file);
+                if (result.success) {
+                    if (result.overwritten) {
+                        this.showNotification(`${file.name} overwritten`, 'warning');
+                    } else {
+                        this.showNotification(`${file.name} uploaded`, 'success');
+                    }
+                } else {
+                    this.showNotification(`Error uploading ${file.name}`, 'error');
+                }
+            } catch (err) {
+                console.error('Upload error', err);
+                this.showNotification(`Error uploading ${file.name}`, 'error');
+            }
+        }
+    }
+
+    async uploadModelFile(file) {
+        const formData = new FormData();
+        formData.append('model', file, file.name);
+        const response = await fetch('/api/upload-model', { method: 'POST', body: formData });
         if (!response.ok) {
             throw new Error('Upload failed');
         }
@@ -1286,8 +1382,8 @@ class NotesApp {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">📝</div>
-                    <h3>No hay notas</h3>
-                    <p>Crea tu primera nota para comenzar</p>
+                    <h3>No chats yet</h3>
+                    <p>Create your first chat to get started</p>
                 </div>
             `;
             return;
@@ -1451,7 +1547,7 @@ class NotesApp {
 
     async transcribeWithOpenAI(audioBlob) {
         try {
-            const model = this.config.transcriptionModel || 'whisper-1';
+            const model = this.config.transcriptionModel;
             
             // Usar el método unificado para todos los modelos
             console.log('🎯 Using unified transcription');
@@ -1643,8 +1739,8 @@ class NotesApp {
         }
 
         // Verificar configuración según el modelo seleccionado
-        const provider = this.config.postprocessProvider || 'openai';
-        const model = this.config.postprocessModel || 'gpt-4o-mini';
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
@@ -1979,7 +2075,7 @@ class NotesApp {
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
             
-            const model = this.config.postprocessModel || 'google/gemma-3-27b-it:free';
+            const model = this.config.postprocessModel;
             return await backendAPI.improveText(text, action, 'openrouter', false, model, customPrompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
@@ -1994,7 +2090,7 @@ class NotesApp {
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
             
-            const model = this.config.postprocessModel || 'google/gemma-3-27b-it:free';
+            const model = this.config.postprocessModel;
             const response = await backendAPI.improveText(text, action, 'openrouter', true, model, customPrompt);
             
             if (!response.body) {
@@ -2501,8 +2597,13 @@ class NotesApp {
         const postprocessProvider = document.getElementById('postprocess-provider').value;
         const postprocessModelSelect = document.getElementById('postprocess-model');
         
-        // Limpiar opciones actuales
+        // Limpiar opciones actuales y añadir placeholder
         postprocessModelSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select model';
+        placeholder.disabled = true;
+        postprocessModelSelect.appendChild(placeholder);
         
         // Definir modelos por proveedor
         const modelsByProvider = {
@@ -2535,13 +2636,13 @@ class NotesApp {
             postprocessModelSelect.appendChild(option);
         });
         
-        // Seleccionar el primer modelo disponible si el actual no está disponible
+        // Seleccionar el modelo almacenado si está disponible
         const currentModel = this.config.postprocessModel;
         const availableValues = models.map(m => m.value);
         if (availableValues.includes(currentModel)) {
             postprocessModelSelect.value = currentModel;
-        } else if (models.length > 0) {
-            postprocessModelSelect.value = models[0].value;
+        } else {
+            postprocessModelSelect.value = '';
         }
     }
     
@@ -2549,6 +2650,11 @@ class NotesApp {
         const provider = document.getElementById('transcription-provider').value;
         const modelSelect = document.getElementById('transcription-model');
         modelSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select model';
+        placeholder.disabled = true;
+        modelSelect.appendChild(placeholder);
 
         // Get available providers from backend status
         let models = [];
@@ -2578,12 +2684,11 @@ class NotesApp {
             modelSelect.appendChild(option);
         });
 
-        // Set value to config or first available
+        // Establecer modelo si el almacenado está disponible
         if (models.includes(this.config.transcriptionModel)) {
             modelSelect.value = this.config.transcriptionModel;
-        } else if (models.length > 0) {
-            modelSelect.value = models[0];
-            this.config.transcriptionModel = models[0];
+        } else {
+            modelSelect.value = '';
         }
     }
     
