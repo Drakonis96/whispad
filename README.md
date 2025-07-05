@@ -16,12 +16,14 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
-- Compatible with multiple providers: OpenAI, Google and local whisper.cpp.
-- Ability to upload local (.bin) whisper.cpp models directly from the interface.
-- Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
+- Write and edit markdown notes.
 - Integrated note manager: create, search, tag, save, restore and download in Markdown format.
+- Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
+- A blue marker indicating where the transcription will be inserted.
+- Compatible with multiple providers: OpenAI, Google and local whisper.cpp (tiny model included on this repo, but you can download small, base, medium or large)
+- Ability to upload local (.bin) whisper.cpp models directly from the interface.
 - Export all notes in a ZIP file with one click.
-- Modern mobile-friendly interface that avoids zooming when typing and shows a blue marker indicating where the transcription will be inserted.
+- Mobile-friendly interface.
 
 ## Quick Setup
 If you are not comfortable with the terminal, the easiest method is to use **Docker Desktop**. You only need to install Docker, download this project and run it.
