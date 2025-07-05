@@ -223,15 +223,20 @@ class NotesApp {
         
         // Recording
         document.getElementById('record-btn').addEventListener('click', () => {
+            if (!this.isRecording) {
+                this.captureInsertionRange();
+            }
             this.toggleRecording();
         });
         const mobileFab = document.getElementById('mobile-record-fab');
         if (mobileFab) {
             const handleMobileFab = () => {
+                if (!this.isRecording) {
+                    this.captureInsertionRange();
+                }
                 this.toggleRecording();
             };
             mobileFab.addEventListener('click', handleMobileFab);
-            mobileFab.addEventListener('touchstart', handleMobileFab);
         }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
@@ -416,6 +421,19 @@ class NotesApp {
         marker.style.top = `${rect.top - editorRect.top + editorContent.scrollTop}px`;
         marker.style.left = `${rect.left - editorRect.left + editorContent.scrollLeft}px`;
         editorContent.appendChild(marker);
+    }
+
+    captureInsertionRange() {
+        const editor = document.getElementById('editor');
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0 && editor.contains(selection.getRangeAt(0).startContainer)) {
+            this.insertionRange = selection.getRangeAt(0).cloneRange();
+        } else if (!this.insertionRange) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            this.insertionRange = range.cloneRange();
+        }
     }
 
     // Show or hide the editor depending on whether a note is selected
