@@ -95,3 +95,23 @@ Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY
 
 With these instructions you should have WhisPad running in just a few minutes with or without Docker. Enjoy fast transcription and all the benefits of organizing your ideas in one place!
 
+## Screenshots
+
+Here are some screenshots of WhisPad in action:
+
+<p align="center">
+  <img src="screenshots/screenshot1.png" alt="Main interface" width="700"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/screenshot2.png" alt="Editing notes" width="700"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/screenshot3.png" alt="Upload models" width="700"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/screenshot4.png" alt="Transcribed notes list" width="700"/>
+</p>
+
