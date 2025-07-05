@@ -785,6 +785,11 @@ select.form-control {
   display: none;
 }
 
+/* Hide editor when no note selected */
+.editor-container.hidden {
+  display: none;
+}
+
 /* Accessibility */
 .sr-only {
   position: absolute;
