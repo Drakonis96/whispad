@@ -77,6 +77,7 @@ class NotesApp {
         this.searchTerm = '';
         this.selectedText = '';
         this.selectedRange = null;
+        this.insertionRange = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
         
@@ -98,7 +99,8 @@ class NotesApp {
             temperature: 0.3,
             maxTokens: 1000,
             topP: 0.95,
-            responseStyle: 'balanced'
+            responseStyle: 'balanced',
+            showMobileRecordButton: true
         };
         
         // Visible styles configuration
@@ -126,6 +128,7 @@ class NotesApp {
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
         this.setupMobileHeaderActions();
+        this.updateMobileFabVisibility();
 
         // Migrate existing notes without ID
         await this.migrateExistingNotes();
@@ -198,7 +201,11 @@ class NotesApp {
         };
 
         moveButtons();
-        window.addEventListener('resize', moveButtons);
+        this.updateMobileFabVisibility();
+        window.addEventListener('resize', () => {
+            moveButtons();
+            this.updateMobileFabVisibility();
+        });
     }
     
     // Configurar event listeners
@@ -218,6 +225,14 @@ class NotesApp {
         document.getElementById('record-btn').addEventListener('click', () => {
             this.toggleRecording();
         });
+        const mobileFab = document.getElementById('mobile-record-fab');
+        if (mobileFab) {
+            const handleMobileFab = () => {
+                this.toggleRecording();
+            };
+            mobileFab.addEventListener('click', handleMobileFab);
+            mobileFab.addEventListener('touchstart', handleMobileFab);
+        }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
         // document.querySelectorAll('.ai-btn').forEach(btn => {
@@ -367,6 +382,7 @@ class NotesApp {
         
         if (this.selectedText && selection.rangeCount > 0) {
             this.selectedRange = selection.getRangeAt(0).cloneRange();
+            this.insertionRange = this.selectedRange.cloneRange();
             this.updateAIButtonsState(false);
             console.log('Text selected, AI buttons enabled');
         } else {
@@ -387,6 +403,7 @@ class NotesApp {
 
         const range = selection.getRangeAt(0).cloneRange();
         range.collapse(true);
+        this.insertionRange = range.cloneRange();
         const rect = range.getClientRects()[0];
         if (!rect) return;
 
@@ -517,6 +534,7 @@ class NotesApp {
         const maxTokens = parseInt(document.getElementById('max-tokens').value);
         const topP = parseFloat(document.getElementById('top-p-range').value);
         const responseStyle = document.getElementById('response-style').value;
+        const showMobileRecordButton = document.getElementById('show-mobile-record').checked;
 
         this.config = {
             ...this.config, // Mantener otras configuraciones como API keys del .env
@@ -530,10 +548,12 @@ class NotesApp {
             temperature,
             maxTokens,
             topP,
-            responseStyle
+            responseStyle,
+            showMobileRecordButton
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
+        this.updateMobileFabVisibility();
         this.hideConfigModal();
         this.showNotification('Configuration saved');
     }
@@ -554,6 +574,7 @@ class NotesApp {
         document.getElementById('max-tokens').value = this.config.maxTokens || 1000;
         document.getElementById('top-p-range').value = this.config.topP || 0.95;
         document.getElementById('response-style').value = this.config.responseStyle || 'balanced';
+        document.getElementById('show-mobile-record').checked = this.config.showMobileRecordButton !== false;
         
         // Actualizar valores mostrados
         this.updateRangeValues();
@@ -1799,12 +1820,17 @@ class NotesApp {
             const recordBtn = document.getElementById('record-btn');
             const recordIcon = document.getElementById('record-icon');
             const recordText = document.getElementById('record-text');
+            const mobileFab = document.getElementById('mobile-record-fab');
             const recordingStatus = document.getElementById('recording-status');
             const recordingIndicator = document.getElementById('recording-indicator');
             
             recordBtn.classList.add('btn--error');
             recordIcon.className = 'fas fa-stop';
             recordText.textContent = 'Stop';
+            if (mobileFab) {
+                mobileFab.classList.add('btn--error');
+                mobileFab.innerHTML = '<i class="fas fa-stop"></i>';
+            }
             recordingStatus.querySelector('.status-text').textContent = 'Recording...';
             recordingIndicator.classList.add('active');
 
@@ -1822,12 +1848,17 @@ class NotesApp {
             const recordBtn = document.getElementById('record-btn');
             const recordIcon = document.getElementById('record-icon');
             const recordText = document.getElementById('record-text');
+            const mobileFab = document.getElementById('mobile-record-fab');
             const recordingStatus = document.getElementById('recording-status');
             const recordingIndicator = document.getElementById('recording-indicator');
             
             recordBtn.classList.remove('btn--error');
             recordIcon.className = 'fas fa-microphone';
             recordText.textContent = 'Record';
+            if (mobileFab) {
+                mobileFab.classList.remove('btn--error');
+                mobileFab.innerHTML = '<i class="fas fa-microphone"></i>';
+            }
             recordingStatus.querySelector('.status-text').textContent = 'Processing...';
             recordingIndicator.classList.remove('active');
         }
@@ -2006,9 +2037,12 @@ class NotesApp {
         // Obtener posición del cursor o insertar al final
         const selection = window.getSelection();
         let range;
-        
+
         if (selection.rangeCount > 0) {
             range = selection.getRangeAt(0);
+            this.insertionRange = range.cloneRange();
+        } else if (this.insertionRange) {
+            range = this.insertionRange.cloneRange();
         } else {
             range = document.createRange();
             range.selectNodeContents(editor);
@@ -2022,6 +2056,7 @@ class NotesApp {
         range.setEndAfter(textNode);
         selection.removeAllRanges();
         selection.addRange(range);
+        this.insertionRange = range.cloneRange();
 
         // Remove insertion marker after inserting text
         const marker = document.getElementById('insertion-marker');
@@ -3098,6 +3133,14 @@ class NotesApp {
             document.getElementById('streaming-enabled').checked = false;
             document.getElementById('transcription-prompt').value = '';
         }
+    }
+
+    updateMobileFabVisibility() {
+        const mobileFab = document.getElementById('mobile-record-fab');
+        if (!mobileFab) return;
+
+        const shouldShow = this.config.showMobileRecordButton !== false && window.innerWidth <= 768;
+        mobileFab.classList.toggle('hidden', !shouldShow);
     }
 }
 

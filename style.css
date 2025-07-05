@@ -2176,3 +2176,34 @@ select.form-control {
     transform: translate(-50%, -50%);
     z-index: 50;
 }
+
+/* Floating record button shown only on mobile */
+#mobile-record-fab {
+    position: fixed;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    color: #fff;
+    border: none;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    z-index: 1100;
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+
+#mobile-record-fab.btn--error {
+    background-color: var(--color-error);
+}
+
+@media (max-width: 768px) {
+    #mobile-record-fab {
+        display: flex;
+    }
+}
