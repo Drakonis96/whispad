@@ -159,27 +159,18 @@
     <div class="modal" id="config-modal">
         <div class="modal-content">
             <h3>Configuración de Proveedores</h3>
-            <div class="config-section">
-                <h4>Proveedor de Transcripción</h4>
-                <select class="form-control" id="transcription-provider">
-                    <option value="" selected>Seleccionar proveedor</option>
-                    <option value="openai">OpenAI</option>
-                    <option value="google">Google Speech-to-Text</option>
-                </select>
-            </div>
-            <div class="config-section">
-                <h4>Proveedor de Post-procesamiento</h4>
-                <select class="form-control" id="postprocess-provider">
-                    <option value="" selected>Seleccionar proveedor</option>
-                    <option value="openai">OpenAI GPT</option>
-                    <option value="google">Google Gemini</option>
-                    <option value="openrouter">OpenRouter</option>
-                </select>
-            </div>
-            <div class="config-section">
-                <h4>Configuración de Modelos</h4>
-                <div class="model-config">
-                    <label class="form-label">Modelo de Transcripción</label>
+            <div class="modal-body">
+                <h4 class="config-group-title">Configuración de Transcripción</h4>
+                <div class="config-section">
+                    <h5>Proveedor de Transcripción</h5>
+                    <select class="form-control" id="transcription-provider">
+                        <option value="" selected>Seleccionar proveedor</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="google">Google Speech-to-Text</option>
+                    </select>
+                </div>
+                <div class="config-section">
+                    <h5>Modelo de Transcripción</h5>
                     <select class="form-control" id="transcription-model">
                         <option value="" selected>Seleccionar modelo</option>
                         <option value="whisper-1">Whisper-1 (OpenAI)</option>
@@ -187,8 +178,19 @@
                         <option value="gpt-4o-transcribe">GPT-4o - High Precision</option>
                     </select>
                 </div>
-                <div class="model-config">
-                    <label class="form-label">Modelo de Post-procesamiento</label>
+
+                <h4 class="config-group-title">Configuración de Post-procesamiento</h4>
+                <div class="config-section">
+                    <h5>Proveedor de Post-procesamiento</h5>
+                    <select class="form-control" id="postprocess-provider">
+                        <option value="" selected>Seleccionar proveedor</option>
+                        <option value="openai">OpenAI GPT</option>
+                        <option value="google">Google Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                    </select>
+                </div>
+                <div class="config-section">
+                    <h5>Modelo de Post-procesamiento</h5>
                     <select class="form-control" id="postprocess-model">
                         <option value="" selected>Seleccionar modelo</option>
                         <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
@@ -198,10 +200,9 @@
                         <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
                     </select>
                 </div>
-            </div>
-            <div class="config-section">
-                <h4>Configuración Avanzada de Post-procesamiento</h4>
-                <div class="advanced-config">
+                <div class="config-section">
+                    <h5>Configuración Avanzada de Post-procesamiento</h5>
+                    <div class="advanced-config">
                     <div class="config-row">
                         <div class="config-col">
                             <label class="form-label">Temperatura (Creatividad)</label>
@@ -236,24 +237,36 @@
                             </select>
                         </div>
                     </div>
+                    </div>
                 </div>
-            </div>
-            <div class="config-section">
-                <h4>API Keys</h4>
-                <div class="api-key-group">
-                    <label class="form-label">OpenAI API Key</label>
-                    <input type="password" class="form-control" id="openai-api-key" placeholder="sk-...">
+                <div class="config-section">
+                    <h5>API Keys</h5>
+                    <div class="api-key-group">
+                        <label class="form-label">OpenAI API Key</label>
+                        <input type="password" class="form-control" id="openai-api-key" placeholder="sk-...">
+                    </div>
+                    <div class="api-key-group">
+                        <label class="form-label">Google AI API Key</label>
+                        <input type="password" class="form-control" id="google-api-key" placeholder="AI...">
+                    </div>
+                    <small>Tus API keys se guardan localmente en tu navegador</small>
                 </div>
-                <div class="api-key-group">
-                    <label class="form-label">Google AI API Key</label>
-                    <input type="password" class="form-control" id="google-api-key" placeholder="AI...">
+
+                <h4 class="config-group-title">Opciones de Interfaz</h4>
+                <div class="config-section">
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="show-mobile-record" checked>
+                            <span class="checkmark"></span>
+                            Mostrar botón flotante de grabación en móvil
+                        </label>
+                    </div>
                 </div>
-                <small>Tus API keys se guardan localmente en tu navegador</small>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn--outline" id="cancel-config">Cancelar</button>
-                <button class="btn btn--primary" id="save-config">Guardar</button>
-            </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn--outline" id="cancel-config">Cancelar</button>
+                    <button class="btn btn--primary" id="save-config">Guardar</button>
+                </div>
         </div>
     </div>
 

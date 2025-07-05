@@ -178,8 +178,9 @@
         <div class="modal-content">
             <h3>Provider Configuration</h3>
             <div class="modal-body">
+                <h4 class="config-group-title">Transcription Configuration</h4>
                 <div class="config-section">
-                    <h4>Transcription Provider</h4>
+                    <h5>Transcription Provider</h5>
                     <select class="form-control" id="transcription-provider">
                         <option value="" selected>Select provider</option>
                         <option value="openai">OpenAI</option>
@@ -191,16 +192,7 @@
                     </small>
                 </div>
                 <div class="config-section">
-                    <h4>Post-processing Provider</h4>
-                    <select class="form-control" id="postprocess-provider">
-                        <option value="" selected>Select provider</option>
-                        <option value="openai">OpenAI GPT</option>
-                        <option value="google">Google Gemini</option>
-                        <option value="openrouter">OpenRouter</option>
-                    </select>
-                </div>
-                <div class="config-section">
-                    <h4>Model Configuration</h4>
+                    <h5>Transcription Model</h5>
                     <div class="model-config">
                         <label class="form-label">Transcription Model</label>
                         <select class="form-control" id="transcription-model">
@@ -250,20 +242,31 @@
                         </select>
                         <small>Select the language you will speak to improve accuracy</small>
                     </div>
-                    <div class="model-config">
-                        <label class="form-label">Post-processing Model</label>
-                        <select class="form-control" id="postprocess-model">
-                            <option value="" selected>Select model</option>
-                            <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
-                            <option value="gpt-4o">GPT-4o (OpenAI)</option>
-                            <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>
-                            <option value="gpt-4.1-mini">GPT-4.1 Mini (OpenAI)</option>
-                            <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
-                        </select>
-                    </div>
+                </div>
+
+                <h4 class="config-group-title">Post-processing Configuration</h4>
+                <div class="config-section">
+                    <h5>Post-processing Provider</h5>
+                    <select class="form-control" id="postprocess-provider">
+                        <option value="" selected>Select provider</option>
+                        <option value="openai">OpenAI GPT</option>
+                        <option value="google">Google Gemini</option>
+                        <option value="openrouter">OpenRouter</option>
+                    </select>
                 </div>
                 <div class="config-section">
-                    <h4>Advanced Post-processing Configuration</h4>
+                    <h5>Post-processing Model</h5>
+                    <select class="form-control" id="postprocess-model">
+                        <option value="" selected>Select model</option>
+                        <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
+                        <option value="gpt-4o">GPT-4o (OpenAI)</option>
+                        <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>
+                        <option value="gpt-4.1-mini">GPT-4.1 Mini (OpenAI)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
+                    </select>
+                </div>
+                <div class="config-section">
+                    <h5>Advanced Post-processing Configuration</h5>
                     <div class="advanced-config">
                         <div class="config-row">
                             <div class="config-col">
@@ -301,8 +304,8 @@
                         </div>
                     </div>
                 </div>
+                <h4 class="config-group-title">Interface Options</h4>
                 <div class="config-section">
-                    <h4>Interface Options</h4>
                     <div class="checkbox-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="show-mobile-record" checked>
