@@ -303,6 +303,7 @@ class NotesApp {
 
         this.setupRestoreDropZone();
         this.setupUploadModelsDropZone();
+        this.setupDownloadModelButtons();
         
         // Modal de confirmación
         document.getElementById('cancel-delete').addEventListener('click', () => {
@@ -1089,6 +1090,16 @@ class NotesApp {
         }
     }
 
+    setupDownloadModelButtons() {
+        const buttons = document.querySelectorAll('.model-download');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const size = btn.getAttribute('data-size');
+                this.handleModelDownload(size);
+            });
+        });
+    }
+
     async handleRestoreFiles(fileList) {
         const files = Array.from(fileList);
         if (!files.length) return;
@@ -1360,6 +1371,43 @@ class NotesApp {
                 throw new Error('Upload timeout - file too large or connection too slow');
             }
             throw error;
+        }
+    }
+
+    async downloadModelWithProgress(size, fileItem) {
+        try {
+            const streamResponse = await backendAPI.downloadModelStream(size);
+            await backendAPI.processDownloadStream(streamResponse, percent => {
+                const progressBar = fileItem.querySelector('.progress-bar');
+                const progressPercentage = fileItem.querySelector('.progress-percentage');
+                progressBar.style.width = percent + '%';
+                progressPercentage.textContent = percent + '%';
+                fileItem.querySelector('.file-upload-status').textContent = `Downloading... ${percent}%`;
+            });
+            this.updateFileUploadStatus(fileItem, 'success', 'Downloaded successfully');
+        } catch (error) {
+            console.error('Download error', error);
+            this.updateFileUploadStatus(fileItem, 'error', 'Download failed');
+            throw error;
+        }
+    }
+
+    async handleModelDownload(size) {
+        const progressSection = document.getElementById('upload-progress-section');
+        const fileUploadList = document.getElementById('file-upload-list');
+        progressSection.style.display = 'block';
+        fileUploadList.innerHTML = '';
+
+        const filename = `ggml-${size}.bin`;
+        const fileItem = this.createFileUploadItem({ name: filename, size: 0 });
+        fileUploadList.appendChild(fileItem);
+
+        try {
+            await this.downloadModelWithProgress(size, fileItem);
+            this.showUploadCompleteMessage(fileUploadList);
+            await this.forceRefreshTranscriptionProviders();
+        } catch (err) {
+            this.showNotification(`Error downloading ${filename}`, 'error');
         }
     }
 

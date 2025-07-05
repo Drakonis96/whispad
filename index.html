@@ -22,8 +22,8 @@
             <button class="btn btn--outline btn--sm" id="restore-btn" title="Restore notes from files">
                 <i class="fas fa-upload"></i>&nbsp;Restore
             </button>
-            <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Upload whisper.cpp models">
-                <i class="fas fa-upload"></i>&nbsp;Upload models
+            <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Manage whisper.cpp models">
+                <i class="fas fa-download"></i>&nbsp;Models
             </button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
@@ -182,7 +182,7 @@
                     <h4>Transcription Provider</h4>
                     <select class="form-control" id="transcription-provider">
                         <option value="" selected>Select provider</option>
-                        <option value="openai">OpenAI Whisper</option>
+                        <option value="openai">OpenAI</option>
                         <option value="local">Local Whisper (whisper.cpp)</option>
                         <option value="google">Google Speech-to-Text</option>
                     </select>
@@ -373,17 +373,24 @@
         </div>
     </div>
 
-    <!-- Upload models modal -->
+    <!-- Download/Upload models modal -->
     <div class="modal" id="upload-model-modal">
         <div class="modal-content">
-            <h3>Upload Models</h3>
-            <p>Drag and drop .bin model files below or click the area to select</p>
+            <h3>Manage Whisper Models</h3>
+            <p>Select a model to download or drop your own .bin files below</p>
+            <div class="model-btns">
+                <button class="btn btn--secondary model-download" data-size="tiny">Tiny</button>
+                <button class="btn btn--secondary model-download" data-size="base">Base</button>
+                <button class="btn btn--secondary model-download" data-size="small">Small</button>
+                <button class="btn btn--secondary model-download" data-size="medium">Medium</button>
+                <button class="btn btn--secondary model-download" data-size="large">Large</button>
+            </div>
             <div class="drop-zone" id="upload-model-drop-zone">Drop files here</div>
             <input type="file" id="upload-model-file-input" multiple accept=".bin" style="display:none">
             
             <!-- Progress section -->
             <div class="upload-progress-section" id="upload-progress-section" style="display:none;">
-                <h4>Upload Progress</h4>
+                <h4>Progress</h4>
                 <div class="file-upload-list" id="file-upload-list"></div>
             </div>
             

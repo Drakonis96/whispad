@@ -49,7 +49,7 @@ def health_check():
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
-    """Endpoint para transcribir audio usando OpenAI Whisper o whisper.cpp local"""
+    """Endpoint para transcribir audio usando OpenAI o whisper.cpp local"""
     try:
         # Obtener el archivo de audio del request
         if 'audio' not in request.files:
@@ -1191,6 +1191,50 @@ def upload_model():
     except Exception as e:
         return jsonify({"error": f"Error al subir modelo: {str(e)}"}), 500
 
+@app.route('/api/download-model', methods=['POST'])
+def download_model():
+    """Download a whisper.cpp model from the internet with progress via SSE"""
+    data = request.get_json() or {}
+    size = data.get('size')
+
+    MODEL_URLS = {
+        'tiny':   'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin',
+        'base':   'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin',
+        'small':  'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin',
+        'medium': 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin',
+        'large':  'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large.bin',
+    }
+
+    if size not in MODEL_URLS:
+        return jsonify({"error": "Modelo no válido"}), 400
+
+    url = MODEL_URLS[size]
+
+    def generate():
+        try:
+            models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+            os.makedirs(models_dir, exist_ok=True)
+            filename = os.path.join(models_dir, os.path.basename(url))
+
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+                total = int(r.headers.get('Content-Length', 0))
+                downloaded = 0
+                with open(filename, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            if total:
+                                progress = int(downloaded * 100 / total)
+                                yield f"data: {json.dumps({'progress': progress})}\n\n"
+
+            yield f"data: {json.dumps({'done': True, 'filename': os.path.basename(filename)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
 @app.route('/api/get-note', methods=['GET'])
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""
@@ -1241,10 +1285,10 @@ def get_transcription_providers():
         if OPENAI_API_KEY:
             providers.append({
                 "id": "openai",
-                "name": "OpenAI Whisper",
-                "description": "Cloud-based transcription using OpenAI's Whisper API",
+                "name": "OpenAI",
+                "description": "Cloud-based transcription using OpenAI's API",
                 "available": True,
-                "models": ["whisper-1"]
+                "models": ["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
             })
         
         # Verificar whisper.cpp local
