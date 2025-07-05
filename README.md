@@ -8,12 +8,13 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 
 ## Table of Contents
 1. [Main Features](#main-features)
-2. [Quick Setup](#quick-setup)
-3. [Installing with Docker Desktop](#installing-with-docker-desktop)
-4. [Installing from the Terminal](#installing-from-the-terminal)
-5. [API Key Configuration](#api-key-configuration)
-6. [Usage Guide](#usage-guide)
-7. [Screenshots](#screenshots)
+2. [Disclaimer](#disclaimer)
+3. [Quick Setup](#quick-setup)
+4. [Installing with Docker Desktop](#installing-with-docker-desktop)
+5. [Installing from the Terminal](#installing-from-the-terminal)
+6. [API Key Configuration](#api-key-configuration)
+7. [Usage Guide](#usage-guide)
+8. [Screenshots](#screenshots)
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
@@ -25,6 +26,9 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Ability to upload local (.bin) whisper.cpp models directly from the interface.
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
+
+## Disclaimer
+This application is currently in testing and is provided **as is**. I take no responsibility for any data loss that may occur when using it. Make sure you make frequent backups of your data.
 
 ## Quick Setup
 If you are not comfortable with the terminal, the easiest method is to use **Docker Desktop**. You only need to install Docker, download this project and run it.
