@@ -162,6 +162,7 @@
             <div class="config-section">
                 <h4>Proveedor de Transcripción</h4>
                 <select class="form-control" id="transcription-provider">
+                    <option value="" selected>Seleccionar proveedor</option>
                     <option value="openai">OpenAI Whisper</option>
                     <option value="google">Google Speech-to-Text</option>
                 </select>
@@ -169,6 +170,7 @@
             <div class="config-section">
                 <h4>Proveedor de Post-procesamiento</h4>
                 <select class="form-control" id="postprocess-provider">
+                    <option value="" selected>Seleccionar proveedor</option>
                     <option value="openai">OpenAI GPT</option>
                     <option value="google">Google Gemini</option>
                     <option value="openrouter">OpenRouter</option>
@@ -179,12 +181,14 @@
                 <div class="model-config">
                     <label class="form-label">Modelo de Transcripción</label>
                     <select class="form-control" id="transcription-model">
+                        <option value="" selected>Seleccionar modelo</option>
                         <option value="whisper-1">Whisper-1 (OpenAI)</option>
                     </select>
                 </div>
                 <div class="model-config">
                     <label class="form-label">Modelo de Post-procesamiento</label>
                     <select class="form-control" id="postprocess-model">
+                        <option value="" selected>Seleccionar modelo</option>
                         <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
                         <option value="gpt-4o">GPT-4o (OpenAI)</option>
                         <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>

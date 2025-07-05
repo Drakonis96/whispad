@@ -78,10 +78,10 @@ class NotesApp {
         
         // Configuración de proveedores
         this.config = {
-            transcriptionProvider: 'openai',
-            postprocessProvider: 'openai',
-            transcriptionModel: 'whisper-1',
-            postprocessModel: 'gpt-4o-mini',
+            transcriptionProvider: '',
+            postprocessProvider: '',
+            transcriptionModel: '',
+            postprocessModel: '',
             openaiApiKey: '',
             googleApiKey: '',
             // Configuración avanzada de post-procesamiento
@@ -306,8 +306,8 @@ class NotesApp {
     showConfigModal() {
         document.getElementById('transcription-provider').value = this.config.transcriptionProvider;
         document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
-        document.getElementById('transcription-model').value = this.config.transcriptionModel || 'whisper-1';
-        document.getElementById('postprocess-model').value = this.config.postprocessModel || 'gpt-4o-mini';
+        document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
+        document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('openai-api-key').value = this.config.openaiApiKey;
         document.getElementById('google-api-key').value = this.config.googleApiKey || '';
         
