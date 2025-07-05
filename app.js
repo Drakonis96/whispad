@@ -376,6 +376,17 @@ class NotesApp {
         marker.style.left = `${rect.left - editorRect.left + editorContent.scrollLeft}px`;
         editorContent.appendChild(marker);
     }
+
+    // Show or hide the editor depending on whether a note is selected
+    updateEditorVisibility() {
+        const container = document.querySelector('.editor-container');
+        if (!container) return;
+        if (this.currentNote) {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+        }
+    }
     
     // Actualizar estado de botones de IA
     updateAIButtonsState(disabled) {
@@ -783,6 +794,8 @@ class NotesApp {
         
         // Limpiar historial de IA al cambiar de nota
         this.clearAIHistory();
+
+        this.updateEditorVisibility();
     }
     
     updateNoteSelection() {
@@ -1589,6 +1602,8 @@ class NotesApp {
             document.getElementById('save-btn').disabled = true;
             document.getElementById('download-btn').disabled = true;
             document.getElementById('delete-btn').disabled = true;
+            this.currentNote = null;
+            this.updateEditorVisibility();
         }
     }
     
