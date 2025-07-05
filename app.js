@@ -2260,83 +2260,16 @@ class NotesApp {
     async improveWithOpenAIStream(text, action, tempElement) {
         try {
             console.log('Starting OpenAI stream for action:', action);
-            
-            // Verificar si es un estilo personalizado y enviar su prompt
+
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
-            
+
             const response = await backendAPI.improveText(text, action, 'openai', true, null, customPrompt);
-            
             if (!response.body) {
                 throw new Error('No response body received');
             }
-            
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
 
-            let improvedText = '';
-            let chunkCount = 0;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    console.log('Stream completed. Total chunks:', chunkCount);
-                    break;
-                }
-
-                chunkCount++;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const dataStr = line.slice(6).trim();
-                            if (dataStr === '[DONE]') {
-                                console.log('Received [DONE] signal');
-                                const finalText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = finalText;
-                                tempElement.className = 'ai-generated-text';
-                                setTimeout(() => { tempElement.className = ''; }, 1000);
-                                return finalText;
-                            }
-
-                            const data = JSON.parse(dataStr);
-                            console.log('Parsed data:', data);
-
-                            if (data.content) {
-                                improvedText += data.content;
-                                const cleanedText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleanedText;
-                                console.log('Updated temp element with:', cleanedText.substring(0, 50) + '...');
-
-                                tempElement.className = 'ai-generating-text';
-                            }
-                            if (data.done) {
-                                console.log('Stream marked as done');
-                                const finalText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = finalText;
-                                tempElement.className = 'ai-generated-text';
-                                setTimeout(() => { tempElement.className = ''; }, 1000);
-                                return finalText;
-                            }
-                            if (data.error) {
-                                console.error('Error in stream data:', data.error);
-                                throw new Error(data.error);
-                            }
-                        } catch (parseError) {
-                            console.warn('Failed to parse JSON:', parseError, 'Line:', line);
-                            continue;
-                        }
-                    }
-                }
-            }
-            
-            const finalResult = this.cleanAIResponse(improvedText);
-            console.log('Returning final result:', finalResult);
-            return finalResult;
+            return await this.processAIStream(response, tempElement);
         } catch (error) {
             console.error('Error in improveWithOpenAIStream:', error);
             throw new Error(`Error improving text with OpenAI: ${error.message}`);
@@ -2359,83 +2292,16 @@ class NotesApp {
     async improveWithGeminiStream(text, action, tempElement) {
         try {
             console.log('Starting Gemini stream for action:', action);
-            
-            // Verificar si es un estilo personalizado y enviar su prompt
+
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
-            
+
             const response = await backendAPI.improveText(text, action, 'google', true, null, customPrompt);
-            
             if (!response.body) {
                 throw new Error('No response body received');
             }
-            
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
 
-            let improvedText = '';
-            let chunkCount = 0;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    console.log('Gemini stream completed. Total chunks:', chunkCount);
-                    break;
-                }
-
-                chunkCount++;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const dataStr = line.slice(6).trim();
-                            if (dataStr === '[DONE]') {
-                                console.log('Received Gemini [DONE] signal');
-                                const finalText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = finalText;
-                                tempElement.className = 'ai-generated-text';
-                                setTimeout(() => { tempElement.className = ''; }, 1000);
-                                return finalText;
-                            }
-
-                            const data = JSON.parse(dataStr);
-                            console.log('Parsed Gemini data:', data);
-
-                            if (data.content) {
-                                improvedText += data.content;
-                                const cleanedText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleanedText;
-                                console.log('Updated Gemini temp element with:', cleanedText.substring(0, 50) + '...');
-
-                                tempElement.className = 'ai-generating-text';
-                            }
-                            if (data.done) {
-                                console.log('Gemini stream marked as done');
-                                const finalText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = finalText;
-                                tempElement.className = 'ai-generated-text';
-                                setTimeout(() => { tempElement.className = ''; }, 1000);
-                                return finalText;
-                            }
-                            if (data.error) {
-                                console.error('Error in Gemini stream data:', data.error);
-                                throw new Error(data.error);
-                            }
-                        } catch (parseError) {
-                            console.warn('Failed to parse Gemini JSON:', parseError, 'Line:', line);
-                            continue;
-                        }
-                    }
-                }
-            }
-            
-            const finalResult = this.cleanAIResponse(improvedText);
-            console.log('Returning final Gemini result:', finalResult);
-            return finalResult;
+            return await this.processAIStream(response, tempElement);
         } catch (error) {
             console.error('Error in improveWithGeminiStream:', error);
             throw new Error(`Error improving text with Gemini: ${error.message}`);
@@ -2458,88 +2324,81 @@ class NotesApp {
     async improveWithOpenRouterStream(text, action, tempElement) {
         try {
             console.log('Starting OpenRouter stream for action:', action);
-            
-            // Verificar si es un estilo personalizado y enviar su prompt
+
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
-            
+
             const model = this.config.postprocessModel;
             const response = await backendAPI.improveText(text, action, 'openrouter', true, model, customPrompt);
-            
             if (!response.body) {
                 throw new Error('No response body received');
             }
-            
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
 
-            let improvedText = '';
-            let chunkCount = 0;
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    console.log('OpenRouter stream completed. Total chunks:', chunkCount);
-                    break;
-                }
-
-                chunkCount++;
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop();
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const dataStr = line.slice(6).trim();
-                            if (dataStr === '[DONE]') {
-                                console.log('Received OpenRouter [DONE] signal');
-                                const finalText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = finalText;
-                                tempElement.className = 'ai-generated-text';
-                                setTimeout(() => { tempElement.className = ''; }, 1000);
-                                return finalText;
-                            }
-
-                            const data = JSON.parse(dataStr);
-                            console.log('Parsed OpenRouter data:', data);
-
-                            if (data.content) {
-                                improvedText += data.content;
-                                const cleanedText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleanedText;
-                                console.log('Updated OpenRouter temp element with:', cleanedText.substring(0, 50) + '...');
-
-                                tempElement.className = 'ai-generating-text';
-                            }
-                            if (data.done) {
-                                console.log('OpenRouter stream marked as done');
-                                const finalText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = finalText;
-                                tempElement.className = 'ai-generated-text';
-                                setTimeout(() => { tempElement.className = ''; }, 1000);
-                                return finalText;
-                            }
-                            if (data.error) {
-                                console.error('Error in OpenRouter stream data:', data.error);
-                                throw new Error(data.error);
-                            }
-                        } catch (parseError) {
-                            console.warn('Failed to parse OpenRouter JSON:', parseError, 'Line:', line);
-                            continue;
-                        }
-                    }
-                }
-            }
-            
-            const finalResult = this.cleanAIResponse(improvedText);
-            console.log('Returning final OpenRouter result:', finalResult);
-            return finalResult;
+            return await this.processAIStream(response, tempElement);
         } catch (error) {
             console.error('Error in improveWithOpenRouterStream:', error);
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
         }
+    }
+
+    // Utilidad para procesar flujos SSE de las APIs de IA
+    async processAIStream(response, tempElement) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let improvedText = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                break;
+            }
+
+            buffer += decoder.decode(value, { stream: true });
+
+            let eventEnd;
+            while ((eventEnd = buffer.indexOf('\n\n')) !== -1) {
+                const rawEvent = buffer.slice(0, eventEnd).trim();
+                buffer = buffer.slice(eventEnd + 2);
+
+                if (!rawEvent.startsWith('data:')) {
+                    continue;
+                }
+
+                const dataStr = rawEvent.slice(5).trim();
+                if (dataStr === '[DONE]' || dataStr === '{"done": true}') {
+                    const final = this.cleanAIResponse(improvedText);
+                    tempElement.textContent = final;
+                    tempElement.className = 'ai-generated-text';
+                    setTimeout(() => { tempElement.className = ''; }, 1000);
+                    return final;
+                }
+
+                try {
+                    const data = JSON.parse(dataStr);
+                    if (data.content) {
+                        improvedText += data.content;
+                        tempElement.textContent = this.cleanAIResponse(improvedText);
+                        tempElement.className = 'ai-generating-text';
+                    }
+                    if (data.done) {
+                        const final = this.cleanAIResponse(improvedText);
+                        tempElement.textContent = final;
+                        tempElement.className = 'ai-generated-text';
+                        setTimeout(() => { tempElement.className = ''; }, 1000);
+                        return final;
+                    }
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse AI stream chunk:', e, 'Chunk:', dataStr);
+                }
+            }
+        }
+
+        const finalResult = this.cleanAIResponse(improvedText);
+        return finalResult;
     }
     
     // Clean AI response to ensure it only returns the edited text
