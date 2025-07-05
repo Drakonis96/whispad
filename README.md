@@ -120,3 +120,6 @@ Here are some screenshots of WhisPad in action:
   <img src="screenshots/screenshot4.png" alt="Transcribed notes list" width="700"/>
 </p>
 
+
+## Acknowledgments
+During the development of this app, we used **Perplexity Labs**, **OpenAI Codex**, and **GitHub Copilot** (Models: Claude 4 and ChatGPT 4o).
