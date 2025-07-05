@@ -49,7 +49,7 @@ def health_check():
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
-    """Endpoint para transcribir audio usando OpenAI Whisper o whisper.cpp local"""
+    """Endpoint para transcribir audio usando OpenAI o whisper.cpp local"""
     try:
         # Obtener el archivo de audio del request
         if 'audio' not in request.files:
@@ -1241,10 +1241,10 @@ def get_transcription_providers():
         if OPENAI_API_KEY:
             providers.append({
                 "id": "openai",
-                "name": "OpenAI Whisper",
-                "description": "Cloud-based transcription using OpenAI's Whisper API",
+                "name": "OpenAI",
+                "description": "Cloud-based transcription using OpenAI's API",
                 "available": True,
-                "models": ["whisper-1"]
+                "models": ["whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"]
             })
         
         # Verificar whisper.cpp local
