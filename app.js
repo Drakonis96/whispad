@@ -125,7 +125,8 @@ class NotesApp {
         await this.checkBackendStatus();
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
-        
+        this.setupMobileHeaderActions();
+
         // Migrate existing notes without ID
         await this.migrateExistingNotes();
     }
@@ -176,6 +177,26 @@ class NotesApp {
                 sidebar.classList.remove('active');
             }
         });
+    }
+
+    setupMobileHeaderActions() {
+        const headerActions = document.querySelector('.header-actions');
+        const mobileContainer = document.querySelector('.mobile-header-actions');
+        const hamburger = document.getElementById('hamburger-menu');
+        if (!headerActions || !mobileContainer || !hamburger) return;
+
+        const buttons = Array.from(headerActions.querySelectorAll('button')).filter(btn => btn !== hamburger);
+
+        const moveButtons = () => {
+            if (window.innerWidth <= 900) {
+                buttons.forEach(btn => mobileContainer.appendChild(btn));
+            } else {
+                buttons.forEach(btn => headerActions.insertBefore(btn, hamburger));
+            }
+        };
+
+        moveButtons();
+        window.addEventListener('resize', moveButtons);
     }
     
     // Configurar event listeners

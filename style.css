@@ -44,6 +44,12 @@
   .hamburger-menu {
     display: flex;
   }
+  .header-actions button:not(#hamburger-menu) {
+    display: none;
+  }
+  .mobile-header-actions {
+    display: flex;
+  }
 }
 
 @media (max-width: 900px) {
@@ -373,6 +379,15 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-12);
+}
+
+/* Container for header buttons when on mobile */
+.mobile-header-actions {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-bottom: 1px solid var(--color-border);
 }
 
 *,
