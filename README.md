@@ -39,7 +39,7 @@ If you are not comfortable with the terminal, the easiest method is to use **Doc
    ```bash
    docker compose up
    ```
-4. Docker will download the dependencies and show *"Starting services..."*. When everything is ready, open your browser at `http://localhost:5037`.
+4. Docker will download the dependencies and show *"Starting services..."*. When everything is ready, open your browser at `https://localhost:5037`.
 5. To stop the application, press `Ctrl+C` in the terminal or use the *Stop* button in Docker Desktop.
 
 ## Installing with Docker Desktop
@@ -56,7 +56,7 @@ This option is ideal if you don't want to worry about installing Python or depen
    ```bash
    docker compose up
    ```
-4. Go to `http://localhost:5037` and start using WhisPad.
+4. Go to `https://localhost:5037` and start using WhisPad.
 5. To stop it, press `Ctrl+C` in the terminal or run `docker compose down`.
 
 ## Installing from the Terminal
@@ -81,7 +81,7 @@ If you prefer not to use Docker, you can also run it directly with Python:
    ```bash
    python backend.py
    ```
-6. Open `index.html` in your browser or serve the folder with `python -m http.server 5037` and visit `http://localhost:5037`.
+6. Open `index.html` in your browser or serve the folder with `python -m http.server 5037` and visit `https://localhost:5037`.
 
 ## API Key Configuration
 Copy `env.example` to `.env` and add your API keys:

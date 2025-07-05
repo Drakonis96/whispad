@@ -19,7 +19,7 @@ def simulate_javascript_execution():
         
         # Paso 2: Cargar audio como lo hace el JavaScript
         print("📁 Cargando archivo de audio...")
-        response = requests.get("http://localhost:5037/test/test.wav")
+        response = requests.get("https://localhost:5037/test/test.wav", verify=False)
         if not response.ok:
             raise Exception(f"No se pudo cargar test.wav: {response.status_code}")
         
@@ -81,7 +81,7 @@ def simulate_javascript_execution():
                 
                 # Hacer la petición EXACTA que hace el JavaScript
                 api_response = requests.post(
-                    "http://localhost:5037/api/transcribe-gpt4o",
+                    "https://localhost:5037/api/transcribe-gpt4o",
                     files=files,
                     data=data,
                     timeout=30
@@ -130,7 +130,7 @@ def analyze_potential_frontend_issues():
     # 1. Verificar si backend-api.js se carga correctamente
     print("1. Verificando backend-api.js...")
     try:
-        response = requests.get("http://localhost:5037/backend-api.js")
+        response = requests.get("https://localhost:5037/backend-api.js", verify=False)
         if response.ok:
             print("✅ backend-api.js accesible")
             
@@ -154,7 +154,7 @@ def analyze_potential_frontend_issues():
     # 2. Verificar página principal
     print("\n2. Verificando página principal...")
     try:
-        response = requests.get("http://localhost:5037/")
+        response = requests.get("https://localhost:5037/", verify=False)
         if response.ok:
             print("✅ Página principal accesible")
             
@@ -176,7 +176,7 @@ def analyze_potential_frontend_issues():
     # 3. Verificar headers CORS
     print("\n3. Verificando CORS...")
     try:
-        response = requests.get("http://localhost:5037/api/check-apis")
+        response = requests.get("https://localhost:5037/api/check-apis", verify=False)
         cors_headers = {k: v for k, v in response.headers.items() if 'cors' in k.lower() or 'access-control' in k.lower()}
         if cors_headers:
             print(f"✅ Headers CORS encontrados: {cors_headers}")
@@ -207,7 +207,7 @@ def main():
         print("🎯 Se encontraron problemas reales en el backend/API")
     
     print("\n📋 RECOMENDACIÓN:")
-    print("1. Abre http://localhost:5037/final_test.html en el navegador")
+    print("1. Abre https://localhost:5037/final_test.html en el navegador")
     print("2. Abre DevTools (F12)")
     print("3. Ve a la pestaña Console")
     print("4. Haz clic en 'Test Exacto del Frontend Principal'")

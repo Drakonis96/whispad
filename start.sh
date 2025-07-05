@@ -9,6 +9,16 @@ echo "Iniciando servicios..."
 mkdir -p /var/log/nginx
 mkdir -p /var/lib/nginx
 
+# Generar certificado SSL autofirmado si no existe
+if [ ! -f /etc/nginx/certs/selfsigned.crt ]; then
+    echo "Generando certificado SSL autofirmado..."
+    mkdir -p /etc/nginx/certs
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout /etc/nginx/certs/selfsigned.key \
+        -out /etc/nginx/certs/selfsigned.crt \
+        -subj "/CN=localhost"
+fi
+
 # Crear y configurar directorio para notas guardadas
 mkdir -p /app/saved_notes
 chmod 777 /app/saved_notes
