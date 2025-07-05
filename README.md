@@ -13,6 +13,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 4. [Installing from the Terminal](#installing-from-the-terminal)
 5. [API Key Configuration](#api-key-configuration)
 6. [Usage Guide](#usage-guide)
+7. [Screenshots](#screenshots)
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
