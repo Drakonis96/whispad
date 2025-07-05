@@ -1466,7 +1466,15 @@ select.form-control {
     margin-bottom: var(--space-20);
 }
 
-.config-section h4 {
+.config-group-title {
+    margin: var(--space-12) 0 var(--space-4) 0;
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text);
+}
+
+.config-section h4,
+.config-section h5 {
     margin: 0 0 var(--space-8) 0;
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
