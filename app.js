@@ -77,6 +77,7 @@ class NotesApp {
         this.searchTerm = '';
         this.selectedText = '';
         this.selectedRange = null;
+        this.insertionRange = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
         
@@ -218,6 +219,12 @@ class NotesApp {
         document.getElementById('record-btn').addEventListener('click', () => {
             this.toggleRecording();
         });
+        const mobileFab = document.getElementById('mobile-record-fab');
+        if (mobileFab) {
+            mobileFab.addEventListener('click', () => {
+                this.toggleRecording();
+            });
+        }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
         // document.querySelectorAll('.ai-btn').forEach(btn => {
@@ -367,6 +374,7 @@ class NotesApp {
         
         if (this.selectedText && selection.rangeCount > 0) {
             this.selectedRange = selection.getRangeAt(0).cloneRange();
+            this.insertionRange = this.selectedRange.cloneRange();
             this.updateAIButtonsState(false);
             console.log('Text selected, AI buttons enabled');
         } else {
@@ -387,6 +395,7 @@ class NotesApp {
 
         const range = selection.getRangeAt(0).cloneRange();
         range.collapse(true);
+        this.insertionRange = range.cloneRange();
         const rect = range.getClientRects()[0];
         if (!rect) return;
 
@@ -1799,12 +1808,17 @@ class NotesApp {
             const recordBtn = document.getElementById('record-btn');
             const recordIcon = document.getElementById('record-icon');
             const recordText = document.getElementById('record-text');
+            const mobileFab = document.getElementById('mobile-record-fab');
             const recordingStatus = document.getElementById('recording-status');
             const recordingIndicator = document.getElementById('recording-indicator');
             
             recordBtn.classList.add('btn--error');
             recordIcon.className = 'fas fa-stop';
             recordText.textContent = 'Stop';
+            if (mobileFab) {
+                mobileFab.classList.add('btn--error');
+                mobileFab.innerHTML = '<i class="fas fa-stop"></i>';
+            }
             recordingStatus.querySelector('.status-text').textContent = 'Recording...';
             recordingIndicator.classList.add('active');
 
@@ -1822,12 +1836,17 @@ class NotesApp {
             const recordBtn = document.getElementById('record-btn');
             const recordIcon = document.getElementById('record-icon');
             const recordText = document.getElementById('record-text');
+            const mobileFab = document.getElementById('mobile-record-fab');
             const recordingStatus = document.getElementById('recording-status');
             const recordingIndicator = document.getElementById('recording-indicator');
             
             recordBtn.classList.remove('btn--error');
             recordIcon.className = 'fas fa-microphone';
             recordText.textContent = 'Record';
+            if (mobileFab) {
+                mobileFab.classList.remove('btn--error');
+                mobileFab.innerHTML = '<i class="fas fa-microphone"></i>';
+            }
             recordingStatus.querySelector('.status-text').textContent = 'Processing...';
             recordingIndicator.classList.remove('active');
         }
@@ -2006,9 +2025,12 @@ class NotesApp {
         // Obtener posición del cursor o insertar al final
         const selection = window.getSelection();
         let range;
-        
+
         if (selection.rangeCount > 0) {
             range = selection.getRangeAt(0);
+            this.insertionRange = range.cloneRange();
+        } else if (this.insertionRange) {
+            range = this.insertionRange.cloneRange();
         } else {
             range = document.createRange();
             range.selectNodeContents(editor);
@@ -2022,6 +2044,7 @@ class NotesApp {
         range.setEndAfter(textNode);
         selection.removeAllRanges();
         selection.addRange(range);
+        this.insertionRange = range.cloneRange();
 
         // Remove insertion marker after inserting text
         const marker = document.getElementById('insertion-marker');
