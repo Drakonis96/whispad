@@ -125,7 +125,8 @@ class NotesApp {
         await this.checkBackendStatus();
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
-        
+        this.setupMobileHeaderActions();
+
         // Migrate existing notes without ID
         await this.migrateExistingNotes();
     }
@@ -177,6 +178,28 @@ class NotesApp {
             }
         });
     }
+
+    setupMobileHeaderActions() {
+        const headerActions = document.querySelector('.header-actions');
+        const mobileContainer = document.querySelector('.mobile-header-actions');
+        const hamburger = document.getElementById('hamburger-menu');
+        if (!headerActions || !mobileContainer || !hamburger) return;
+
+        const buttons = Array.from(headerActions.querySelectorAll('button')).filter(btn => btn !== hamburger);
+
+        const moveButtons = () => {
+            if (window.innerWidth <= 900) {
+                buttons.forEach(btn => mobileContainer.appendChild(btn));
+                mobileContainer.style.display = 'flex';
+            } else {
+                buttons.forEach(btn => headerActions.insertBefore(btn, hamburger));
+                mobileContainer.style.display = 'none';
+            }
+        };
+
+        moveButtons();
+        window.addEventListener('resize', moveButtons);
+    }
     
     // Configurar event listeners
     setupEventListeners() {
@@ -220,10 +243,17 @@ class NotesApp {
         editor.addEventListener('mouseup', () => {
             this.updateSelectedText();
         });
-        
+
         editor.addEventListener('keyup', () => {
             this.updateSelectedText();
         });
+
+        // Show insertion marker on click/touch
+        const showMarker = () => {
+            this.showInsertionMarker();
+        };
+        editor.addEventListener('click', showMarker);
+        editor.addEventListener('touchend', showMarker);
         
         // Título de nota
         document.getElementById('note-title').addEventListener('input', () => {
@@ -342,6 +372,42 @@ class NotesApp {
             this.selectedRange = null;
             this.updateAIButtonsState(true);
             console.log('No text selected, AI buttons disabled');
+        }
+    }
+
+    // Show a marker where the next transcription will be inserted
+    showInsertionMarker() {
+        // Remove existing marker
+        const oldMarker = document.getElementById('insertion-marker');
+        if (oldMarker) oldMarker.remove();
+
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0).cloneRange();
+        range.collapse(true);
+        const rect = range.getClientRects()[0];
+        if (!rect) return;
+
+        const editorContent = document.querySelector('.editor-content');
+        const editorRect = editorContent.getBoundingClientRect();
+
+        const marker = document.createElement('div');
+        marker.id = 'insertion-marker';
+        marker.className = 'insertion-marker';
+        marker.style.top = `${rect.top - editorRect.top + editorContent.scrollTop}px`;
+        marker.style.left = `${rect.left - editorRect.left + editorContent.scrollLeft}px`;
+        editorContent.appendChild(marker);
+    }
+
+    // Show or hide the editor depending on whether a note is selected
+    updateEditorVisibility() {
+        const container = document.querySelector('.editor-container');
+        if (!container) return;
+        if (this.currentNote) {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
         }
     }
     
@@ -751,6 +817,8 @@ class NotesApp {
         
         // Limpiar historial de IA al cambiar de nota
         this.clearAIHistory();
+
+        this.updateEditorVisibility();
     }
     
     updateNoteSelection() {
@@ -1549,15 +1617,15 @@ class NotesApp {
     }
     
     async setupDefaultNote() {
-        if (this.notes.length > 0) {
-            await this.selectNote(this.notes[0].id);
-        } else {
-            document.getElementById('note-title').value = '';
-            document.getElementById('editor').innerHTML = '';
-            document.getElementById('save-btn').disabled = true;
-            document.getElementById('download-btn').disabled = true;
-            document.getElementById('delete-btn').disabled = true;
-        }
+        // Do not auto select any note. Keep the editor hidden until the user
+        // chooses one.
+        document.getElementById('note-title').value = '';
+        document.getElementById('editor').innerHTML = '';
+        document.getElementById('save-btn').disabled = true;
+        document.getElementById('download-btn').disabled = true;
+        document.getElementById('delete-btn').disabled = true;
+        this.currentNote = null;
+        this.updateEditorVisibility();
     }
     
     // Renderizado de lista
@@ -1906,7 +1974,11 @@ class NotesApp {
         range.setEndAfter(textNode);
         selection.removeAllRanges();
         selection.addRange(range);
-        
+
+        // Remove insertion marker after inserting text
+        const marker = document.getElementById('insertion-marker');
+        if (marker) marker.remove();
+
         // Disparar evento de cambio
         this.handleEditorChange();
         
@@ -2998,6 +3070,7 @@ document.addEventListener('selectionchange', () => {
             if (window.notesApp) {
                 window.notesApp.updateFormatButtons();
                 window.notesApp.updateSelectedText();
+                window.notesApp.showInsertionMarker();
             }
         }, 10);
     }

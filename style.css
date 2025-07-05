@@ -44,6 +44,12 @@
   .hamburger-menu {
     display: flex;
   }
+  .header-actions button:not(#hamburger-menu) {
+    display: none;
+  }
+  .mobile-header-actions {
+    display: flex;
+  }
 }
 
 @media (max-width: 900px) {
@@ -373,6 +379,15 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-12);
+}
+
+/* Container for header buttons when on mobile */
+.mobile-header-actions {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-12);
+  padding: var(--space-16);
+  border-bottom: 1px solid var(--color-border);
 }
 
 *,
@@ -1113,6 +1128,7 @@ select.form-control {
     flex: 1;
     padding: var(--space-20);
     overflow-y: auto;
+    position: relative;
 }
 
 .editor {
@@ -1127,6 +1143,12 @@ select.form-control {
     background: transparent;
     resize: none;
     min-height: 300px;
+}
+
+@media (max-width: 768px) {
+    .editor {
+        font-size: 16px;
+    }
 }
 
 .editor:empty::before {
@@ -2128,4 +2150,16 @@ select.form-control {
 .upload-complete-message .message-text {
     color: var(--color-text);
     font-weight: 600;
+}
+
+/* Marker showing where transcriptions will be inserted */
+.insertion-marker {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 50;
 }

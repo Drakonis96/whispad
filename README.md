@@ -4,83 +4,92 @@
 
 # WhisPad
 
-## Table of Contents
-1. [Description](#description)
-2. [Features](#features)
-3. [Installation](#installation)
-4. [Usage Guide](#usage-guide)
+WhisPad es una herramienta de transcripción y gestión de notas diseñada para que cualquier persona pueda pasar su voz a texto y organizar sus ideas fácilmente. La aplicación permite usar modelos en la nube (OpenAI, Google) o modelos locales de whisper.cpp para trabajar sin conexión.
 
-## Description
-WhisPad is a simple and powerful application for real-time speech-to-text transcription, note-taking, and audio analysis. It leverages advanced AI models to transcribe audio, manage notes, and visualize data, all in an intuitive interface.
+## Tabla de contenido
+1. [Características principales](#caracteristicas-principales)
+2. [Instalación rápida](#instalacion-rapida)
+3. [Instalación con Docker Desktop](#instalacion-con-docker-desktop)
+4. [Instalación desde la terminal](#instalacion-desde-la-terminal)
+5. [Configuración de claves API](#configuracion-de-claves-api)
+6. [Guía de uso](#guia-de-uso)
 
-## Features
-- Real-time speech-to-text transcription
-- Save and manage transcribed notes
-- Audio file upload and transcription
-- Simple and modern web interface
-- Audio analysis and visualization
-- API integration for advanced AI models
+## Características principales
+- Transcripción de voz a texto en tiempo real desde el navegador.
+- Compatibilidad con varios proveedores: OpenAI, Google y whisper.cpp local.
+- Posibilidad de cargar modelos locales (.bin) para whisper.cpp directamente desde la interfaz.
+- Mejora automática de texto mediante IA (OpenAI, Google o OpenRouter) con respuestas en streaming.
+- Gestor de notas integrado: crear, buscar, etiquetar, guardar, restaurar y descargar en formato Markdown.
+- Exportación de todas las notas en un ZIP con un solo clic.
+- Interfaz moderna adaptada a móviles sin hacer zoom al escribir y con un marcador azul que indica dónde se insertará la transcripción.
 
-## Installation
-1. **Clone the repository:**
+## Instalación rápida
+Si no tienes conocimientos de la terminal, la forma más sencilla es usando **Docker Desktop**. Solo necesitas instalar Docker, descargar este proyecto y ejecutarlo.
+
+1. Descarga Docker Desktop desde <https://www.docker.com/products/docker-desktop/> e instálalo como cualquier otra aplicación.
+2. Descarga este repositorio en formato ZIP desde la página de GitHub y descomprímelo en la carpeta que prefieras.
+3. Abre Docker Desktop y selecciona **Open in Terminal** (o abre una terminal en esa carpeta). Escribe:
    ```bash
-   git clone <repository-url>
-   cd WhisPad4
+   docker compose up
    ```
-2. **Install Python dependencies:**
+4. Docker descargará las dependencias y mostrará el mensaje *"Iniciando servicios..."*. Cuando veas que todo está listo, abre tu navegador en `http://localhost:5037`.
+5. Para detener la aplicación, pulsa `Ctrl+C` en la terminal o usa el botón *Stop* de Docker Desktop.
+
+## Instalación con Docker Desktop
+Esta opción es ideal si no quieres preocuparte por instalar Python o dependencias manualmente.
+
+1. Instala **Docker Desktop**.
+2. Abre una terminal y clona el repositorio:
+   ```bash
+   git clone https://github.com/tu_usuario/whispad.git
+   cd whispad
+   ```
+   (Si lo prefieres, descarga el ZIP y descomprímelo).
+3. Ejecuta la aplicación con:
+   ```bash
+   docker compose up
+   ```
+4. Accede a `http://localhost:5037` y empieza a usar WhisPad.
+5. Para pararlo, usa `Ctrl+C` en la terminal o `docker compose down`.
+
+## Instalación desde la terminal
+Si prefieres no usar Docker, también puedes ejecutarlo directamente con Python:
+
+1. Asegúrate de tener **Python 3.11** o superior y **pip** instalados.
+2. Clona el repositorio o descarga el código y accede a la carpeta del proyecto:
+   ```bash
+   git clone https://github.com/tu_usuario/whispad.git
+   cd whispad
+   ```
+3. Instala las dependencias de Python:
    ```bash
    pip install -r requirements.txt
    ```
-3. **(Optional) Install Node.js dependencies:**
-   If you use Node.js features, install dependencies:
+4. (Opcional) Descarga un modelo de whisper.cpp con el script incluido:
    ```bash
-   npm install
+   bash install-whisper-cpp.sh
    ```
-4. **(Optional) Build or run Docker container:**
+   También puedes subir tus propios modelos `.bin` desde la interfaz.
+5. Ejecuta el servidor:
    ```bash
-   docker-compose up
+   python backend.py
    ```
+6. Abre `index.html` en tu navegador o sirve la carpeta con `python -m http.server 5037` y visita `http://localhost:5037`.
 
-## Usage Guide
+## Configuración de claves API
+Copia `env.example` como `.env` y coloca tus claves de API:
+```bash
+cp env.example .env
+```
+Edita el archivo `.env` y rellena las variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` y `OPENROUTER_API_KEY` según los servicios que quieras usar. Estas claves permiten la transcripción en la nube y la mejora de texto.
 
-### 1. Real-time Speech-to-Text Transcription
-- Run the backend server:
-  ```bash
-  python backend.py
-  ```
-- Open `index.html` in your browser.
-- Click the microphone button to start transcribing.
+## Guía de uso
+1. Pulsa el botón del micrófono para grabar audio y obtén la transcripción en tiempo real.
+2. Selecciona fragmentos de texto y aplica mejoras de estilo o claridad con un clic.
+3. Organiza tus notas: ponles título, etiquetas y búscalas fácilmente.
+4. Descarga cada nota en Markdown o todo el conjunto en un archivo ZIP.
+5. Si dispones de modelos locales de whisper.cpp, cárgalos desde el menú **Upload models** y disfruta de transcripción sin conexión.
+6. Utiliza el menú **Restore** para importar notas guardadas anteriormente.
 
-### 2. Save and Manage Notes
-- After transcription, click the save button to store your note.
-- Access saved notes in the `saved_notes/` folder.
+Con estas instrucciones deberías tener WhisPad funcionando en pocos minutos tanto con Docker como sin él. ¡Disfruta de una transcripción rápida y de todas las ventajas de organizar tus ideas en un mismo lugar!
 
-### 3. Audio File Upload and Transcription
-- Use the web interface to upload an audio file (e.g., `.wav`).
-- The app will transcribe the audio and display the text.
-
-### 4. Audio Analysis and Visualization
-- Transcribed audio can be visualized using the chart features in the app.
-- Open `chart_script.py` or `chart_script_1.py` for custom analysis.
-
-
-### 5. API Integration
-- Configure API keys and endpoints in the backend as needed.
-- See `api_documentation/` for details on supported APIs.
-
-
-### 6. API Keys Setup
-- Speech-to-text features use the OpenAI Whisper-1 model and GPT-4o transcribe models. You must provide a valid OpenAI API key for these features to work.
-- Some other features may require additional API keys (e.g., for Gemini or other AI services).
-- Create a `.env` file in the project root directory.
-- Add your API keys in the following format:
-  ```env
-  OPENAI_API_KEY=your_openai_key_here
-  GEMINI_API_KEY=your_gemini_key_here
-  # Add other keys as needed
-  ```
-- The backend will automatically load these keys if you use a library like `python-dotenv` (make sure it's in `requirements.txt`).
-- Never share your `.env` file or API keys publicly.
-
----
-For more information, see the code comments and documentation files in the `api_documentation/` folder.
