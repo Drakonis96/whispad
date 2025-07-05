@@ -4,92 +4,92 @@
 
 # WhisPad
 
-WhisPad es una herramienta de transcripción y gestión de notas diseñada para que cualquier persona pueda pasar su voz a texto y organizar sus ideas fácilmente. La aplicación permite usar modelos en la nube (OpenAI, Google) o modelos locales de whisper.cpp para trabajar sin conexión.
+WhisPad is a transcription and note management tool designed so anyone can turn their voice into text and easily organize their ideas. The application lets you use cloud models (OpenAI, Google) or local whisper.cpp models to work offline.
 
-## Tabla de contenido
-1. [Características principales](#caracteristicas-principales)
-2. [Instalación rápida](#instalacion-rapida)
-3. [Instalación con Docker Desktop](#instalacion-con-docker-desktop)
-4. [Instalación desde la terminal](#instalacion-desde-la-terminal)
-5. [Configuración de claves API](#configuracion-de-claves-api)
-6. [Guía de uso](#guia-de-uso)
+## Table of Contents
+1. [Main Features](#main-features)
+2. [Quick Setup](#quick-setup)
+3. [Installing with Docker Desktop](#installing-with-docker-desktop)
+4. [Installing from the Terminal](#installing-from-the-terminal)
+5. [API Key Configuration](#api-key-configuration)
+6. [Usage Guide](#usage-guide)
 
-## Características principales
-- Transcripción de voz a texto en tiempo real desde el navegador.
-- Compatibilidad con varios proveedores: OpenAI, Google y whisper.cpp local.
-- Posibilidad de cargar modelos locales (.bin) para whisper.cpp directamente desde la interfaz.
-- Mejora automática de texto mediante IA (OpenAI, Google o OpenRouter) con respuestas en streaming.
-- Gestor de notas integrado: crear, buscar, etiquetar, guardar, restaurar y descargar en formato Markdown.
-- Exportación de todas las notas en un ZIP con un solo clic.
-- Interfaz moderna adaptada a móviles sin hacer zoom al escribir y con un marcador azul que indica dónde se insertará la transcripción.
+## Main Features
+- Real-time voice-to-text transcription from the browser.
+- Compatible with multiple providers: OpenAI, Google and local whisper.cpp.
+- Ability to upload local (.bin) whisper.cpp models directly from the interface.
+- Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
+- Integrated note manager: create, search, tag, save, restore and download in Markdown format.
+- Export all notes in a ZIP file with one click.
+- Modern mobile-friendly interface that avoids zooming when typing and shows a blue marker indicating where the transcription will be inserted.
 
-## Instalación rápida
-Si no tienes conocimientos de la terminal, la forma más sencilla es usando **Docker Desktop**. Solo necesitas instalar Docker, descargar este proyecto y ejecutarlo.
+## Quick Setup
+If you are not comfortable with the terminal, the easiest method is to use **Docker Desktop**. You only need to install Docker, download this project and run it.
 
-1. Descarga Docker Desktop desde <https://www.docker.com/products/docker-desktop/> e instálalo como cualquier otra aplicación.
-2. Descarga este repositorio en formato ZIP desde la página de GitHub y descomprímelo en la carpeta que prefieras.
-3. Abre Docker Desktop y selecciona **Open in Terminal** (o abre una terminal en esa carpeta). Escribe:
+1. Download Docker Desktop from <https://www.docker.com/products/docker-desktop/> and install it like any other application.
+2. Download this repository as a ZIP from GitHub and unzip it in the folder of your choice.
+3. Open Docker Desktop and select **Open in Terminal** (or open a terminal in that folder). Type:
    ```bash
    docker compose up
    ```
-4. Docker descargará las dependencias y mostrará el mensaje *"Iniciando servicios..."*. Cuando veas que todo está listo, abre tu navegador en `http://localhost:5037`.
-5. Para detener la aplicación, pulsa `Ctrl+C` en la terminal o usa el botón *Stop* de Docker Desktop.
+4. Docker will download the dependencies and show *"Starting services..."*. When everything is ready, open your browser at `http://localhost:5037`.
+5. To stop the application, press `Ctrl+C` in the terminal or use the *Stop* button in Docker Desktop.
 
-## Instalación con Docker Desktop
-Esta opción es ideal si no quieres preocuparte por instalar Python o dependencias manualmente.
+## Installing with Docker Desktop
+This option is ideal if you don't want to worry about installing Python or dependencies manually.
 
-1. Instala **Docker Desktop**.
-2. Abre una terminal y clona el repositorio:
+1. Install **Docker Desktop**.
+2. Open a terminal and clone the repository:
    ```bash
    git clone https://github.com/tu_usuario/whispad.git
    cd whispad
    ```
-   (Si lo prefieres, descarga el ZIP y descomprímelo).
-3. Ejecuta la aplicación con:
+   (If you prefer, download the ZIP and unzip it.)
+3. Run the application with:
    ```bash
    docker compose up
    ```
-4. Accede a `http://localhost:5037` y empieza a usar WhisPad.
-5. Para pararlo, usa `Ctrl+C` en la terminal o `docker compose down`.
+4. Go to `http://localhost:5037` and start using WhisPad.
+5. To stop it, press `Ctrl+C` in the terminal or run `docker compose down`.
 
-## Instalación desde la terminal
-Si prefieres no usar Docker, también puedes ejecutarlo directamente con Python:
+## Installing from the Terminal
+If you prefer not to use Docker, you can also run it directly with Python:
 
-1. Asegúrate de tener **Python 3.11** o superior y **pip** instalados.
-2. Clona el repositorio o descarga el código y accede a la carpeta del proyecto:
+1. Make sure you have **Python 3.11** or higher and **pip** installed.
+2. Clone the repository or download the code and go to the project folder:
    ```bash
    git clone https://github.com/tu_usuario/whispad.git
    cd whispad
    ```
-3. Instala las dependencias de Python:
+3. Install the Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. (Opcional) Descarga un modelo de whisper.cpp con el script incluido:
+4. (Optional) Download a whisper.cpp model with the included script:
    ```bash
    bash install-whisper-cpp.sh
    ```
-   También puedes subir tus propios modelos `.bin` desde la interfaz.
-5. Ejecuta el servidor:
+   You can also upload your own `.bin` models from the interface.
+5. Run the server:
    ```bash
    python backend.py
    ```
-6. Abre `index.html` en tu navegador o sirve la carpeta con `python -m http.server 5037` y visita `http://localhost:5037`.
+6. Open `index.html` in your browser or serve the folder with `python -m http.server 5037` and visit `http://localhost:5037`.
 
-## Configuración de claves API
-Copia `env.example` como `.env` y coloca tus claves de API:
+## API Key Configuration
+Copy `env.example` to `.env` and add your API keys:
 ```bash
 cp env.example .env
 ```
-Edita el archivo `.env` y rellena las variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` y `OPENROUTER_API_KEY` según los servicios que quieras usar. Estas claves permiten la transcripción en la nube y la mejora de texto.
+Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
 
-## Guía de uso
-1. Pulsa el botón del micrófono para grabar audio y obtén la transcripción en tiempo real.
-2. Selecciona fragmentos de texto y aplica mejoras de estilo o claridad con un clic.
-3. Organiza tus notas: ponles título, etiquetas y búscalas fácilmente.
-4. Descarga cada nota en Markdown o todo el conjunto en un archivo ZIP.
-5. Si dispones de modelos locales de whisper.cpp, cárgalos desde el menú **Upload models** y disfruta de transcripción sin conexión.
-6. Utiliza el menú **Restore** para importar notas guardadas anteriormente.
+## Usage Guide
+1. Press the microphone button to record audio and get real-time transcription.
+2. Select text fragments and apply style or clarity improvements with a click.
+3. Organize your notes: add titles, tags and search them easily.
+4. Download each note in Markdown or the entire set in a ZIP file.
+5. If you have local whisper.cpp models, upload them from the **Upload models** menu and enjoy offline transcription.
+6. Use the **Restore** menu to import previously saved notes.
 
-Con estas instrucciones deberías tener WhisPad funcionando en pocos minutos tanto con Docker como sin él. ¡Disfruta de una transcripción rápida y de todas las ventajas de organizar tus ideas en un mismo lugar!
+With these instructions you should have WhisPad running in just a few minutes with or without Docker. Enjoy fast transcription and all the benefits of organizing your ideas in one place!
 
