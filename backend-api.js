@@ -368,6 +368,62 @@ class BackendAPI {
             throw error;
         }
     }
+
+    async downloadModelStream(size) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/download-model`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ size })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return response;
+        } catch (error) {
+            console.error('Error requesting model download:', error);
+            throw error;
+        }
+    }
+
+    async processDownloadStream(streamResponse, onProgress = null) {
+        try {
+            const reader = streamResponse.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        try {
+                            const eventData = JSON.parse(data);
+                            if (eventData.progress !== undefined && onProgress) {
+                                onProgress(eventData.progress);
+                            } else if (eventData.error) {
+                                throw new Error(eventData.error);
+                            } else if (eventData.done) {
+                                if (onProgress) onProgress(100);
+                                return;
+                            }
+                        } catch (err) {
+                            console.warn('Error parsing download progress:', err);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error processing download stream:', error);
+            throw error;
+        }
+    }
 }
 
 // Instancia global del API backend

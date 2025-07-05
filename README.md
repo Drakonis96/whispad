@@ -23,7 +23,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
 - A blue marker indicating where the transcription will be inserted.
 - Compatible with multiple providers: OpenAI, Google and local whisper.cpp (tiny model included on this repo, but you can download small, base, medium or large)
-- Ability to upload local (.bin) whisper.cpp models directly from the interface.
+- Download or upload local (.bin) whisper.cpp models directly from the interface.
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
 
@@ -76,7 +76,7 @@ If you prefer not to use Docker, you can also run it directly with Python:
    ```bash
    bash install-whisper-cpp.sh
    ```
-   You can also upload your own `.bin` models from the interface.
+   You can also download or upload models from the interface.
 5. Run the server:
    ```bash
    python backend.py
@@ -95,7 +95,7 @@ Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY
 2. Select text fragments and apply style or clarity improvements with a click.
 3. Organize your notes: add titles, tags and search them easily.
 4. Download each note in Markdown or the entire set in a ZIP file.
-5. If you have local whisper.cpp models, upload them from the **Upload models** menu and enjoy offline transcription.
+5. Download additional whisper.cpp models from the **Models** menu (you can still drag and drop your own files) and enjoy offline transcription.
 6. Use the **Restore** menu to import previously saved notes.
 
 With these instructions you should have WhisPad running in just a few minutes with or without Docker. Enjoy fast transcription and all the benefits of organizing your ideas in one place!
@@ -113,7 +113,7 @@ Here are some screenshots of WhisPad in action:
 </p>
 
 <p align="center">
-  <img src="screenshots/screenshot3.png" alt="Upload models" width="700"/>
+  <img src="screenshots/screenshot3.png" alt="Manage whisper models" width="700"/>
 </p>
 
 <p align="center">

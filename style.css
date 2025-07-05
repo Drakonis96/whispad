@@ -1287,6 +1287,14 @@ select.form-control {
     background-color: var(--color-surface);
 }
 
+/* Model download buttons */
+.model-btns {
+    display: flex;
+    gap: var(--space-8);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-16);
+}
+
 /* Processing overlay */
 .processing-overlay {
     display: none;
