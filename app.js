@@ -220,10 +220,17 @@ class NotesApp {
         editor.addEventListener('mouseup', () => {
             this.updateSelectedText();
         });
-        
+
         editor.addEventListener('keyup', () => {
             this.updateSelectedText();
         });
+
+        // Show insertion marker on click/touch
+        const showMarker = () => {
+            this.showInsertionMarker();
+        };
+        editor.addEventListener('click', showMarker);
+        editor.addEventListener('touchend', showMarker);
         
         // Título de nota
         document.getElementById('note-title').addEventListener('input', () => {
@@ -343,6 +350,31 @@ class NotesApp {
             this.updateAIButtonsState(true);
             console.log('No text selected, AI buttons disabled');
         }
+    }
+
+    // Show a marker where the next transcription will be inserted
+    showInsertionMarker() {
+        // Remove existing marker
+        const oldMarker = document.getElementById('insertion-marker');
+        if (oldMarker) oldMarker.remove();
+
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+
+        const range = selection.getRangeAt(0).cloneRange();
+        range.collapse(true);
+        const rect = range.getClientRects()[0];
+        if (!rect) return;
+
+        const editorContent = document.querySelector('.editor-content');
+        const editorRect = editorContent.getBoundingClientRect();
+
+        const marker = document.createElement('div');
+        marker.id = 'insertion-marker';
+        marker.className = 'insertion-marker';
+        marker.style.top = `${rect.top - editorRect.top + editorContent.scrollTop}px`;
+        marker.style.left = `${rect.left - editorRect.left + editorContent.scrollLeft}px`;
+        editorContent.appendChild(marker);
     }
     
     // Actualizar estado de botones de IA
@@ -1906,7 +1938,11 @@ class NotesApp {
         range.setEndAfter(textNode);
         selection.removeAllRanges();
         selection.addRange(range);
-        
+
+        // Remove insertion marker after inserting text
+        const marker = document.getElementById('insertion-marker');
+        if (marker) marker.remove();
+
         // Disparar evento de cambio
         this.handleEditorChange();
         
@@ -2998,6 +3034,7 @@ document.addEventListener('selectionchange', () => {
             if (window.notesApp) {
                 window.notesApp.updateFormatButtons();
                 window.notesApp.updateSelectedText();
+                window.notesApp.showInsertionMarker();
             }
         }, 10);
     }
