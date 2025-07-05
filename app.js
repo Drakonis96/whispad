@@ -1887,9 +1887,9 @@ class NotesApp {
             console.log('Language:', this.config.transcriptionLanguage);
             
             const result = await backendAPI.transcribeAudio(
-                audioBlob, 
-                this.config.transcriptionLanguage, 
-                'whisper-tiny-local',
+                audioBlob,
+                this.config.transcriptionLanguage,
+                this.config.transcriptionModel,
                 'local'
             );
             
@@ -2989,9 +2989,6 @@ class NotesApp {
         // Fallbacks for known providers
         if (provider === 'openai' && models.length === 0) {
             models = ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'];
-        }
-        if (provider === 'local' && models.length === 0) {
-            models = ['whisper-tiny-local'];
         }
         if (provider === 'google' && models.length === 0) {
             models = ['google-speech-to-text'];

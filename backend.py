@@ -62,6 +62,7 @@ def transcribe_audio():
         # Obtener parámetros del request
         language = request.form.get('language', None)  # None = detección automática
         provider = request.form.get('provider', 'openai')  # openai o local
+        model_name = request.form.get('model')
         
         # Verificar disponibilidad del proveedor
         if provider == 'local':
@@ -70,10 +71,17 @@ def transcribe_audio():
             
             # Usar whisper.cpp local
             audio_bytes = audio_file.read()
+
+            model_path = None
+            if model_name:
+                models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+                model_path = os.path.join(models_dir, os.path.basename(model_name))
+
             result = whisper_wrapper.transcribe_audio_from_bytes(
-                audio_bytes, 
+                audio_bytes,
                 audio_file.filename,
-                language
+                language,
+                model_path
             )
             
             if result.get('success'):

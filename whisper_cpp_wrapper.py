@@ -51,25 +51,15 @@ class WhisperCppWrapper:
         else:
             self.whisper_cpp_path = Path(whisper_cpp_path)
             
-        # Check if paths exist
+        # Check if whisper.cpp executable exists
         self._check_prerequisites()
     
     def _check_prerequisites(self) -> bool:
-        """Check if whisper.cpp is compiled and model exists"""
-        issues = []
-        
-        if not self.model_path.exists():
-            issues.append(f"Model file not found: {self.model_path}")
-            
+        """Check if whisper.cpp executable exists"""
         if not self.whisper_cpp_path.exists():
-            issues.append(f"Whisper.cpp executable not found: {self.whisper_cpp_path}")
-            
-        if issues:
-            logger.error("Prerequisites not met:")
-            for issue in issues:
-                logger.error(f"  - {issue}")
+            logger.error(f"Whisper.cpp executable not found: {self.whisper_cpp_path}")
             return False
-            
+
         return True
     
     def compile_whisper_cpp(self) -> bool:
@@ -106,8 +96,8 @@ class WhisperCppWrapper:
             logger.error(f"Error during compilation: {e}")
             return False
     
-    def transcribe_audio(self, audio_file_path: str, language: str = None, 
-                        output_format: str = "json") -> Dict[str, Any]:
+    def transcribe_audio(self, audio_file_path: str, language: str = None,
+                        output_format: str = "json", model_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Transcribe audio using whisper.cpp
         
@@ -126,10 +116,15 @@ class WhisperCppWrapper:
                 if not self.compile_whisper_cpp():
                     raise Exception("Failed to compile whisper.cpp")
             
+            # Determine model to use
+            used_model = Path(model_path) if model_path else self.model_path
+            if not used_model.exists():
+                raise Exception(f"Model file not found: {used_model}")
+
             # Prepare command - simpler approach with direct stdout output
             cmd = [
                 str(self.whisper_cpp_path),
-                "-m", str(self.model_path),
+                "-m", str(used_model),
                 "-f", str(audio_file_path),
                 "--no-timestamps",
                 "--no-prints",  # Suppress debug prints to stderr
@@ -218,7 +213,7 @@ class WhisperCppWrapper:
                     "success": True,
                     "transcription": transcription_text,
                     "language": language or "auto",
-                    "model": "whisper-tiny-local"
+                    "model": used_model.name
                 }
             else:
                 logger.error(f"Whisper.cpp failed: {result.stderr}")
@@ -244,7 +239,7 @@ class WhisperCppWrapper:
             }
     
     def transcribe_audio_from_bytes(self, audio_bytes: bytes, filename: str = "audio.wav",
-                                   language: str = None) -> Dict[str, Any]:
+                                   language: str = None, model_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Transcribe audio from bytes data
         
@@ -266,7 +261,7 @@ class WhisperCppWrapper:
             wav_temp_path = self._convert_to_wav(original_temp_path, filename)
             
             # Transcribe using the WAV file
-            result = self.transcribe_audio(wav_temp_path, language)
+            result = self.transcribe_audio(wav_temp_path, language, model_path=model_path)
             
             # Clean up temporary files
             os.unlink(original_temp_path)
