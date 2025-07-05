@@ -23,7 +23,7 @@ app.config['MAX_CONTENT_LENGTH'] = 4 * 1024 * 1024 * 1024  # 4GB
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
 # Configurar CORS para permitir acceso desde el frontend
-cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5037').split(',')
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://localhost:5037').split(',')
 CORS(app, origins=cors_origins)
 
 # Configuración de APIs
