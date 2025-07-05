@@ -2181,7 +2181,8 @@ select.form-control {
 #mobile-record-fab {
     position: fixed;
     bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
-    right: 16px;
+    left: 50%;
+    transform: translateX(-50%);
     width: 56px;
     height: 56px;
     border-radius: 50%;

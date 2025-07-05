@@ -99,7 +99,8 @@ class NotesApp {
             temperature: 0.3,
             maxTokens: 1000,
             topP: 0.95,
-            responseStyle: 'balanced'
+            responseStyle: 'balanced',
+            showMobileRecordButton: true
         };
         
         // Visible styles configuration
@@ -127,6 +128,7 @@ class NotesApp {
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
         this.setupMobileHeaderActions();
+        this.updateMobileFabVisibility();
 
         // Migrate existing notes without ID
         await this.migrateExistingNotes();
@@ -199,7 +201,11 @@ class NotesApp {
         };
 
         moveButtons();
-        window.addEventListener('resize', moveButtons);
+        this.updateMobileFabVisibility();
+        window.addEventListener('resize', () => {
+            moveButtons();
+            this.updateMobileFabVisibility();
+        });
     }
     
     // Configurar event listeners
@@ -528,6 +534,7 @@ class NotesApp {
         const maxTokens = parseInt(document.getElementById('max-tokens').value);
         const topP = parseFloat(document.getElementById('top-p-range').value);
         const responseStyle = document.getElementById('response-style').value;
+        const showMobileRecordButton = document.getElementById('show-mobile-record').checked;
 
         this.config = {
             ...this.config, // Mantener otras configuraciones como API keys del .env
@@ -541,10 +548,12 @@ class NotesApp {
             temperature,
             maxTokens,
             topP,
-            responseStyle
+            responseStyle,
+            showMobileRecordButton
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
+        this.updateMobileFabVisibility();
         this.hideConfigModal();
         this.showNotification('Configuration saved');
     }
@@ -565,6 +574,7 @@ class NotesApp {
         document.getElementById('max-tokens').value = this.config.maxTokens || 1000;
         document.getElementById('top-p-range').value = this.config.topP || 0.95;
         document.getElementById('response-style').value = this.config.responseStyle || 'balanced';
+        document.getElementById('show-mobile-record').checked = this.config.showMobileRecordButton !== false;
         
         // Actualizar valores mostrados
         this.updateRangeValues();
@@ -3123,6 +3133,14 @@ class NotesApp {
             document.getElementById('streaming-enabled').checked = false;
             document.getElementById('transcription-prompt').value = '';
         }
+    }
+
+    updateMobileFabVisibility() {
+        const mobileFab = document.getElementById('mobile-record-fab');
+        if (!mobileFab) return;
+
+        const shouldShow = this.config.showMobileRecordButton !== false && window.innerWidth <= 768;
+        mobileFab.classList.toggle('hidden', !shouldShow);
     }
 }
 
