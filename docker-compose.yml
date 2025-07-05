@@ -17,9 +17,3 @@ services:
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-k", "-f", "https://localhost:5037/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
