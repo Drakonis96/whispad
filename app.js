@@ -221,9 +221,11 @@ class NotesApp {
         });
         const mobileFab = document.getElementById('mobile-record-fab');
         if (mobileFab) {
-            mobileFab.addEventListener('click', () => {
+            const handleMobileFab = () => {
                 this.toggleRecording();
-            });
+            };
+            mobileFab.addEventListener('click', handleMobileFab);
+            mobileFab.addEventListener('touchstart', handleMobileFab);
         }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
