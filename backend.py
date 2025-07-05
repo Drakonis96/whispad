@@ -18,6 +18,9 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 load_dotenv()
 
 app = Flask(__name__)
+# Allow uploads up to 4GB for large whisper.cpp models
+app.config['MAX_CONTENT_LENGTH'] = 4 * 1024 * 1024 * 1024  # 4GB
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
 # Configurar CORS para permitir acceso desde el frontend
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5037').split(',')
@@ -1159,6 +1162,35 @@ def upload_note():
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
 
+@app.route('/api/upload-model', methods=['POST'])
+def upload_model():
+    """Upload a whisper.cpp model file to the whisper-cpp-models directory"""
+    try:
+        if 'model' not in request.files:
+            return jsonify({"error": "No se recibió archivo"}), 400
+
+        model_file = request.files['model']
+        if model_file.filename == '':
+            return jsonify({"error": "Tipo de archivo no válido"}), 400
+
+        ext = os.path.splitext(model_file.filename)[1].lower()
+        if ext != '.bin':
+            return jsonify({"error": "Tipo de archivo no válido"}), 400
+
+        models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+        os.makedirs(models_dir, exist_ok=True)
+        filepath = os.path.join(models_dir, model_file.filename)
+        overwritten = os.path.exists(filepath)
+
+        # Save incrementally to handle very large files without exhausting memory
+        with open(filepath, 'wb') as f:
+            for chunk in iter(lambda: model_file.stream.read(8192), b''):
+                f.write(chunk)
+
+        return jsonify({"success": True, "filename": model_file.filename, "overwritten": overwritten})
+    except Exception as e:
+        return jsonify({"error": f"Error al subir modelo: {str(e)}"}), 500
+
 @app.route('/api/get-note', methods=['GET'])
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""
@@ -1238,4 +1270,5 @@ def get_transcription_providers():
 if __name__ == '__main__':
     port = int(os.getenv('BACKEND_PORT', 8000))
     debug = os.getenv('DEBUG', 'False').lower() == 'true'
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    # For large file uploads, we need to ensure proper configuration
+    app.run(host='0.0.0.0', port=port, debug=debug, threaded=True, request_handler=None)

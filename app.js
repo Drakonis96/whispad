@@ -86,10 +86,10 @@ class NotesApp {
         
         // Provider configuration
         this.config = {
-            transcriptionProvider: 'openai',
-            postprocessProvider: 'openai',
-            transcriptionModel: 'gpt-4o-mini-transcribe', // Cambiar a GPT-4o mini por defecto
-            postprocessModel: 'gpt-4o-mini',
+            transcriptionProvider: '',
+            postprocessProvider: '',
+            transcriptionModel: '',
+            postprocessModel: '',
             transcriptionLanguage: 'auto', // auto-detectar por defecto
             // Nuevas opciones para GPT-4o transcription
             streamingEnabled: true,
@@ -263,7 +263,16 @@ class NotesApp {
             this.hideRestoreModal();
         });
 
+        document.getElementById('upload-models-btn').addEventListener('click', () => {
+            this.showUploadModelsModal();
+        });
+
+        document.getElementById('cancel-upload-models').addEventListener('click', () => {
+            this.hideUploadModelsModal();
+        });
+
         this.setupRestoreDropZone();
+        this.setupUploadModelsDropZone();
         
         // Modal de confirmación
         document.getElementById('cancel-delete').addEventListener('click', () => {
@@ -465,8 +474,8 @@ class NotesApp {
     showConfigModal() {
         document.getElementById('transcription-provider').value = this.config.transcriptionProvider;
         document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
-        document.getElementById('transcription-model').value = this.config.transcriptionModel || 'gpt-4o-mini-transcribe';
-        document.getElementById('postprocess-model').value = this.config.postprocessModel || 'gpt-4o-mini';
+        document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
+        document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
         
         // Nuevas opciones para GPT-4o
@@ -695,7 +704,8 @@ class NotesApp {
             title: `Nota ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
             content: '',
             createdAt: now.toISOString(),
-            updatedAt: now.toISOString()
+            updatedAt: now.toISOString(),
+            loaded: true // Mark as loaded since it's a new note with empty content
         };
         
         this.notes.unshift(newNote);
@@ -937,8 +947,25 @@ class NotesApp {
         modal.classList.remove('active');
     }
 
+    showUploadModelsModal() {
+        const modal = document.getElementById('upload-model-modal');
+        modal.classList.add('active');
+    }
+
+    hideUploadModelsModal() {
+        const modal = document.getElementById('upload-model-modal');
+        modal.classList.remove('active');
+        
+        // Reset the progress section
+        const progressSection = document.getElementById('upload-progress-section');
+        const fileUploadList = document.getElementById('file-upload-list');
+        progressSection.style.display = 'none';
+        fileUploadList.innerHTML = '';
+    }
+
     setupRestoreDropZone() {
         const dropZone = document.getElementById('restore-drop-zone');
+        const fileInput = document.getElementById('restore-file-input');
         if (!dropZone) return;
         ['dragenter', 'dragover'].forEach(evt => {
             dropZone.addEventListener(evt, e => {
@@ -952,11 +979,50 @@ class NotesApp {
                 dropZone.classList.remove('highlight');
             });
         });
-        dropZone.addEventListener('drop', e => this.handleRestoreDrop(e));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            this.handleRestoreFiles(e.dataTransfer.files);
+        });
+        if (fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', e => {
+                this.handleRestoreFiles(e.target.files);
+                fileInput.value = '';
+            });
+        }
     }
 
-    async handleRestoreDrop(e) {
-        const files = Array.from(e.dataTransfer.files);
+    setupUploadModelsDropZone() {
+        const dropZone = document.getElementById('upload-model-drop-zone');
+        const fileInput = document.getElementById('upload-model-file-input');
+        if (!dropZone) return;
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                dropZone.classList.add('highlight');
+            });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                dropZone.classList.remove('highlight');
+            });
+        });
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            this.handleModelFiles(e.dataTransfer.files);
+        });
+        if (fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', e => {
+                this.handleModelFiles(e.target.files);
+                fileInput.value = '';
+            });
+        }
+    }
+
+    async handleRestoreFiles(fileList) {
+        const files = Array.from(fileList);
         if (!files.length) return;
 
         const mdFiles = files.filter(f => f.name.toLowerCase().endsWith('.md') || f.name.toLowerCase().endsWith('.meta'));
@@ -996,6 +1062,237 @@ class NotesApp {
             throw new Error('Upload failed');
         }
         return await response.json();
+    }
+
+    async handleModelFiles(fileList) {
+        const files = Array.from(fileList);
+        if (!files.length) return;
+
+        const modelFiles = files.filter(f => f.name.toLowerCase().endsWith('.bin'));
+        const invalid = files.filter(f => !f.name.toLowerCase().endsWith('.bin'));
+        invalid.forEach(f => this.showNotification(`${f.name} rejected`, 'error'));
+
+        if (modelFiles.length === 0) return;
+
+        // Show progress section
+        const progressSection = document.getElementById('upload-progress-section');
+        const fileUploadList = document.getElementById('file-upload-list');
+        progressSection.style.display = 'block';
+        fileUploadList.innerHTML = '';
+
+        let allUploadsComplete = true;
+        let hasErrors = false;
+
+        for (const file of modelFiles) {
+            const fileItem = this.createFileUploadItem(file);
+            fileUploadList.appendChild(fileItem);
+
+            try {
+                const result = await this.uploadModelFileWithProgress(file, fileItem);
+                if (result.success) {
+                    this.updateFileUploadStatus(fileItem, 'success', 
+                        result.overwritten ? 'Overwritten' : 'Uploaded successfully');
+                    if (result.overwritten) {
+                        this.showNotification(`${file.name} overwritten`, 'warning');
+                    } else {
+                        this.showNotification(`${file.name} uploaded`, 'success');
+                    }
+                } else {
+                    hasErrors = true;
+                    allUploadsComplete = false;
+                    this.updateFileUploadStatus(fileItem, 'error', 'Upload failed');
+                    this.showNotification(`Error uploading ${file.name}`, 'error');
+                }
+            } catch (err) {
+                hasErrors = true;
+                allUploadsComplete = false;
+                console.error('Upload error', err);
+                this.updateFileUploadStatus(fileItem, 'error', 
+                    err.message || 'Upload failed');
+                this.showNotification(`Error uploading ${file.name}`, 'error');
+            }
+        }
+
+        // Show completion message and force refresh
+        if (allUploadsComplete && !hasErrors) {
+            this.showUploadCompleteMessage(fileUploadList);
+            // Force refresh transcription providers to load new models
+            await this.forceRefreshTranscriptionProviders();
+        }
+    }
+
+    createFileUploadItem(file) {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-upload-item';
+        fileItem.innerHTML = `
+            <div class="file-upload-header">
+                <span class="file-upload-name">${file.name}</span>
+                <span class="file-upload-size">${this.formatFileSize(file.size)}</span>
+                <span class="file-upload-status">Preparing...</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar"></div>
+            </div>
+            <div class="progress-percentage">0%</div>
+        `;
+        return fileItem;
+    }
+
+    updateFileUploadStatus(fileItem, status, message) {
+        const statusElement = fileItem.querySelector('.file-upload-status');
+        const progressBar = fileItem.querySelector('.progress-bar');
+        const progressPercentage = fileItem.querySelector('.progress-percentage');
+        
+        statusElement.textContent = message;
+        statusElement.className = `file-upload-status ${status}`;
+        
+        if (status === 'success') {
+            progressBar.style.width = '100%';
+            progressBar.className = 'progress-bar complete';
+            progressPercentage.textContent = '100%';
+        } else if (status === 'error') {
+            progressBar.className = 'progress-bar error';
+            progressPercentage.textContent = 'Failed';
+        }
+    }
+
+    showUploadCompleteMessage(container) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'upload-complete-message';
+        messageDiv.innerHTML = `
+            <i class="fas fa-check-circle message-icon"></i>
+            <span class="message-text">All models uploaded successfully! Refreshing providers...</span>
+        `;
+        container.appendChild(messageDiv);
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    async forceRefreshTranscriptionProviders() {
+        try {
+            // Clear any cached provider data
+            this.availableTranscriptionProviders = null;
+            
+            // Reload transcription providers
+            try {
+                this.availableTranscriptionProviders = await backendAPI.getTranscriptionProviders();
+                console.log('Refreshed transcription providers:', this.availableTranscriptionProviders);
+            } catch (error) {
+                console.error('Error refreshing transcription providers:', error);
+                this.availableTranscriptionProviders = { providers: [], default: null };
+            }
+            
+            // Force a hard refresh of the browser to ensure new models are loaded
+            setTimeout(() => {
+                window.location.reload(true);
+            }, 2000);
+            
+        } catch (error) {
+            console.error('Error refreshing transcription providers:', error);
+        }
+    }
+
+    async uploadModelFileWithProgress(file, fileItem) {
+        const formData = new FormData();
+        formData.append('model', file, file.name);
+        
+        const progressBar = fileItem.querySelector('.progress-bar');
+        const progressPercentage = fileItem.querySelector('.progress-percentage');
+        const statusElement = fileItem.querySelector('.file-upload-status');
+        
+        // Create an AbortController with a longer timeout for large files
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 minutes timeout
+        
+        try {
+            statusElement.textContent = 'Uploading...';
+            
+            // Create a new XMLHttpRequest for better progress tracking
+            const xhr = new XMLHttpRequest();
+            
+            return new Promise((resolve, reject) => {
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        progressBar.style.width = percentComplete + '%';
+                        progressPercentage.textContent = Math.round(percentComplete) + '%';
+                        
+                        if (percentComplete < 100) {
+                            statusElement.textContent = `Uploading... ${Math.round(percentComplete)}%`;
+                        } else {
+                            statusElement.textContent = 'Processing...';
+                        }
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    clearTimeout(timeoutId);
+                    if (xhr.status === 200) {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            resolve(result);
+                        } catch (e) {
+                            reject(new Error('Invalid response format'));
+                        }
+                    } else {
+                        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+                    }
+                });
+                
+                xhr.addEventListener('error', () => {
+                    clearTimeout(timeoutId);
+                    reject(new Error('Network error during upload'));
+                });
+                
+                xhr.addEventListener('abort', () => {
+                    clearTimeout(timeoutId);
+                    reject(new Error('Upload timeout - file too large or connection too slow'));
+                });
+                
+                xhr.open('POST', '/api/upload-model');
+                xhr.send(formData);
+            });
+            
+        } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+        }
+    }
+
+    async uploadModelFile(file) {
+        const formData = new FormData();
+        formData.append('model', file, file.name);
+        
+        // Create an AbortController with a longer timeout for large files
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 minutes timeout
+        
+        try {
+            const response = await fetch('/api/upload-model', { 
+                method: 'POST', 
+                body: formData,
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                throw new Error('Upload failed');
+            }
+            return await response.json();
+        } catch (error) {
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                throw new Error('Upload timeout - file too large or connection too slow');
+            }
+            throw error;
+        }
     }
 
     htmlToMarkdown(html, title) {
@@ -1286,8 +1583,8 @@ class NotesApp {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">📝</div>
-                    <h3>No hay notas</h3>
-                    <p>Crea tu primera nota para comenzar</p>
+                    <h3>No chats yet</h3>
+                    <p>Create your first chat to get started</p>
                 </div>
             `;
             return;
@@ -1451,7 +1748,7 @@ class NotesApp {
 
     async transcribeWithOpenAI(audioBlob) {
         try {
-            const model = this.config.transcriptionModel || 'whisper-1';
+            const model = this.config.transcriptionModel;
             
             // Usar el método unificado para todos los modelos
             console.log('🎯 Using unified transcription');
@@ -1643,8 +1940,8 @@ class NotesApp {
         }
 
         // Verificar configuración según el modelo seleccionado
-        const provider = this.config.postprocessProvider || 'openai';
-        const model = this.config.postprocessModel || 'gpt-4o-mini';
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
@@ -1979,7 +2276,7 @@ class NotesApp {
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
             
-            const model = this.config.postprocessModel || 'google/gemma-3-27b-it:free';
+            const model = this.config.postprocessModel;
             return await backendAPI.improveText(text, action, 'openrouter', false, model, customPrompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
@@ -1994,7 +2291,7 @@ class NotesApp {
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
             
-            const model = this.config.postprocessModel || 'google/gemma-3-27b-it:free';
+            const model = this.config.postprocessModel;
             const response = await backendAPI.improveText(text, action, 'openrouter', true, model, customPrompt);
             
             if (!response.body) {
@@ -2501,8 +2798,13 @@ class NotesApp {
         const postprocessProvider = document.getElementById('postprocess-provider').value;
         const postprocessModelSelect = document.getElementById('postprocess-model');
         
-        // Limpiar opciones actuales
+        // Limpiar opciones actuales y añadir placeholder
         postprocessModelSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select model';
+        placeholder.disabled = true;
+        postprocessModelSelect.appendChild(placeholder);
         
         // Definir modelos por proveedor
         const modelsByProvider = {
@@ -2535,13 +2837,13 @@ class NotesApp {
             postprocessModelSelect.appendChild(option);
         });
         
-        // Seleccionar el primer modelo disponible si el actual no está disponible
+        // Seleccionar el modelo almacenado si está disponible
         const currentModel = this.config.postprocessModel;
         const availableValues = models.map(m => m.value);
         if (availableValues.includes(currentModel)) {
             postprocessModelSelect.value = currentModel;
-        } else if (models.length > 0) {
-            postprocessModelSelect.value = models[0].value;
+        } else {
+            postprocessModelSelect.value = '';
         }
     }
     
@@ -2549,6 +2851,11 @@ class NotesApp {
         const provider = document.getElementById('transcription-provider').value;
         const modelSelect = document.getElementById('transcription-model');
         modelSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select model';
+        placeholder.disabled = true;
+        modelSelect.appendChild(placeholder);
 
         // Get available providers from backend status
         let models = [];
@@ -2578,12 +2885,11 @@ class NotesApp {
             modelSelect.appendChild(option);
         });
 
-        // Set value to config or first available
+        // Establecer modelo si el almacenado está disponible
         if (models.includes(this.config.transcriptionModel)) {
             modelSelect.value = this.config.transcriptionModel;
-        } else if (models.length > 0) {
-            modelSelect.value = models[0];
-            this.config.transcriptionModel = models[0];
+        } else {
+            modelSelect.value = '';
         }
     }
     

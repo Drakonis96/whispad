@@ -426,8 +426,8 @@ class NotesApp {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">📝</div>
-                    <h3>No hay notas</h3>
-                    <p>Crea tu primera nota para comenzar</p>
+                    <h3>No chats yet</h3>
+                    <p>Create your first chat to get started</p>
                 </div>
             `;
             return;

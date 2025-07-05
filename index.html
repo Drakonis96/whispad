@@ -22,6 +22,9 @@
             <button class="btn btn--outline btn--sm" id="restore-btn" title="Restore notes from files">
                 <i class="fas fa-upload"></i>&nbsp;Restore
             </button>
+            <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Upload whisper.cpp models">
+                <i class="fas fa-upload"></i>&nbsp;Upload models
+            </button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -175,6 +178,7 @@
                 <div class="config-section">
                     <h4>Transcription Provider</h4>
                     <select class="form-control" id="transcription-provider">
+                        <option value="" disabled selected>Select provider</option>
                         <option value="openai">OpenAI Whisper</option>
                         <option value="local">Local Whisper (whisper.cpp)</option>
                         <option value="google">Google Speech-to-Text</option>
@@ -186,6 +190,7 @@
                 <div class="config-section">
                     <h4>Post-processing Provider</h4>
                     <select class="form-control" id="postprocess-provider">
+                        <option value="" disabled selected>Select provider</option>
                         <option value="openai">OpenAI GPT</option>
                         <option value="google">Google Gemini</option>
                         <option value="openrouter">OpenRouter</option>
@@ -196,8 +201,9 @@
                     <div class="model-config">
                         <label class="form-label">Transcription Model</label>
                         <select class="form-control" id="transcription-model">
+                            <option value="" disabled selected>Select model</option>
                             <option value="whisper-1">Whisper-1 (Legacy) - Complete</option>
-                            <option value="gpt-4o-mini-transcribe" selected>GPT-4o Mini - Fast</option>
+                            <option value="gpt-4o-mini-transcribe">GPT-4o Mini - Fast</option>
                             <option value="gpt-4o-transcribe">GPT-4o - High Precision</option>
                         </select>
                     </div>
@@ -244,6 +250,7 @@
                     <div class="model-config">
                         <label class="form-label">Post-processing Model</label>
                         <select class="form-control" id="postprocess-model">
+                            <option value="" disabled selected>Select model</option>
                             <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
                             <option value="gpt-4o">GPT-4o (OpenAI)</option>
                             <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>
@@ -354,10 +361,31 @@
     <div class="modal" id="restore-modal">
         <div class="modal-content">
             <h3>Restore Notes</h3>
-            <p>Drag and drop individual .md or .meta files below</p>
+            <p>Drag and drop individual .md or .meta files below or click the area to select</p>
             <div class="drop-zone" id="restore-drop-zone">Drop files here</div>
+            <input type="file" id="restore-file-input" multiple accept=".md,.meta" style="display:none">
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-restore">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload models modal -->
+    <div class="modal" id="upload-model-modal">
+        <div class="modal-content">
+            <h3>Upload Models</h3>
+            <p>Drag and drop .bin model files below or click the area to select</p>
+            <div class="drop-zone" id="upload-model-drop-zone">Drop files here</div>
+            <input type="file" id="upload-model-file-input" multiple accept=".bin" style="display:none">
+            
+            <!-- Progress section -->
+            <div class="upload-progress-section" id="upload-progress-section" style="display:none;">
+                <h4>Upload Progress</h4>
+                <div class="file-upload-list" id="file-upload-list"></div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-upload-models">Close</button>
             </div>
         </div>
     </div>
