@@ -18,6 +18,8 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 load_dotenv()
 
 app = Flask(__name__)
+# Allow uploads up to 4GB for large whisper.cpp models
+app.config['MAX_CONTENT_LENGTH'] = 4 * 1024 * 1024 * 1024  # 4GB
 
 # Configurar CORS para permitir acceso desde el frontend
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5037').split(',')
@@ -1178,7 +1180,11 @@ def upload_model():
         os.makedirs(models_dir, exist_ok=True)
         filepath = os.path.join(models_dir, model_file.filename)
         overwritten = os.path.exists(filepath)
-        model_file.save(filepath)
+
+        # Save incrementally to handle very large files without exhausting memory
+        with open(filepath, 'wb') as f:
+            for chunk in iter(lambda: model_file.stream.read(8192), b''):
+                f.write(chunk)
 
         return jsonify({"success": True, "filename": model_file.filename, "overwritten": overwritten})
     except Exception as e:
