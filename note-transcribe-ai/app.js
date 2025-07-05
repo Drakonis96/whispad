@@ -724,10 +724,11 @@ class NotesApp {
             return;
         }
 
-        // Verificar configuración según el modelo seleccionado
+        const provider = this.config.postprocessProvider || 'openai';
         const model = this.config.postprocessModel || 'gpt-4o-mini';
-        const isGemini = model.startsWith('gemini');
-        const isOpenAI = model.startsWith('gpt');
+        const isGemini = provider === 'google';
+        const isOpenAI = provider === 'openai';
+        const isOpenRouter = provider === 'openrouter';
 
         if (isOpenAI && !this.config.openaiApiKey) {
             this.showNotification('Por favor configura tu API key de OpenAI', 'warning');
@@ -745,42 +746,56 @@ class NotesApp {
         this.saveAIHistory();
 
         this.showProcessingOverlay(`Mejorando texto con IA...`);
-        
+
+        const textToImprove = this.selectedText;
+        const rangeToReplace = this.selectedRange.cloneRange();
+
+        // Crear elemento temporal para mostrar progreso
+        const tempSpan = document.createElement('span');
+        tempSpan.className = 'ai-generating-text';
+        tempSpan.style.padding = '2px 4px';
+        tempSpan.style.borderRadius = '3px';
+        tempSpan.style.border = '1px dashed #1976d2';
+        tempSpan.textContent = '⏳ Mejorando...';
+
+        rangeToReplace.deleteContents();
+        rangeToReplace.insertNode(tempSpan);
+
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+
         try {
             let improvedText = '';
-            
+
             if (isOpenAI) {
-                improvedText = await this.improveWithOpenAI(this.selectedText, action);
+                improvedText = await this.improveWithOpenAIStream(textToImprove, action, tempSpan);
             } else if (isGemini) {
-                improvedText = await this.improveWithGemini(this.selectedText, action);
+                improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
+            } else if (isOpenRouter) {
+                improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
             } else {
-                // Fallback a mejora local
-                improvedText = this.applyAIImprovement(this.selectedText, action);
+                improvedText = this.applyAIImprovement(textToImprove, action);
+                tempSpan.textContent = improvedText;
             }
-            
-            // Restaurar selección y reemplazar texto
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(this.selectedRange);
-            
-            // Reemplazar texto seleccionado
-            this.selectedRange.deleteContents();
-            this.selectedRange.insertNode(document.createTextNode(improvedText));
-            
-            // Limpiar selección
-            selection.removeAllRanges();
+
+            tempSpan.className = 'ai-generated-text';
+            setTimeout(() => { tempSpan.className = ''; }, 1000);
+
             this.selectedText = '';
             this.selectedRange = null;
-            this.updateAIButtonsState(true);
-            
-            // Habilitar botón de deshacer
             this.updateUndoButton();
-            
+
             this.hideProcessingOverlay();
             this.showNotification(`Texto mejorado: ${configuracionMejoras[action].nombre}`);
             this.handleEditorChange();
-            
+
         } catch (error) {
+            if (tempSpan && tempSpan.parentNode) {
+                tempSpan.textContent = textToImprove;
+                tempSpan.className = '';
+            }
+            this.selectedText = '';
+            this.selectedRange = null;
             this.hideProcessingOverlay();
             console.error('Error al mejorar texto:', error);
             this.showNotification('Error al mejorar texto: ' + error.message, 'error');
@@ -902,6 +917,106 @@ class NotesApp {
 
         const data = await response.json();
         return data.candidates?.[0]?.content?.parts?.[0]?.text || text;
+    }
+
+    async improveWithOpenAIStream(text, action, tempElement) {
+        const response = await backendAPI.improveText(text, action, 'openai', true, this.config.postprocessModel);
+        if (!response.body) {
+            throw new Error('No response body received');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let improvedText = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') break;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            improvedText += data.content;
+                            tempElement.textContent = this.cleanAIResponse(improvedText);
+                        }
+                    } catch {}
+                }
+            }
+        }
+        return this.cleanAIResponse(improvedText);
+    }
+
+    async improveWithGeminiStream(text, action, tempElement) {
+        const response = await backendAPI.improveText(text, action, 'google', true, this.config.postprocessModel);
+        if (!response.body) {
+            throw new Error('No response body received');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let improvedText = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') break;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            improvedText += data.content;
+                            tempElement.textContent = this.cleanAIResponse(improvedText);
+                        }
+                    } catch {}
+                }
+            }
+        }
+        return this.cleanAIResponse(improvedText);
+    }
+
+    async improveWithOpenRouterStream(text, action, tempElement) {
+        const response = await backendAPI.improveText(text, action, 'openrouter', true, this.config.postprocessModel);
+        if (!response.body) {
+            throw new Error('No response body received');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let improvedText = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') break;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            improvedText += data.content;
+                            tempElement.textContent = this.cleanAIResponse(improvedText);
+                        }
+                    } catch {}
+                }
+            }
+        }
+        return this.cleanAIResponse(improvedText);
+    }
+
+    cleanAIResponse(text) {
+        if (!text || typeof text !== 'string') return '';
+        let cleaned = text.trim();
+        if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+            cleaned = cleaned.slice(1, -1);
+        }
+        cleaned = cleaned.replace(/^\n+|\n+$/g, '');
+        return cleaned;
     }
     
     applyAIImprovement(text, action) {
