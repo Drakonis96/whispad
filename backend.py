@@ -17,13 +17,15 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 # Cargar variables de entorno
 load_dotenv()
 
-app = Flask(__name__)
+# Servir archivos estáticos directamente desde el backend
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, static_folder=BASE_DIR, static_url_path='')
 # Allow uploads up to 4GB for large whisper.cpp models
 app.config['MAX_CONTENT_LENGTH'] = 4 * 1024 * 1024 * 1024  # 4GB
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 
 # Configurar CORS para permitir acceso desde el frontend
-cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://localhost:5037').split(',')
+cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5037').split(',')
 CORS(app, origins=cors_origins)
 
 # Configuración de APIs
@@ -41,6 +43,11 @@ except Exception as e:
     print(f"Error initializing whisper.cpp: {e}")
     WHISPER_CPP_AVAILABLE = False
     whisper_wrapper = None
+
+@app.route('/')
+def serve_index():
+    """Servir la aplicación web"""
+    return app.send_static_file('index.html')
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -1320,7 +1327,7 @@ def get_transcription_providers():
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 if __name__ == '__main__':
-    port = int(os.getenv('BACKEND_PORT', 8000))
+    port = int(os.getenv('BACKEND_PORT', 5037))
     debug = os.getenv('DEBUG', 'False').lower() == 'true'
     # For large file uploads, we need to ensure proper configuration
     app.run(host='0.0.0.0', port=port, debug=debug, threaded=True, request_handler=None)

@@ -1,4 +1,4 @@
-// Configuración del backend - usa rutas relativas ya que nginx hace el proxy
+// Configuración del backend - se usan rutas relativas para llamadas al servidor
 const BACKEND_URL = '';
 
 // Clase para manejar las llamadas al backend

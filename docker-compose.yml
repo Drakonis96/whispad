@@ -9,11 +9,10 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - BACKEND_PORT=8000
-      - CORS_ORIGINS=https://localhost:5037,https://127.0.0.1:5037
+      - BACKEND_PORT=5037
+      - CORS_ORIGINS=http://localhost:5037,http://127.0.0.1:5037
       - DEBUG=False
     volumes:
-      - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
     restart: unless-stopped

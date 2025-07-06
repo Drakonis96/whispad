@@ -1,9 +1,8 @@
-# Dockerfile unificado para nginx + python backend
+# Dockerfile para servir la aplicación solo con Python
 FROM python:3.11-slim
 
-# Instalar nginx, build tools y dependencias del sistema
+# Instalar herramientas de compilación y dependencias del sistema
 RUN apt-get update && apt-get install -y \
-    nginx \
     build-essential \
     cmake \
     git \
@@ -50,30 +49,6 @@ RUN if [ -f "whisper.cpp-main/build/bin/whisper-cli" ]; then \
         echo "Warning: whisper-cli binary not found"; \
     fi
 
-# Configurar nginx
-COPY nginx.conf /etc/nginx/sites-available/default
-RUN rm -f /etc/nginx/sites-enabled/default && \
-    ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
-
-# Copiar archivos estáticos al directorio que nginx puede servir
-RUN mkdir -p /usr/share/nginx/html && \
-    cp index.html /usr/share/nginx/html/ && \
-    cp style.css /usr/share/nginx/html/ && \
-    cp app.js /usr/share/nginx/html/ && \
-    cp backend-api.js /usr/share/nginx/html/ && \
-    cp -r note-transcribe-ai /usr/share/nginx/html/ || true && \
-    cp -r logos /usr/share/nginx/html/ || true
-
-# Dar permisos correctos a los archivos estáticos
-RUN chmod -R 755 /usr/share/nginx/html && \
-    chown -R www-data:www-data /usr/share/nginx/html
-
-# Crear directorios para logs de nginx y notas guardadas
-RUN mkdir -p /var/log/nginx && \
-    touch /var/log/nginx/access.log && \
-    touch /var/log/nginx/error.log && \
-    chmod 666 /var/log/nginx/access.log && \
-    chmod 666 /var/log/nginx/error.log
 
 # Crear directorio para notas guardadas con permisos apropiados
 RUN mkdir -p /app/saved_notes && \
