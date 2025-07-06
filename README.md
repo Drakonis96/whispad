@@ -22,7 +22,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Integrated note manager: create, search, tag, save, restore and download in Markdown format.
 - Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
 - A blue marker indicating where the transcription will be inserted.
-- Compatible with multiple providers: OpenAI, Google and local whisper.cpp (tiny model included on this repo, but you can download small, base, medium or large)
+- Compatible with multiple providers: OpenAI, Google and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
 - Download or upload local (.bin) whisper.cpp models directly from the interface.
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
@@ -72,11 +72,11 @@ If you prefer not to use Docker, you can also run it directly with Python:
    ```bash
    pip install -r requirements.txt
    ```
-4. (Optional) Download a whisper.cpp model with the included script:
+4. Download a whisper.cpp model with the script or from the **Models** menu (no model is included by default):
    ```bash
    bash install-whisper-cpp.sh
    ```
-   You can also download or upload models from the interface.
+   You can also download or upload models directly from the interface.
 5. Run the server:
    ```bash
    python backend.py
