@@ -120,3 +120,7 @@ Here are some screenshots of WhisPad in action:
   <img src="screenshots/screenshot4.png" alt="Transcribed notes list" width="700"/>
 </p>
 
+## Acknowledgements
+
+This project was developed with the help of AI tools including **Perplexity Labs**, **OpenAI Codex**, and **Claude 4**. Local transcription models run thanks to [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (a copy is bundled here for easier installation).
+
