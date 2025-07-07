@@ -1,0 +1,15 @@
+name: whispad_app
+description: Flutter wrapper for WhisPad web interface
+version: 1.0.0+1
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  webview_flutter: ^4.7.0
+  shared_preferences: ^2.2.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+flutter:
+  uses-material-design: true
