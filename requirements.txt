@@ -7,3 +7,7 @@ python-dotenv
 pydub
 librosa
 soundfile
+funasr
+torch
+torchaudio
+huggingface_hub

@@ -388,6 +388,19 @@ class BackendAPI {
         }
     }
 
+    async downloadSenseVoiceModelStream() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/download-sensevoice`, { method: 'POST' });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response;
+        } catch (error) {
+            console.error('Error requesting SenseVoice model download:', error);
+            throw error;
+        }
+    }
+
     async processDownloadStream(streamResponse, onProgress = null) {
         try {
             const reader = streamResponse.body.getReader();

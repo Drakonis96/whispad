@@ -1423,7 +1423,12 @@ class NotesApp {
 
     async downloadModelWithProgress(size, fileItem) {
         try {
-            const streamResponse = await backendAPI.downloadModelStream(size);
+            let streamResponse;
+            if (size === 'sensevoice-small') {
+                streamResponse = await backendAPI.downloadSenseVoiceModelStream();
+            } else {
+                streamResponse = await backendAPI.downloadModelStream(size);
+            }
             await backendAPI.processDownloadStream(streamResponse, percent => {
                 const progressBar = fileItem.querySelector('.progress-bar');
                 const progressPercentage = fileItem.querySelector('.progress-percentage');
@@ -1445,7 +1450,12 @@ class NotesApp {
         progressSection.style.display = 'block';
         fileUploadList.innerHTML = '';
 
-        const filename = `ggml-${size}.bin`;
+        let filename;
+        if (size === 'sensevoice-small') {
+            filename = 'sensevoice_small';
+        } else {
+            filename = `ggml-${size}.bin`;
+        }
         const fileItem = this.createFileUploadItem({ name: filename, size: 0 });
         fileUploadList.appendChild(fileItem);
 

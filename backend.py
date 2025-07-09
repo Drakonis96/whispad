@@ -42,6 +42,17 @@ except Exception as e:
     WHISPER_CPP_AVAILABLE = False
     whisper_wrapper = None
 
+# Initialize SenseVoice wrapper
+try:
+    from sensevoice_wrapper import SenseVoiceWrapper
+    sensevoice_wrapper = SenseVoiceWrapper()
+    SENSEVOICE_AVAILABLE = sensevoice_wrapper.load_model()
+    print(f"SenseVoice available: {SENSEVOICE_AVAILABLE}")
+except Exception as e:
+    print(f"Error initializing SenseVoice: {e}")
+    sensevoice_wrapper = None
+    SENSEVOICE_AVAILABLE = False
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el backend está funcionando"""
@@ -92,7 +103,23 @@ def transcribe_audio():
                 })
             else:
                 return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
-                
+
+        elif provider == 'sensevoice':
+            if not SENSEVOICE_AVAILABLE:
+                return jsonify({"error": "SenseVoice not available"}), 500
+
+            audio_bytes = audio_file.read()
+            result = sensevoice_wrapper.transcribe_audio_from_bytes(audio_bytes, language)
+
+            if result.get('success'):
+                return jsonify({
+                    "transcription": result.get('transcription', ''),
+                    "provider": "sensevoice",
+                    "model": result.get('model', 'SenseVoice Small')
+                })
+            else:
+                return jsonify({"error": f"Error en transcripción SenseVoice: {result.get('error', 'Unknown error')}"}), 500
+
         else:  # OpenAI
             if not OPENAI_API_KEY:
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
@@ -1243,6 +1270,26 @@ def download_model():
 
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
+@app.route('/api/download-sensevoice', methods=['POST'])
+def download_sensevoice_model():
+    """Trigger download of the SenseVoice Small model"""
+
+    def generate():
+        try:
+            if sensevoice_wrapper:
+                success = sensevoice_wrapper.load_model()
+                if success:
+                    yield f"data: {json.dumps({'progress': 100})}\n\n"
+                    yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall'})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'error': 'Failed to load model'})}\n\n"
+            else:
+                yield f"data: {json.dumps({'error': 'Wrapper not available'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
 @app.route('/api/get-note', methods=['GET'])
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""
@@ -1310,10 +1357,27 @@ def get_transcription_providers():
                 "models": [model["name"] for model in models],
                 "privacy": "Full privacy - no data leaves your device"
             })
+
+        # SenseVoice provider
+        if SENSEVOICE_AVAILABLE:
+            providers.append({
+                "id": "sensevoice",
+                "name": "SenseVoice",
+                "description": "Local transcription using SenseVoice Small",
+                "available": True,
+                "models": ["sensevoice-small"],
+                "privacy": "Full privacy - no data leaves your device"
+            })
         
         return jsonify({
             "providers": providers,
-            "default": "openai" if OPENAI_API_KEY else ("local" if WHISPER_CPP_AVAILABLE else None)
+            "default": (
+                "openai" if OPENAI_API_KEY else (
+                    "local" if WHISPER_CPP_AVAILABLE else (
+                        "sensevoice" if SENSEVOICE_AVAILABLE else None
+                    )
+                )
+            )
         })
         
     except Exception as e:
