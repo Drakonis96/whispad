@@ -14,8 +14,9 @@ except Exception as e:
 class SenseVoiceWrapper:
     """Wrapper for the SenseVoice Small model"""
 
-    def __init__(self, model_dir: str = "iic/SenseVoiceSmall", device: Optional[str] = None):
-        self.model_dir = model_dir
+    def __init__(self, model_dir: Optional[str] = None, device: Optional[str] = None):
+        default_dir = os.getenv("SENSEVOICE_MODEL_DIR", "FunAudioLLM/SenseVoiceSmall")
+        self.model_dir = model_dir or default_dir
         self.device = device or os.getenv("SENSEVOICE_DEVICE", "cpu")
         self.model = None
         self.kwargs = None
@@ -36,14 +37,25 @@ class SenseVoiceWrapper:
             return False
         if self._loaded:
             return True
-        try:
-            self.model, self.kwargs = self.ModelClass.from_pretrained(model=self.model_dir, device=self.device)
-            self.model.eval()
-            self._loaded = True
-            return True
-        except Exception as e:
-            print(f"Error loading SenseVoice model: {e}")
-            return False
+
+        candidates = [self.model_dir]
+        if self.model_dir != "FunAudioLLM/SenseVoiceSmall":
+            candidates.append("FunAudioLLM/SenseVoiceSmall")
+        if self.model_dir != "iic/SenseVoiceSmall":
+            candidates.append("iic/SenseVoiceSmall")
+
+        for path in candidates:
+            try:
+                print(f"Attempting to load SenseVoice model from {path}")
+                self.model, self.kwargs = self.ModelClass.from_pretrained(model=path, device=self.device)
+                self.model.eval()
+                self._loaded = True
+                self.model_dir = path
+                return True
+            except Exception as e:
+                print(f"Error loading SenseVoice from {path}: {e}")
+
+        return False
 
     def is_ready(self) -> bool:
         return self._loaded
@@ -68,6 +80,6 @@ class SenseVoiceWrapper:
                 return {"success": False, "error": "No result"}
             text = res[0][0]["text"]
             text = rich_transcription_postprocess(text)
-            return {"success": True, "transcription": text, "model": "SenseVoice Small"}
+            return {"success": True, "transcription": text, "model": "sensevoice-small"}
         except Exception as e:
             return {"success": False, "error": str(e)}

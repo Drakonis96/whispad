@@ -115,7 +115,7 @@ def transcribe_audio():
                 return jsonify({
                     "transcription": result.get('transcription', ''),
                     "provider": "sensevoice",
-                    "model": result.get('model', 'SenseVoice Small')
+                    "model": result.get('model', 'sensevoice-small')
                 })
             else:
                 return jsonify({"error": f"Error en transcripción SenseVoice: {result.get('error', 'Unknown error')}"}), 500
@@ -1280,7 +1280,7 @@ def download_sensevoice_model():
                 success = sensevoice_wrapper.load_model()
                 if success:
                     yield f"data: {json.dumps({'progress': 100})}\n\n"
-                    yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall'})}\n\n"
+                    yield f"data: {json.dumps({'done': True, 'filename': 'sensevoice-small'})}\n\n"
                 else:
                     yield f"data: {json.dumps({'error': 'Failed to load model'})}\n\n"
             else:
@@ -1363,7 +1363,7 @@ def get_transcription_providers():
             providers.append({
                 "id": "sensevoice",
                 "name": "SenseVoice",
-                "description": "Local transcription using SenseVoice Small",
+                "description": "Local transcription using SenseVoice",
                 "available": True,
                 "models": ["sensevoice-small"],
                 "privacy": "Full privacy - no data leaves your device"
