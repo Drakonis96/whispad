@@ -547,6 +547,11 @@ class NotesApp {
         const streamingEnabled = document.getElementById('streaming-enabled').checked;
         const transcriptionPrompt = document.getElementById('transcription-prompt').value.trim();
         
+        // SenseVoice options
+        const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
+        const detectEvents = document.getElementById('detect-events')?.checked ?? true;
+        const useItn = document.getElementById('use-itn')?.checked ?? true;
+        
         // Configuración avanzada
         const temperature = parseFloat(document.getElementById('temperature-range').value);
         const maxTokens = parseInt(document.getElementById('max-tokens').value);
@@ -563,6 +568,9 @@ class NotesApp {
             transcriptionLanguage,
             streamingEnabled,
             transcriptionPrompt,
+            detectEmotion,
+            detectEvents,
+            useItn,
             temperature,
             maxTokens,
             topP,
@@ -587,6 +595,17 @@ class NotesApp {
         document.getElementById('streaming-enabled').checked = this.config.streamingEnabled !== false; // true por defecto
         document.getElementById('transcription-prompt').value = this.config.transcriptionPrompt || '';
         
+        // SenseVoice options
+        if (document.getElementById('detect-emotion')) {
+            document.getElementById('detect-emotion').checked = this.config.detectEmotion !== false;
+        }
+        if (document.getElementById('detect-events')) {
+            document.getElementById('detect-events').checked = this.config.detectEvents !== false;
+        }
+        if (document.getElementById('use-itn')) {
+            document.getElementById('use-itn').checked = this.config.useItn !== false;
+        }
+        
         // Configuración avanzada
         document.getElementById('temperature-range').value = this.config.temperature || 0.3;
         document.getElementById('max-tokens').value = this.config.maxTokens || 1000;
@@ -602,6 +621,9 @@ class NotesApp {
         
         // Mostrar/ocultar opciones GPT-4o según el modelo seleccionado
         this.updateTranscriptionOptions();
+        
+        // Mostrar/ocultar opciones SenseVoice según el proveedor seleccionado
+        this.toggleSenseVoiceOptions();
 
         const modal = document.getElementById('config-modal');
         this.hideMobileFab();
@@ -1145,6 +1167,15 @@ class NotesApp {
                 this.handleModelDownload(size);
             });
         });
+        
+        // Setup advanced model download buttons
+        const advancedButtons = document.querySelectorAll('.model-download-advanced');
+        advancedButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const model = btn.getAttribute('data-model');
+                this.handleAdvancedModelDownload(model);
+            });
+        });
     }
 
     async handleRestoreFiles(fileList) {
@@ -1439,6 +1470,28 @@ class NotesApp {
         }
     }
 
+    async downloadAdvancedModelWithProgress(model, fileItem) {
+        try {
+            const streamResponse = await backendAPI.downloadAdvancedModelStream(model);
+            await backendAPI.processAdvancedDownloadStream(streamResponse, (percent, status) => {
+                const progressBar = fileItem.querySelector('.progress-bar');
+                const progressPercentage = fileItem.querySelector('.progress-percentage');
+                if (percent !== undefined) {
+                    progressBar.style.width = percent + '%';
+                    progressPercentage.textContent = percent + '%';
+                }
+                if (status) {
+                    fileItem.querySelector('.file-upload-status').textContent = status;
+                }
+            });
+            this.updateFileUploadStatus(fileItem, 'success', 'Downloaded successfully');
+        } catch (error) {
+            console.error('Advanced model download error', error);
+            this.updateFileUploadStatus(fileItem, 'error', 'Download failed');
+            throw error;
+        }
+    }
+
     async handleModelDownload(size) {
         const progressSection = document.getElementById('upload-progress-section');
         const fileUploadList = document.getElementById('file-upload-list');
@@ -1455,6 +1508,37 @@ class NotesApp {
             await this.forceRefreshTranscriptionProviders();
         } catch (err) {
             this.showNotification(`Error downloading ${filename}`, 'error');
+        }
+    }
+
+    async handleAdvancedModelDownload(model) {
+        const progressSection = document.getElementById('upload-progress-section');
+        const fileUploadList = document.getElementById('file-upload-list');
+        progressSection.style.display = 'block';
+        fileUploadList.innerHTML = '';
+
+        let filename = '';
+        let displayName = '';
+        
+        switch(model) {
+            case 'sensevoice':
+                filename = 'SenseVoiceSmall';
+                displayName = 'SenseVoice Small';
+                break;
+            default:
+                this.showNotification('Unknown model type', 'error');
+                return;
+        }
+
+        const fileItem = this.createFileUploadItem({ name: displayName, size: 0 });
+        fileUploadList.appendChild(fileItem);
+
+        try {
+            await this.downloadAdvancedModelWithProgress(model, fileItem);
+            this.showUploadCompleteMessage(fileUploadList);
+            await this.forceRefreshTranscriptionProviders();
+        } catch (err) {
+            this.showNotification(`Error downloading ${displayName}`, 'error');
         }
     }
 
@@ -1805,10 +1889,10 @@ class NotesApp {
                 return;
             }
             
-            if (this.config.transcriptionProvider === 'local' && 
+            if (this.config.transcriptionProvider === 'sensevoice' && 
                 (!this.availableTranscriptionProviders?.providers || 
-                 !this.availableTranscriptionProviders.providers.some(p => p.id === 'local'))) {
-                this.showNotification('Local whisper.cpp not available in backend', 'warning');
+                 !this.availableTranscriptionProviders.providers.some(p => p.id === 'sensevoice'))) {
+                this.showNotification('SenseVoice not available. Please download the SenseVoiceSmall model first.', 'warning');
                 return;
             }
 
@@ -1900,6 +1984,8 @@ class NotesApp {
                 transcription = await this.transcribeWithOpenAI(audioBlob);
             } else if (this.config.transcriptionProvider === 'local') {
                 transcription = await this.transcribeWithLocal(audioBlob);
+            } else if (this.config.transcriptionProvider === 'sensevoice') {
+                transcription = await this.transcribeWithSenseVoice(audioBlob);
             } else if (this.config.transcriptionProvider === 'google') {
                 // TODO: Implementar Google Speech-to-Text
                 transcription = 'Transcripción con Google (no implementado aún)';
@@ -1963,6 +2049,52 @@ class NotesApp {
         } catch (error) {
             console.error('Error in local transcription:', error);
             throw new Error(`Error en transcripción local: ${error.message}`);
+        }
+    }
+
+    async transcribeWithSenseVoice(audioBlob) {
+        try {
+            console.log('🎯 Using SenseVoice transcription');
+            console.log('Language:', this.config.transcriptionLanguage);
+            
+            // Get SenseVoice-specific options
+            const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
+            const detectEvents = document.getElementById('detect-events')?.checked ?? true;
+            const useItn = document.getElementById('use-itn')?.checked ?? true;
+            
+            const result = await backendAPI.transcribeAudioSenseVoice(
+                audioBlob,
+                this.config.transcriptionLanguage,
+                detectEmotion,
+                detectEvents,
+                useItn
+            );
+            
+            console.log('SenseVoice transcription result:', result);
+            
+            // Display emotion and events information if available
+            if (result.emotion) {
+                this.showNotification(`Emotion detected: ${result.emotion.name}`, 'info');
+            }
+            
+            if (result.events && result.events.length > 0) {
+                const eventNames = result.events.map(e => e.name).join(', ');
+                this.showNotification(`Events detected: ${eventNames}`, 'info');
+            }
+            
+            if (result.language_detected && result.language_detected !== 'auto') {
+                this.showNotification(`Language detected: ${result.language_detected}`, 'info');
+            }
+            
+            // Check if we got empty or invalid result
+            if (!result.transcription || result.transcription.trim() === '') {
+                throw new Error('Empty transcription result from SenseVoice');
+            }
+            
+            return result.transcription;
+        } catch (error) {
+            console.error('Error in SenseVoice transcription:', error);
+            throw new Error(`Error en transcripción SenseVoice: ${error.message}`);
         }
     }
 
@@ -2973,6 +3105,7 @@ class NotesApp {
         if (transcriptionProvider) {
             transcriptionProvider.addEventListener('change', () => {
                 this.updateTranscriptionModelOptions();
+                this.toggleSenseVoiceOptions();
             });
         }
     }
@@ -3160,6 +3293,57 @@ class NotesApp {
         if (!isGPT4O) {
             document.getElementById('streaming-enabled').checked = false;
             document.getElementById('transcription-prompt').value = '';
+        }
+    }
+
+    toggleSenseVoiceOptions() {
+        const provider = document.getElementById('transcription-provider').value;
+        const sensevoiceOptions = document.getElementById('sensevoice-options');
+        
+        if (sensevoiceOptions) {
+            sensevoiceOptions.style.display = provider === 'sensevoice' ? 'block' : 'none';
+        }
+        
+        // Update language options for SenseVoice
+        if (provider === 'sensevoice') {
+            this.updateLanguageOptionsForSenseVoice();
+        }
+    }
+
+    updateLanguageOptionsForSenseVoice() {
+        const languageSelect = document.getElementById('transcription-language');
+        if (!languageSelect) return;
+        
+        // Store current selection
+        const currentValue = languageSelect.value;
+        
+        // Clear existing options
+        languageSelect.innerHTML = '';
+        
+        // SenseVoice supported languages
+        const sensevoiceLanguages = [
+            { value: 'auto', text: 'Auto-detect' },
+            { value: 'zh', text: 'Chinese (Mandarin)' },
+            { value: 'yue', text: 'Chinese (Cantonese)' },
+            { value: 'en', text: 'English' },
+            { value: 'ja', text: 'Japanese' },
+            { value: 'ko', text: 'Korean' },
+            { value: 'nospeech', text: 'No Speech' }
+        ];
+        
+        // Add options
+        sensevoiceLanguages.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.value;
+            option.textContent = lang.text;
+            languageSelect.appendChild(option);
+        });
+        
+        // Restore selection if it's supported, otherwise use auto
+        if (sensevoiceLanguages.some(lang => lang.value === currentValue)) {
+            languageSelect.value = currentValue;
+        } else {
+            languageSelect.value = 'auto';
         }
     }
 

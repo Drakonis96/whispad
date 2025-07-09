@@ -2215,3 +2215,117 @@ select.form-control {
         display: flex;
     }
 }
+
+/* SenseVoice specific styling */
+#sensevoice-options {
+    background-color: rgba(var(--color-primary-rgb), 0.05);
+    border: 1px solid rgba(var(--color-primary-rgb), 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--space-16);
+    margin-top: var(--space-8);
+}
+
+#sensevoice-options .form-label {
+    color: var(--color-primary);
+    font-weight: 600;
+    margin-bottom: var(--space-12);
+}
+
+#sensevoice-options .checkbox-group {
+    gap: var(--space-12);
+}
+
+#sensevoice-options .checkbox-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.sensevoice-feature-highlight {
+    background: linear-gradient(135deg, 
+        rgba(var(--color-primary-rgb), 0.1), 
+        rgba(var(--color-secondary-rgb), 0.1));
+    border: 1px solid rgba(var(--color-primary-rgb), 0.3);
+    border-radius: var(--radius-md);
+    padding: var(--space-12);
+    margin: var(--space-8) 0;
+}
+
+.sensevoice-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4);
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+    color: var(--color-primary);
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+}
+
+/* Notification enhancements for SenseVoice features */
+.notification.notification--info {
+    background-color: rgba(var(--color-primary-rgb), 0.1);
+    border-left: 4px solid var(--color-primary);
+}
+
+.notification.notification--sensevoice {
+    background: linear-gradient(135deg, 
+        rgba(var(--color-primary-rgb), 0.1), 
+        rgba(var(--color-secondary-rgb), 0.1));
+    border-left: 4px solid var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Advanced model download button styling */
+.model-download-advanced {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: white;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.model-download-advanced:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.3);
+}
+
+.model-download-advanced small {
+    opacity: 0.9;
+}
+
+/* Language selection enhancement for SenseVoice */
+.sensevoice-language-note {
+    background-color: rgba(var(--color-info-rgb), 0.1);
+    border: 1px solid rgba(var(--color-info-rgb), 0.3);
+    border-radius: var(--radius-sm);
+    padding: var(--space-8);
+    margin-top: var(--space-8);
+    font-size: var(--font-size-xs);
+    color: var(--color-info);
+}
+
+/* Emotion and event detection indicators */
+.emotion-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4);
+    background-color: rgba(var(--color-success-rgb), 0.1);
+    color: var(--color-success);
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    margin: var(--space-4) var(--space-2);
+}
+
+.event-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-4);
+    background-color: rgba(var(--color-warning-rgb), 0.1);
+    color: var(--color-warning);
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    margin: var(--space-4) var(--space-2);
+}

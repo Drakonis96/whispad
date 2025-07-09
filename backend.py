@@ -13,6 +13,7 @@ import base64
 import re
 from datetime import datetime
 from whisper_cpp_wrapper import WhisperCppWrapper
+from sensevoice_wrapper import get_sensevoice_wrapper
 
 # Cargar variables de entorno
 load_dotenv()
@@ -41,6 +42,16 @@ except Exception as e:
     print(f"Error initializing whisper.cpp: {e}")
     WHISPER_CPP_AVAILABLE = False
     whisper_wrapper = None
+
+# Inicializar el wrapper de SenseVoice
+try:
+    sensevoice_wrapper = get_sensevoice_wrapper()
+    SENSEVOICE_AVAILABLE = sensevoice_wrapper.is_available()
+    print(f"SenseVoice available: {SENSEVOICE_AVAILABLE}")
+except Exception as e:
+    print(f"Error initializing SenseVoice: {e}")
+    SENSEVOICE_AVAILABLE = False
+    sensevoice_wrapper = None
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -92,6 +103,45 @@ def transcribe_audio():
                 })
             else:
                 return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
+        
+        elif provider == 'sensevoice':
+            if not SENSEVOICE_AVAILABLE:
+                return jsonify({"error": "SenseVoice no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
+            
+            # Usar SenseVoice
+            audio_bytes = audio_file.read()
+            
+            # Obtener opciones adicionales
+            detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
+            detect_events = request.form.get('detect_events', 'true').lower() == 'true'
+            use_itn = request.form.get('use_itn', 'true').lower() == 'true'
+            
+            result = sensevoice_wrapper.transcribe_audio_from_bytes(
+                audio_bytes,
+                audio_file.filename,
+                language,
+                detect_emotion=detect_emotion,
+                detect_events=detect_events,
+                use_itn=use_itn
+            )
+            
+            if result.get('success'):
+                response_data = {
+                    "transcription": result.get('transcription', ''),
+                    "provider": "sensevoice",
+                    "model": result.get('model', 'SenseVoiceSmall'),
+                    "language_detected": result.get('language_detected'),
+                }
+                
+                # Agregar información adicional si está disponible
+                if result.get('emotion'):
+                    response_data["emotion"] = result.get('emotion')
+                if result.get('events'):
+                    response_data["events"] = result.get('events')
+                
+                return jsonify(response_data)
+            else:
+                return jsonify({"error": f"Error en transcripción SenseVoice: {result.get('error', 'Unknown error')}"}), 500
                 
         else:  # OpenAI
             if not OPENAI_API_KEY:
@@ -1243,6 +1293,66 @@ def download_model():
 
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
+@app.route('/api/download-sensevoice', methods=['POST'])
+def download_sensevoice():
+    """Download SenseVoice model from Hugging Face with progress via SSE"""
+    try:
+        def generate():
+            try:
+                # Import huggingface_hub here to avoid startup dependency
+                try:
+                    from huggingface_hub import snapshot_download
+                    import subprocess
+                    import sys
+                except ImportError:
+                    # Try to install huggingface_hub if not available
+                    yield f"data: {json.dumps({'status': 'Installing huggingface_hub...'})}\n\n"
+                    try:
+                        subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
+                        from huggingface_hub import snapshot_download
+                    except Exception as install_error:
+                        yield f"data: {json.dumps({'error': f'Failed to install huggingface_hub: {str(install_error)}'})}\n\n"
+                        return
+                
+                # Note: FunASR will be installed on-demand when using SenseVoice for transcription
+                # For now, we just download the model files
+                yield f"data: {json.dumps({'status': 'FunASR will be installed when needed for transcription'})}\n\n"
+
+                # Create models directory
+                models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+                os.makedirs(models_dir, exist_ok=True)
+                
+                # Create SenseVoice specific directory
+                sensevoice_dir = os.path.join(models_dir, 'SenseVoiceSmall')
+                
+                yield f"data: {json.dumps({'status': 'Starting SenseVoice Small download...'})}\n\n"
+                yield f"data: {json.dumps({'progress': 10})}\n\n"
+                
+                # Download the model from Hugging Face
+                repo_id = "FunAudioLLM/SenseVoiceSmall"
+                yield f"data: {json.dumps({'status': f'Downloading from {repo_id}...'})}\n\n"
+                yield f"data: {json.dumps({'progress': 30})}\n\n"
+                
+                # Download the snapshot
+                snapshot_download(
+                    repo_id=repo_id,
+                    local_dir=sensevoice_dir,
+                    repo_type="model"
+                )
+                
+                yield f"data: {json.dumps({'progress': 80})}\n\n"
+                yield f"data: {json.dumps({'status': 'Download completed successfully!'})}\n\n"
+                yield f"data: {json.dumps({'progress': 100})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall', 'path': sensevoice_dir})}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'error': f'SenseVoice download failed: {str(e)}'})}\n\n"
+
+        return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+        
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
 @app.route('/api/get-note', methods=['GET'])
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""
@@ -1311,9 +1421,25 @@ def get_transcription_providers():
                 "privacy": "Full privacy - no data leaves your device"
             })
         
+        # Verificar SenseVoice
+        if SENSEVOICE_AVAILABLE and sensevoice_wrapper:
+            model_info = sensevoice_wrapper.get_model_info()
+            providers.append({
+                "id": "sensevoice",
+                "name": "SenseVoice",
+                "description": "Advanced multilingual speech recognition with emotion and event detection",
+                "available": True,
+                "models": ["SenseVoiceSmall"],
+                "languages": [lang["code"] for lang in model_info["languages"]],
+                "features": model_info["features"],
+                "emotions": model_info["emotions"],
+                "events": model_info["events"],
+                "privacy": "Full privacy - no data leaves your device"
+            })
+        
         return jsonify({
             "providers": providers,
-            "default": "openai" if OPENAI_API_KEY else ("local" if WHISPER_CPP_AVAILABLE else None)
+            "default": "openai" if OPENAI_API_KEY else ("sensevoice" if SENSEVOICE_AVAILABLE else ("local" if WHISPER_CPP_AVAILABLE else None))
         })
         
     except Exception as e:

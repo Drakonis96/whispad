@@ -89,6 +89,73 @@ class BackendAPI {
         }
     }
 
+    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true) {
+        try {
+            const formData = new FormData();
+            
+            // Determine file extension based on blob type
+            let filename = 'audio.wav';
+            if (audioBlob.type) {
+                if (audioBlob.type.includes('webm')) {
+                    filename = 'audio.webm';
+                } else if (audioBlob.type.includes('ogg')) {
+                    filename = 'audio.ogg';
+                } else if (audioBlob.type.includes('mp4')) {
+                    filename = 'audio.mp4';
+                }
+            }
+            
+            console.log('SenseVoice audio blob type:', audioBlob.type, 'Using filename:', filename);
+            
+            formData.append('audio', audioBlob, filename);
+            formData.append('provider', 'sensevoice');
+            formData.append('detect_emotion', detectEmotion.toString());
+            formData.append('detect_events', detectEvents.toString());
+            formData.append('use_itn', useItn.toString());
+            
+            if (language && language !== 'auto') {
+                formData.append('language', language);
+            }
+
+            console.log('Sending SenseVoice transcription request:', { 
+                language, 
+                detectEmotion, 
+                detectEvents, 
+                useItn, 
+                filename 
+            });
+
+            const response = await fetch(`${this.baseUrl}/api/transcribe`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('SenseVoice transcription API error:', errorData);
+                throw new Error(errorData.error || `HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('SenseVoice transcription API response:', data);
+            
+            // Check if we have a valid transcription
+            if (!data.transcription && data.transcription !== '') {
+                console.error('No transcription field in SenseVoice response:', data);
+                throw new Error('Invalid response format: missing transcription field');
+            }
+            
+            if (data.transcription.trim() === '') {
+                console.warn('Empty transcription received from SenseVoice');
+            }
+            
+            return data; // Return full data including emotion and events
+        } catch (error) {
+            console.error('Error transcribing audio with SenseVoice:', error);
+            throw error;
+        }
+    }
+
     async getTranscriptionProviders() {
         try {
             const response = await fetch(`${this.baseUrl}/api/transcription-providers`);
@@ -388,6 +455,34 @@ class BackendAPI {
         }
     }
 
+    async downloadAdvancedModelStream(model) {
+        try {
+            let endpoint = '';
+            switch(model) {
+                case 'sensevoice':
+                    endpoint = '/api/download-sensevoice';
+                    break;
+                default:
+                    throw new Error(`Unknown model: ${model}`);
+            }
+
+            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            return response;
+        } catch (error) {
+            console.error('Error requesting advanced model download:', error);
+            throw error;
+        }
+    }
+
     async processDownloadStream(streamResponse, onProgress = null) {
         try {
             const reader = streamResponse.body.getReader();
@@ -421,6 +516,44 @@ class BackendAPI {
             }
         } catch (error) {
             console.error('Error processing download stream:', error);
+            throw error;
+        }
+    }
+
+    async processAdvancedDownloadStream(streamResponse, onUpdate = null) {
+        try {
+            const reader = streamResponse.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        try {
+                            const eventData = JSON.parse(data);
+                            if (onUpdate) {
+                                onUpdate(eventData.progress, eventData.status);
+                            }
+                            if (eventData.error) {
+                                throw new Error(eventData.error);
+                            } else if (eventData.done) {
+                                if (onUpdate) onUpdate(100, 'Download completed');
+                                return;
+                            }
+                        } catch (err) {
+                            console.warn('Error parsing advanced download progress:', err);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error processing advanced download stream:', error);
             throw error;
         }
     }
