@@ -53,12 +53,12 @@ class BackendAPI {
         }
     }
 
-    async improveText(text, improvementType, provider = 'openai', stream = true, model = null) {
+    async improveText(text, improvementType, provider = 'openai', stream = true, model = null, host = null, port = null) {
         try {
             if (stream) {
-                return this.improveTextStream(text, improvementType, provider, model);
+                return this.improveTextStream(text, improvementType, provider, model, host, port);
             } else {
-                return this.improveTextNonStream(text, improvementType, provider, model);
+                return this.improveTextNonStream(text, improvementType, provider, model, host, port);
             }
         } catch (error) {
             console.error('Error improving text:', error);
@@ -66,7 +66,7 @@ class BackendAPI {
         }
     }
 
-    async improveTextNonStream(text, improvementType, provider = 'openai', model = null) {
+    async improveTextNonStream(text, improvementType, provider = 'openai', model = null, host = null, port = null) {
         try {
             const requestBody = {
                 text: text,
@@ -77,6 +77,12 @@ class BackendAPI {
             
             if (model) {
                 requestBody.model = model;
+            }
+            if (host) {
+                requestBody.host = host;
+            }
+            if (port) {
+                requestBody.port = port;
             }
 
             const response = await fetch(`${this.baseUrl}/api/improve-text`, {
@@ -100,7 +106,7 @@ class BackendAPI {
         }
     }
 
-    async improveTextStream(text, improvementType, provider = 'openai', model = null) {
+    async improveTextStream(text, improvementType, provider = 'openai', model = null, host = null, port = null) {
         try {
             const requestBody = {
                 text: text,
@@ -111,6 +117,12 @@ class BackendAPI {
             
             if (model) {
                 requestBody.model = model;
+            }
+            if (host) {
+                requestBody.host = host;
+            }
+            if (port) {
+                requestBody.port = port;
             }
 
             const response = await fetch(`${this.baseUrl}/api/improve-text`, {

@@ -100,7 +100,10 @@ class NotesApp {
             maxTokens: 1000,
             topP: 0.95,
             responseStyle: 'balanced',
-            showMobileRecordButton: true
+            showMobileRecordButton: true,
+            lmstudioHost: '127.0.0.1',
+            lmstudioPort: '1234',
+            lmstudioModels: ''
         };
         
         // Visible styles configuration
@@ -562,6 +565,9 @@ class NotesApp {
         const topP = parseFloat(document.getElementById('top-p-range').value);
         const responseStyle = document.getElementById('response-style').value;
         const showMobileRecordButton = document.getElementById('show-mobile-record').checked;
+        const lmstudioHost = document.getElementById('lmstudio-host').value.trim();
+        const lmstudioPort = document.getElementById('lmstudio-port').value.trim();
+        const lmstudioModels = document.getElementById('lmstudio-models').value.trim();
 
         this.config = {
             ...this.config, // Mantener otras configuraciones como API keys del .env
@@ -579,7 +585,10 @@ class NotesApp {
             maxTokens,
             topP,
             responseStyle,
-            showMobileRecordButton
+            showMobileRecordButton,
+            lmstudioHost,
+            lmstudioPort,
+            lmstudioModels
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
@@ -616,6 +625,9 @@ class NotesApp {
         document.getElementById('top-p-range').value = this.config.topP || 0.95;
         document.getElementById('response-style').value = this.config.responseStyle || 'balanced';
         document.getElementById('show-mobile-record').checked = this.config.showMobileRecordButton !== false;
+        document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
+        document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
+        document.getElementById('lmstudio-models').value = this.config.lmstudioModels || '';
         
         // Actualizar valores mostrados
         this.updateRangeValues();
@@ -2338,6 +2350,7 @@ class NotesApp {
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
+        const isLmStudio = provider === 'lmstudio';
 
         // Verificar que el backend esté disponible
         const backendAvailable = await this.checkBackendStatus();
@@ -2358,6 +2371,12 @@ class NotesApp {
 
         if (isOpenRouter && !this.availableAPIs?.openrouter) {
             this.showNotification('OpenRouter API not configured in backend', 'warning');
+            this.showConfigModal();
+            return;
+        }
+
+        if (isLmStudio && !this.config.lmstudioHost) {
+            this.showNotification('LM Studio host not configured', 'warning');
             this.showConfigModal();
             return;
         }
@@ -2398,6 +2417,8 @@ class NotesApp {
                 improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
             } else if (isOpenRouter) {
                 improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
+            } else if (isLmStudio) {
+                improvedText = await this.improveWithLmStudioStream(textToImprove, action, tempSpan);
             } else {
                 // Fallback a mejora local
                 improvedText = this.applyAIImprovement(textToImprove, action);
@@ -2676,6 +2697,19 @@ class NotesApp {
         }
     }
 
+    async improveWithLmStudio(text, action) {
+        try {
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.postprocessModel;
+            const host = this.config.lmstudioHost;
+            const port = this.config.lmstudioPort;
+            return await backendAPI.improveText(text, action, 'lmstudio', false, model, customPrompt, host, port);
+        } catch (error) {
+            throw new Error(`Error improving text with LM Studio: ${error.message}`);
+        }
+    }
+
     async improveWithOpenRouterStream(text, action, tempElement) {
         try {
             console.log('Starting OpenRouter stream for action:', action);
@@ -2767,6 +2801,70 @@ class NotesApp {
         } catch (error) {
             console.error('Error in improveWithOpenRouterStream:', error);
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
+        }
+    }
+
+    async improveWithLmStudioStream(text, action, tempElement) {
+        try {
+            console.log('Starting LM Studio stream for action:', action);
+
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+
+            const model = this.config.postprocessModel;
+            const host = this.config.lmstudioHost;
+            const port = this.config.lmstudioPort;
+            const response = await backendAPI.improveText(text, action, 'lmstudio', true, model, customPrompt, host, port);
+
+            if (!response.body) {
+                throw new Error('No response body received');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let improvedText = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                break;
+                            }
+                            const data = JSON.parse(dataStr);
+                            if (data.content) {
+                                improvedText += data.content;
+                                const cleaned = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = cleaned;
+                                tempElement.className = 'ai-generating-text';
+                            }
+                            if (data.done) {
+                                const finalText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
+                            }
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+                        } catch (parseError) {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            const finalResult = this.cleanAIResponse(improvedText);
+            return finalResult;
+        } catch (error) {
+            console.error('Error in improveWithLmStudioStream:', error);
+            throw new Error(`Error improving text with LM Studio: ${error.message}`);
         }
     }
     
@@ -3221,7 +3319,8 @@ class NotesApp {
                 { value: 'deepseek/deepseek-chat-v3-0324:free', text: 'DeepSeek Chat v3 (Free)' },
                 { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
                 { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' }
-            ]
+            ],
+            'lmstudio': (this.config.lmstudioModels ? this.config.lmstudioModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : [])
         };
         
         // Añadir opciones según el proveedor seleccionado
