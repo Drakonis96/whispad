@@ -103,7 +103,10 @@ class NotesApp {
             showMobileRecordButton: true,
             lmstudioHost: '127.0.0.1',
             lmstudioPort: '1234',
-            lmstudioModels: ''
+            lmstudioModels: '',
+            ollamaHost: '127.0.0.1',
+            ollamaPort: '11434',
+            ollamaModels: ''
         };
         
         // Visible styles configuration
@@ -399,6 +402,13 @@ class NotesApp {
                 this.updateLmStudioModelsList();
             });
         }
+
+        const updateOllamaBtn = document.getElementById('update-ollama-models-btn');
+        if (updateOllamaBtn) {
+            updateOllamaBtn.addEventListener('click', () => {
+                this.updateOllamaModelsList();
+            });
+        }
         
         // Auto-guardado cada 30 segundos
         setInterval(() => {
@@ -591,6 +601,9 @@ class NotesApp {
         const lmstudioHost = document.getElementById('lmstudio-host').value.trim();
         const lmstudioPort = document.getElementById('lmstudio-port').value.trim();
         const lmstudioModels = document.getElementById('lmstudio-models').value.trim();
+        const ollamaHost = document.getElementById('ollama-host').value.trim();
+        const ollamaPort = document.getElementById('ollama-port').value.trim();
+        const ollamaModels = document.getElementById('ollama-models').value.trim();
 
         this.config = {
             ...this.config, // Mantener otras configuraciones como API keys del .env
@@ -611,7 +624,10 @@ class NotesApp {
             showMobileRecordButton,
             lmstudioHost,
             lmstudioPort,
-            lmstudioModels
+            lmstudioModels,
+            ollamaHost,
+            ollamaPort,
+            ollamaModels
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
@@ -651,6 +667,9 @@ class NotesApp {
         document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
         document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
         document.getElementById('lmstudio-models').value = this.config.lmstudioModels || '';
+        document.getElementById('ollama-host').value = this.config.ollamaHost || '127.0.0.1';
+        document.getElementById('ollama-port').value = this.config.ollamaPort || '11434';
+        document.getElementById('ollama-models').value = this.config.ollamaModels || '';
         
         // Actualizar valores mostrados
         this.updateRangeValues();
@@ -665,6 +684,8 @@ class NotesApp {
         this.toggleSenseVoiceOptions();
         // Mostrar/ocultar opciones LM Studio según el proveedor seleccionado
         this.toggleLmStudioOptions();
+        // Mostrar/ocultar opciones Ollama según el proveedor seleccionado
+        this.toggleOllamaOptions();
 
         const modal = document.getElementById('config-modal');
         this.hideMobileFab();
@@ -2431,6 +2452,7 @@ class NotesApp {
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
         const isLmStudio = provider === 'lmstudio';
+        const isOllama = provider === 'ollama';
 
         // Verificar que el backend esté disponible
         const backendAvailable = await this.checkBackendStatus();
@@ -2457,6 +2479,12 @@ class NotesApp {
 
         if (isLmStudio && !this.config.lmstudioHost) {
             this.showNotification('LM Studio host not configured', 'warning');
+            this.showConfigModal();
+            return;
+        }
+
+        if (isOllama && !this.config.ollamaHost) {
+            this.showNotification('Ollama host not configured', 'warning');
             this.showConfigModal();
             return;
         }
@@ -2499,6 +2527,8 @@ class NotesApp {
                 improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
             } else if (isLmStudio) {
                 improvedText = await this.improveWithLmStudioStream(textToImprove, action, tempSpan);
+            } else if (isOllama) {
+                improvedText = await this.improveWithOllamaStream(textToImprove, action, tempSpan);
             } else {
                 // Fallback a mejora local
                 improvedText = this.applyAIImprovement(textToImprove, action);
@@ -2790,6 +2820,19 @@ class NotesApp {
         }
     }
 
+    async improveWithOllama(text, action) {
+        try {
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.postprocessModel;
+            const host = this.config.ollamaHost;
+            const port = this.config.ollamaPort;
+            return await backendAPI.improveText(text, action, 'ollama', false, model, customPrompt, host, port);
+        } catch (error) {
+            throw new Error(`Error improving text with Ollama: ${error.message}`);
+        }
+    }
+
     async improveWithOpenRouterStream(text, action, tempElement) {
         try {
             console.log('Starting OpenRouter stream for action:', action);
@@ -2945,6 +2988,70 @@ class NotesApp {
         } catch (error) {
             console.error('Error in improveWithLmStudioStream:', error);
             throw new Error(`Error improving text with LM Studio: ${error.message}`);
+        }
+    }
+
+    async improveWithOllamaStream(text, action, tempElement) {
+        try {
+            console.log('Starting Ollama stream for action:', action);
+
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+
+            const model = this.config.postprocessModel;
+            const host = this.config.ollamaHost;
+            const port = this.config.ollamaPort;
+            const response = await backendAPI.improveText(text, action, 'ollama', true, model, customPrompt, host, port);
+
+            if (!response.body) {
+                throw new Error('No response body received');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let improvedText = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                break;
+                            }
+                            const data = JSON.parse(dataStr);
+                            if (data.content) {
+                                improvedText += data.content;
+                                const cleaned = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = cleaned;
+                                tempElement.className = 'ai-generating-text';
+                            }
+                            if (data.done) {
+                                const finalText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
+                            }
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+                        } catch (parseError) {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            const finalResult = this.cleanAIResponse(improvedText);
+            return finalResult;
+        } catch (error) {
+            console.error('Error in improveWithOllamaStream:', error);
+            throw new Error(`Error improving text with Ollama: ${error.message}`);
         }
     }
     
@@ -3358,6 +3465,7 @@ class NotesApp {
             postprocessProvider.addEventListener('change', () => {
                 this.updateModelOptions();
                 this.toggleLmStudioOptions();
+                this.toggleOllamaOptions();
             });
         }
         
@@ -3401,7 +3509,8 @@ class NotesApp {
                 { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
                 { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' }
             ],
-            'lmstudio': (this.config.lmstudioModels ? this.config.lmstudioModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : [])
+            'lmstudio': (this.config.lmstudioModels ? this.config.lmstudioModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : []),
+            'ollama': (this.config.ollamaModels ? this.config.ollamaModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : [])
         };
         
         // Añadir opciones según el proveedor seleccionado
@@ -3578,11 +3687,28 @@ class NotesApp {
         }
     }
 
+    toggleOllamaOptions() {
+        const provider = document.getElementById('postprocess-provider').value;
+        const ollamaOptions = document.getElementById('ollama-options');
+
+        if (ollamaOptions) {
+            ollamaOptions.style.display = provider === 'ollama' ? 'block' : 'none';
+        }
+    }
+
     updateLmStudioModelsList() {
         const modelsInput = document.getElementById('lmstudio-models');
         if (!modelsInput) return;
 
         this.config.lmstudioModels = modelsInput.value.trim();
+        this.updateModelOptions();
+    }
+
+    updateOllamaModelsList() {
+        const modelsInput = document.getElementById('ollama-models');
+        if (!modelsInput) return;
+
+        this.config.ollamaModels = modelsInput.value.trim();
         this.updateModelOptions();
     }
 

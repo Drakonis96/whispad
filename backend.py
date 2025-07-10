@@ -35,6 +35,8 @@ DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
 LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
+OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
+OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 
 # Inicializar el wrapper de whisper.cpp local
 try:
@@ -214,6 +216,11 @@ def improve_text():
                 host = data.get('host', LMSTUDIO_HOST)
                 port = data.get('port', LMSTUDIO_PORT)
                 return improve_text_lmstudio_stream(text, improvement_type, model, host, port, custom_prompt)
+            elif provider == 'ollama':
+                model = data.get('model')
+                host = data.get('host', OLLAMA_HOST)
+                port = data.get('port', OLLAMA_PORT)
+                return improve_text_ollama_stream(text, improvement_type, model, host, port, custom_prompt)
             else:
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
@@ -229,6 +236,11 @@ def improve_text():
                 host = data.get('host', LMSTUDIO_HOST)
                 port = data.get('port', LMSTUDIO_PORT)
                 return improve_text_lmstudio(text, improvement_type, model, host, port, custom_prompt)
+            elif provider == 'ollama':
+                model = data.get('model')
+                host = data.get('host', OLLAMA_HOST)
+                port = data.get('port', OLLAMA_PORT)
+                return improve_text_ollama(text, improvement_type, model, host, port, custom_prompt)
             else:
                 return jsonify({"error": "Proveedor no soportado"}), 400
             
@@ -751,6 +763,103 @@ def improve_text_lmstudio_stream(text, improvement_type, model, host, port, cust
                             continue
         except requests.RequestException as e:
             yield f"data: {json.dumps({'error': f'Error de conexión con LM Studio: {str(e)}'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt=None):
+    """Mejorar texto usando Ollama local"""
+    if not host or not port or not model:
+        return jsonify({"error": "Ollama host, port and model required"}), 400
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'claridad': f"Reescribe el siguiente texto de manera m\xE1s clara y legible. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'formal': f"Reescribe el siguiente texto en un tono formal. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'casual': f"Reescribe el siguiente texto en un tono casual y amigable. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'academico': f"Reescribe el siguiente texto en estilo acad\xE9mico. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'narrativo': f"Mejora el siguiente texto narrativo o di\xE1logo de novela, preservando el estilo literario y la voz narrativa. Mejora la fluidez, la descripci\xF3n y la calidad literaria manteniendo la esencia del texto. Responde \xDANICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'academico_v2': f"Mejora el siguiente texto acad\xE9mico realizando cambios m\xEDnimos para preservar las palabras del autor. Usa palabras m\xE1s precisas cuando sea necesario, mejora la estructura y elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Mant\xE9n el estilo y vocabulario original tanto como sea posible. Responde \xDANICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'resumir': f"Crea un resumen conciso del siguiente texto. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el resumen, sin explicaciones adicionales:\n\n{text}",
+            'expandir': f"Expande el siguiente texto a\xF1adiendo m\xE1s detalles y contexto relevante. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto expandido, sin explicaciones adicionales:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Mejora el siguiente texto: {text}")
+
+    url = f"http://{host}:{port}/api/chat"
+    headers = { 'Content-Type': 'application/json' }
+    payload = {
+        'model': model,
+        'messages': [{ 'role': 'user', 'content': prompt }]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            result = response.json()
+            improved_text = result.get('message', {}).get('content', '')
+            return jsonify({"improved_text": improved_text})
+        else:
+            return jsonify({"error": f"Ollama error {response.status_code}"}), response.status_code
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error de conexi\xF3n con Ollama: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+def improve_text_ollama_stream(text, improvement_type, model, host, port, custom_prompt=None):
+    """Mejorar texto usando Ollama con streaming"""
+    if not host or not port or not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Ollama host, port and model required'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'claridad': f"Reescribe el siguiente texto de manera m\xE1s clara y legible. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'formal': f"Reescribe el siguiente texto en un tono formal. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'casual': f"Reescribe el siguiente texto en un tono casual y amigable. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'academico': f"Reescribe el siguiente texto en estilo acad\xE9mico. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'narrativo': f"Mejora el siguiente texto narrativo o di\xE1logo de novela, preservando el estilo literario y la voz narrativa. Mejora la fluidez, la descripci\xF3n y la calidad literaria manteniendo la esencia del texto. Responde \xDANICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'academico_v2': f"Mejora el siguiente texto acad\xE9mico realizando cambios m\xEDnimos para preservar las palabras del autor. Usa palabras m\xE1s precisas cuando sea necesario, mejora la estructura y elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Mant\xE9n el estilo y vocabulario original tanto como sea posible. Responde \xDANICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'resumir': f"Crea un resumen conciso del siguiente texto. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el resumen, sin explicaciones adicionales:\n\n{text}",
+            'expandir': f"Expande el siguiente texto a\xF1adiendo m\xE1s detalles y contexto relevante. Elimina cualquier tipo de interjecci\xF3n o expresi\xF3n propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde \xDANICAMENTE con el texto expandido, sin explicaciones adicionales:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Mejora el siguiente texto: {text}")
+
+    url = f"http://{host}:{port}/api/chat"
+    headers = { 'Content-Type': 'application/json' }
+    payload = {
+        'model': model,
+        'messages': [{ 'role': 'user', 'content': prompt }],
+        'stream': True
+    }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'Ollama error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line.decode('utf-8'))
+                        if data.get('message') and data['message'].get('content'):
+                            content = data['message']['content']
+                            yield f"data: {json.dumps({'content': content})}\n\n"
+                        if data.get('done'):
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                    except json.JSONDecodeError:
+                        continue
+        except requests.RequestException as e:
+            yield f"data: {json.dumps({'error': f'Error de conexi\xF3n con Ollama: {str(e)}'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
 

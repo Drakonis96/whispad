@@ -316,6 +316,7 @@
                         <option value="google">Google Gemini</option>
                         <option value="openrouter">OpenRouter</option>
                         <option value="lmstudio">LM Studio</option>
+                        <option value="ollama">Ollama</option>
                     </select>
                 </div>
                 <div class="config-section">
@@ -344,6 +345,22 @@
                         <input type="text" class="form-control" id="lmstudio-models" placeholder="model-A,model-B">
                         <button class="btn btn--primary btn--sm" id="update-lmstudio-models-btn">Update Models</button>
                 </div>
+                </div>
+                <div class="config-section" id="ollama-options" style="display: none;">
+                    <h5>Ollama Server</h5>
+                    <div class="api-key-group">
+                        <label class="form-label">Host</label>
+                        <input type="text" class="form-control" id="ollama-host" placeholder="127.0.0.1">
+                    </div>
+                    <div class="api-key-group">
+                        <label class="form-label">Port</label>
+                        <input type="number" class="form-control" id="ollama-port" placeholder="11434">
+                    </div>
+                    <div class="api-key-group">
+                        <label class="form-label">Models (comma separated)</label>
+                        <input type="text" class="form-control" id="ollama-models" placeholder="model-A,model-B">
+                        <button class="btn btn--primary btn--sm" id="update-ollama-models-btn">Update Models</button>
+                    </div>
                 </div>
                 <div class="config-section">
                     <h5>Advanced Post-processing Configuration</h5>
