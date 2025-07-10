@@ -22,7 +22,8 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Integrated note manager: create, search, tag, save, restore and download in Markdown format.
 - Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
 - A blue marker indicating where the transcription will be inserted.
-- Compatible with multiple providers: OpenAI, Google and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
+- Compatible with multiple providers: OpenAI, Google, SenseVoice and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
+- **NEW: SenseVoice Integration** - Advanced multilingual speech recognition with emotion detection and audio event recognition for 50+ languages.
 - Download or upload local (.bin) whisper.cpp models directly from the interface.
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
@@ -119,6 +120,39 @@ Here are some screenshots of WhisPad in action:
 <p align="center">
   <img src="screenshots/screenshot4.png" alt="Transcribed notes list" width="700"/>
 </p>
+
+## SenseVoice Integration - Advanced Multilingual Transcription
+
+WhisPad now includes **SenseVoice**, a state-of-the-art multilingual speech recognition model with unique capabilities:
+
+### Key Features
+- **50+ Language Support**: Including Chinese (Mandarin), Cantonese, English, Japanese, Korean, and many more
+- **Emotion Recognition**: Automatically detects emotions (Happy, Sad, Angry, Neutral, Fearful, Disgusted, Surprised)
+- **Audio Event Detection**: Identifies background music, applause, laughter, crying, coughing, sneezing, and more
+- **Superior Performance**: 15x faster than Whisper-Large with higher accuracy for Asian languages
+- **Complete Privacy**: All processing happens locally - no data leaves your device
+
+### How to Use SenseVoice
+
+1. **Download the Model**: Go to "Models" → Click "SenseVoice Small" to download the model (first time only)
+2. **Configure**: In "Config" → Select "SenseVoice" as your transcription provider
+3. **Customize**: Enable/disable emotion detection and audio event detection as needed
+4. **Transcribe**: Record audio and get enhanced transcriptions with emotional context
+
+### Supported Languages
+- **Chinese**: Mandarin (zh), Cantonese (yue)
+- **East Asian**: Japanese (ja), Korean (ko)
+- **Western**: English (en), and 40+ additional languages
+- **Auto-detection**: Automatically identifies the spoken language
+
+### Advanced Features
+- **Inverse Text Normalization**: Automatic punctuation and formatting
+- **Batch Processing**: Efficient processing of longer audio segments
+- **Rich Transcription**: Includes metadata about emotions and audio events
+- **High Accuracy**: Outperforms Whisper on Chinese and Cantonese content
+
+### Technical Details
+SenseVoice is based on FunASR and provides enterprise-grade speech recognition capabilities. The model is approximately 234MB and runs efficiently on both CPU and GPU.
 
 ## Acknowledgements
 

@@ -1,0 +1,123 @@
+# Variables de entorno
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+access.log
+error.log
+
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.env
+.venv
+env/
+venv/
+*.egg-info/
+dist/
+build/
+.coverage
+.pytest_cache/
+.mypy_cache/
+.tox/
+
+# IDEs y editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+.directory
+*~
+
+# Docker
+.dockerignore
+
+# Archivos de audio/video (archivos de prueba grandes)
+*.wav
+*.mp3
+*.mp4
+*.avi
+*.mov
+*.flv
+*.wmv
+*.m4a
+*.aac
+*.ogg
+*.flac
+
+# Archivos de notas guardadas (datos de usuario)
+saved_notes/
+temp_notes/
+uploads/
+recordings/
+
+# Archivos temporales
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.cache/
+temp/
+tmp/
+
+# Archivos de configuración específicos del usuario
+config.json
+settings.json
+user_config.json
+
+# Archivos de API keys y tokens
+api_keys.txt
+tokens.txt
+credentials.json
+service_account.json
+
+# Archivos de base de datos
+*.db
+*.sqlite
+*.sqlite3
+
+# Archivos de certificados SSL
+*.pem
+*.key
+*.crt
+*.cert
+
+# Archivos de modelo de ML (si son muy grandes)
+*.model
+*.pkl
+*.joblib
+models/
+
+# Archivos de Whisper.cpp (si se descargan localmente)
+whisper.cpp/
+whisper_models/
+
+# Archivos de desarrollo y testing
+.pytest_cache/
+.coverage
+htmlcov/
+test_results/
+coverage/

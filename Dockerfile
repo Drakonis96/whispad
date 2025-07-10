@@ -7,10 +7,14 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     cmake \
     git \
+    git-lfs \
     curl \
     ffmpeg \
     openssl \
     && rm -rf /var/lib/apt/lists/*
+
+# Configurar git-lfs
+RUN git lfs install
 
 # Crear directorio de trabajo
 WORKDIR /app
@@ -18,6 +22,9 @@ WORKDIR /app
 # Copiar archivos de requirements y instalar dependencias Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar PyTorch con torchaudio para SenseVoice
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 # Copiar todos los archivos de la aplicación
 COPY . .

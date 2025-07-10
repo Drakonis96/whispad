@@ -185,6 +185,7 @@
                         <option value="" selected>Select provider</option>
                         <option value="openai">OpenAI</option>
                         <option value="local">Local Whisper (whisper.cpp)</option>
+                        <option value="sensevoice">SenseVoice (Multilingual + Emotion + Events)</option>
                         <option value="google">Google Speech-to-Text</option>
                     </select>
                     <small class="form-text text-muted">
@@ -229,7 +230,8 @@
                             <option value="ru">Russian</option>
                             <option value="ja">Japanese</option>
                             <option value="ko">Korean</option>
-                            <option value="zh">Chinese</option>
+                            <option value="zh">Chinese (Mandarin)</option>
+                            <option value="yue">Chinese (Cantonese)</option>
                             <option value="ar">Arabic</option>
                             <option value="hi">Hindi</option>
                             <option value="tr">Turkish</option>
@@ -241,6 +243,26 @@
                             <option value="fi">Finnish</option>
                         </select>
                         <small>Select the language you will speak to improve accuracy</small>
+                    </div>
+                    <div class="model-config" id="sensevoice-options" style="display: none;">
+                        <label class="form-label">SenseVoice Features</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="detect-emotion" checked>
+                                <span class="checkmark"></span>
+                                Detect emotions (Happy, Sad, Angry, etc.)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="detect-events" checked>
+                                <span class="checkmark"></span>
+                                Detect audio events (Applause, Laughter, Music, etc.)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="use-itn" checked>
+                                <span class="checkmark"></span>
+                                Use inverse text normalization (punctuation)
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -398,6 +420,16 @@
                 <button class="btn btn--secondary model-download" data-size="medium">Medium</button>
                 <button class="btn btn--secondary model-download" data-size="large">Large</button>
             </div>
+            
+            <h4 style="margin-top: 20px;">Advanced Models</h4>
+            <p>Download advanced speech recognition models with additional capabilities</p>
+            <div class="model-btns">
+                <button class="btn btn--primary model-download-advanced" data-model="sensevoice">
+                    <span style="font-size: 12px;">🎯</span>&nbsp;SenseVoice Small
+                    <small style="display: block; font-size: 11px; opacity: 0.8;">Multilingual + Emotion + Events</small>
+                </button>
+            </div>
+            
             <div class="drop-zone" id="upload-model-drop-zone">Drop files here</div>
             <input type="file" id="upload-model-file-input" multiple accept=".bin" style="display:none">
             

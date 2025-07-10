@@ -3,7 +3,7 @@ services:
   whispad:
     build: .
     ports:
-      - "5037:5037"
+      - "5038:5037"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
@@ -16,4 +16,5 @@ services:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
+      - ./whisper-cpp-models/SenseVoiceSmall:/app/whisper-cpp-models/SenseVoiceSmall
     restart: unless-stopped

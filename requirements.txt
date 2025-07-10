@@ -7,3 +7,8 @@ python-dotenv
 pydub
 librosa
 soundfile
+# Optional dependencies for SenseVoice (installed on-demand)
+torch>=2.0.0
+funasr
+soundfile
+huggingface_hub

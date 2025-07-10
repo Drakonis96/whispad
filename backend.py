@@ -13,6 +13,7 @@ import base64
 import re
 from datetime import datetime
 from whisper_cpp_wrapper import WhisperCppWrapper
+from sensevoice_wrapper import get_sensevoice_wrapper
 
 # Cargar variables de entorno
 load_dotenv()
@@ -41,6 +42,18 @@ except Exception as e:
     print(f"Error initializing whisper.cpp: {e}")
     WHISPER_CPP_AVAILABLE = False
     whisper_wrapper = None
+
+# Inicializar el wrapper de SenseVoice
+try:
+    sensevoice_wrapper = get_sensevoice_wrapper()
+    print("SenseVoice wrapper initialized")
+    # Check initial availability (for logging purposes)
+    initial_sensevoice_available = sensevoice_wrapper.is_available()
+    print(f"SenseVoice initially available: {initial_sensevoice_available}")
+    # Note: We'll check availability dynamically instead of caching it
+except Exception as e:
+    print(f"Error initializing SenseVoice wrapper: {e}")
+    sensevoice_wrapper = None
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -92,6 +105,47 @@ def transcribe_audio():
                 })
             else:
                 return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
+        
+        elif provider == 'sensevoice':
+            # Check SenseVoice availability dynamically
+            sensevoice_available = sensevoice_wrapper and sensevoice_wrapper.is_available()
+            if not sensevoice_available:
+                return jsonify({"error": "SenseVoice no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
+            
+            # Usar SenseVoice
+            audio_bytes = audio_file.read()
+            
+            # Obtener opciones adicionales
+            detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
+            detect_events = request.form.get('detect_events', 'true').lower() == 'true'
+            use_itn = request.form.get('use_itn', 'true').lower() == 'true'
+            
+            result = sensevoice_wrapper.transcribe_audio_from_bytes(
+                audio_bytes,
+                audio_file.filename,
+                language,
+                detect_emotion=detect_emotion,
+                detect_events=detect_events,
+                use_itn=use_itn
+            )
+            
+            if result.get('success'):
+                response_data = {
+                    "transcription": result.get('transcription', ''),
+                    "provider": "sensevoice",
+                    "model": result.get('model', 'SenseVoiceSmall'),
+                    "language_detected": result.get('language_detected'),
+                }
+                
+                # Agregar información adicional si está disponible
+                if result.get('emotion'):
+                    response_data["emotion"] = result.get('emotion')
+                if result.get('events'):
+                    response_data["events"] = result.get('events')
+                
+                return jsonify(response_data)
+            else:
+                return jsonify({"error": f"Error en transcripción SenseVoice: {result.get('error', 'Unknown error')}"}), 500
                 
         else:  # OpenAI
             if not OPENAI_API_KEY:
@@ -1243,6 +1297,213 @@ def download_model():
 
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
+@app.route('/api/download-sensevoice', methods=['POST'])
+def download_sensevoice():
+    """Download SenseVoice model from Hugging Face with progress via SSE"""
+    try:
+        def generate():
+            try:
+                # Import huggingface_hub here to avoid startup dependency
+                try:
+                    from huggingface_hub import snapshot_download
+                    import subprocess
+                    import sys
+                except ImportError:
+                    # Try to install huggingface_hub if not available
+                    yield f"data: {json.dumps({'status': 'Installing huggingface_hub...'})}\n\n"
+                    try:
+                        subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
+                        from huggingface_hub import snapshot_download
+                    except Exception as install_error:
+                        yield f"data: {json.dumps({'error': f'Failed to install huggingface_hub: {str(install_error)}'})}\n\n"
+                        return
+                
+                # Note: FunASR will be installed on-demand when using SenseVoice for transcription
+                # For now, we just download the model files
+                yield f"data: {json.dumps({'status': 'FunASR will be installed when needed for transcription'})}\n\n"
+
+                # Create models directory
+                models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+                os.makedirs(models_dir, exist_ok=True)
+                
+                # Create SenseVoice specific directory
+                sensevoice_dir = os.path.join(models_dir, 'SenseVoiceSmall')
+                
+                yield f"data: {json.dumps({'status': 'Starting SenseVoice Small download...'})}\n\n"
+                yield f"data: {json.dumps({'progress': 5})}\n\n"
+                
+                # Download the model from Hugging Face in two phases
+                repo_id = "FunAudioLLM/SenseVoiceSmall"
+                yield f"data: {json.dumps({'status': f'Preparing download from {repo_id}...'})}\n\n"
+                yield f"data: {json.dumps({'progress': 10})}\n\n"
+                
+                # Phase 1: Download model.pt with progress tracking
+                yield f"data: {json.dumps({'status': 'Downloading model.pt (936 MB)...'})}\n\n"
+                yield f"data: {json.dumps({'progress': 15})}\n\n"
+                
+                try:
+                    import requests
+                    from urllib.parse import urljoin
+                    
+                    # Direct download of model.pt with progress
+                    model_url = f"https://huggingface.co/{repo_id}/resolve/main/model.pt"
+                    model_path = os.path.join(sensevoice_dir, 'model.pt')
+                    
+                    # Create directory if it doesn't exist
+                    os.makedirs(sensevoice_dir, exist_ok=True)
+                    
+                    # Set headers for better compatibility
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (compatible; WhisPad/1.0)',
+                        'Accept': 'application/octet-stream, */*',
+                    }
+                    
+                    # Download with progress tracking
+                    response = requests.get(model_url, stream=True, headers=headers, timeout=30)
+                    response.raise_for_status()
+                    
+                    total_size = int(response.headers.get('content-length', 0))
+                    downloaded = 0
+                    
+                    yield f"data: {json.dumps({'status': f'Starting download of model.pt ({total_size // (1024*1024)} MB)...'})}\n\n"
+                    
+                    with open(model_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=1024*1024):  # 1MB chunks
+                            if chunk:
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                
+                                if total_size > 0:
+                                    # Progress from 15% to 70% for model.pt download
+                                    progress = 15 + int((downloaded / total_size) * 55)
+                                    mb_downloaded = downloaded // (1024*1024)
+                                    mb_total = total_size // (1024*1024)
+                                    yield f"data: {json.dumps({'progress': progress, 'status': f'Downloading model.pt: {mb_downloaded}/{mb_total} MB ({progress-15:.1f}%)'})}\n\n"
+                                else:
+                                    # Fallback if content-length is not available
+                                    mb_downloaded = downloaded // (1024*1024)
+                                    yield f"data: {json.dumps({'status': f'Downloading model.pt: {mb_downloaded} MB...'})}\n\n"
+                    
+                    # Verify the downloaded file
+                    if os.path.exists(model_path) and os.path.getsize(model_path) > 0:
+                        final_size = os.path.getsize(model_path) // (1024*1024)
+                        yield f"data: {json.dumps({'progress': 70, 'status': f'model.pt downloaded successfully! ({final_size} MB)'})}\n\n"
+                    else:
+                        raise Exception("Downloaded file is empty or doesn't exist")
+                    
+                except Exception as model_download_error:
+                    yield f"data: {json.dumps({'status': f'HTTP download failed: {str(model_download_error)}, trying git-lfs...'})}\n\n"
+                    
+                    # Fallback: try using git clone with LFS
+                    try:
+                        import subprocess
+                        import shutil
+                        
+                        # Remove any partial download
+                        if os.path.exists(model_path):
+                            os.remove(model_path)
+                        if os.path.exists(sensevoice_dir):
+                            shutil.rmtree(sensevoice_dir)
+                        
+                        # Clone with git-lfs
+                        clone_url = f"https://huggingface.co/{repo_id}.git"
+                        yield f"data: {json.dumps({'progress': 30, 'status': 'Cloning repository with git-lfs...'})}\n\n"
+                        
+                        result = subprocess.run([
+                            'git', 'clone', '--progress', clone_url, sensevoice_dir
+                        ], capture_output=True, text=True, timeout=600)  # 10 minutes timeout
+                        
+                        if result.returncode == 0:
+                            yield f"data: {json.dumps({'progress': 70, 'status': 'Repository cloned successfully!'})}\n\n"
+                        else:
+                            raise Exception(f"Git clone failed: {result.stderr}")
+                        
+                    except Exception as git_error:
+                        yield f"data: {json.dumps({'error': f'All download methods failed. HTTP: {str(model_download_error)}, Git: {str(git_error)}'})}\n\n"
+                        return
+                
+                # Phase 2: Download remaining files using huggingface_hub
+                yield f"data: {json.dumps({'progress': 75, 'status': 'Downloading remaining model files...'})}\n\n"
+                
+                try:
+                    # Download all files except model.pt (which we already have)
+                    snapshot_download(
+                        repo_id=repo_id,
+                        local_dir=sensevoice_dir,
+                        repo_type="model",
+                        local_files_only=False,
+                        allow_patterns=None,
+                        ignore_patterns=["model.pt"]  # Skip model.pt since we already downloaded it
+                    )
+                    yield f"data: {json.dumps({'progress': 90})}\n\n"
+                except Exception as remaining_download_error:
+                    yield f"data: {json.dumps({'error': f'Failed to download remaining files: {str(remaining_download_error)}'})}\n\n"
+                    return
+                
+                # Verify that all required files were downloaded
+                yield f"data: {json.dumps({'status': 'Verifying downloaded files...'})}\n\n"
+                required_files = ['config.yaml', 'model.pt']
+                missing_files = []
+                verification_info = []
+                
+                for file in required_files:
+                    file_path = os.path.join(sensevoice_dir, file)
+                    if not os.path.exists(file_path):
+                        missing_files.append(file)
+                    else:
+                        file_size = os.path.getsize(file_path)
+                        size_mb = file_size / (1024 * 1024)
+                        verification_info.append(f'{file}: {size_mb:.1f} MB')
+                
+                if missing_files:
+                    yield f"data: {json.dumps({'error': f'Download incomplete: missing files {missing_files}'})}\n\n"
+                    return
+                
+                # Success message with file info
+                verification_msg = f"All files verified: {', '.join(verification_info)}"
+                yield f"data: {json.dumps({'status': verification_msg})}\n\n"
+                
+                yield f"data: {json.dumps({'progress': 80})}\n\n"
+                yield f"data: {json.dumps({'status': 'Download completed successfully!'})}\n\n"
+                yield f"data: {json.dumps({'progress': 100})}\n\n"
+                yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall', 'path': sensevoice_dir})}\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'error': f'SenseVoice download failed: {str(e)}'})}\n\n"
+
+        return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+        
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+@app.route('/api/refresh-providers', methods=['POST'])
+def refresh_providers():
+    """Force refresh of transcription providers availability"""
+    try:
+        # This endpoint forces a fresh check of all providers
+        # The actual refresh happens automatically when /api/transcription-providers is called
+        # since we now check availability dynamically
+        
+        # Log current status for debugging
+        whisper_available = WHISPER_CPP_AVAILABLE and whisper_wrapper
+        sensevoice_available = sensevoice_wrapper and sensevoice_wrapper.is_available()
+        
+        print(f"Provider refresh requested:")
+        print(f"  - Whisper.cpp available: {whisper_available}")
+        print(f"  - SenseVoice available: {sensevoice_available}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Providers refreshed successfully",
+            "providers": {
+                "whisper_cpp": whisper_available,
+                "sensevoice": sensevoice_available
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Error refreshing providers: {str(e)}"}), 500
+
 @app.route('/api/get-note', methods=['GET'])
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""
@@ -1311,9 +1572,26 @@ def get_transcription_providers():
                 "privacy": "Full privacy - no data leaves your device"
             })
         
+        # Verificar SenseVoice (check availability dynamically)
+        sensevoice_available = sensevoice_wrapper and sensevoice_wrapper.is_available()
+        if sensevoice_available:
+            model_info = sensevoice_wrapper.get_model_info()
+            providers.append({
+                "id": "sensevoice",
+                "name": "SenseVoice",
+                "description": "Advanced multilingual speech recognition with emotion and event detection",
+                "available": True,
+                "models": ["SenseVoiceSmall"],
+                "languages": [lang["code"] for lang in model_info["languages"]],
+                "features": model_info["features"],
+                "emotions": model_info["emotions"],
+                "events": model_info["events"],
+                "privacy": "Full privacy - no data leaves your device"
+            })
+        
         return jsonify({
             "providers": providers,
-            "default": "openai" if OPENAI_API_KEY else ("local" if WHISPER_CPP_AVAILABLE else None)
+            "default": "openai" if OPENAI_API_KEY else ("sensevoice" if sensevoice_available else ("local" if WHISPER_CPP_AVAILABLE else None))
         })
         
     except Exception as e:
