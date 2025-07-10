@@ -1409,13 +1409,12 @@ class NotesApp {
         if (this.availableAPIs?.openai) {
             providerMap.set('openai', { id: 'openai', name: 'OpenAI' });
         }
-        if (this.availableAPIs?.google) {
-            providerMap.set('google', { id: 'google', name: 'Google' });
-        }
 
         if (this.availableTranscriptionProviders?.providers) {
             this.availableTranscriptionProviders.providers.forEach(p => {
-                providerMap.set(p.id, p);
+                if (p.id !== 'google') {
+                    providerMap.set(p.id, p);
+                }
             });
         }
 
@@ -2080,9 +2079,6 @@ class NotesApp {
                 transcription = await this.transcribeWithLocal(audioBlob);
             } else if (this.config.transcriptionProvider === 'sensevoice') {
                 transcription = await this.transcribeWithSenseVoice(audioBlob);
-            } else if (this.config.transcriptionProvider === 'google') {
-                // TODO: Implementar Google Speech-to-Text
-                transcription = 'Transcripción con Google (no implementado aún)';
             }
             
             if (transcription) {
@@ -3279,9 +3275,6 @@ class NotesApp {
         // Fallbacks for known providers
         if (provider === 'openai' && models.length === 0) {
             models = ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'];
-        }
-        if (provider === 'google' && models.length === 0) {
-            models = ['google-speech-to-text'];
         }
 
         // Add options to dropdown
