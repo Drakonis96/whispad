@@ -251,11 +251,11 @@ class NotesApp {
         if (saved) {
             this.notes = JSON.parse(saved);
         } else {
-            // Nota de ejemplo inicial
+            // Example note on first run
             this.notes = [{
                 id: 1,
-                title: "Nota de ejemplo",
-                content: "Esta es una nota de ejemplo para demostrar la funcionalidad de la aplicación. Puedes editarla, eliminarla o crear nuevas notas.",
+                title: "Example Note",
+                content: "This is a sample note to demonstrate the application's features. You can edit it, delete it or create new notes.",
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             }];
@@ -337,7 +337,7 @@ class NotesApp {
         const now = new Date();
         const newNote = {
             id: Date.now(),
-            title: `Nota ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
+            title: `Note ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
             content: '',
             createdAt: now.toISOString(),
             updatedAt: now.toISOString()
@@ -419,7 +419,7 @@ class NotesApp {
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('editor').innerHTML;
         
-        this.currentNote.title = title || 'Nota sin título';
+        this.currentNote.title = title || 'Untitled Note';
         this.currentNote.content = content;
         this.currentNote.updatedAt = new Date().toISOString();
         
@@ -432,7 +432,7 @@ class NotesApp {
         this.saveNoteToServer(silent);
         
         if (!silent) {
-            this.showNotification('Nota guardada correctamente');
+            this.showNotification('Note saved successfully');
         }
     }
     
@@ -459,7 +459,7 @@ class NotesApp {
             const result = await response.json();
             
             if (!silent && result.success) {
-                console.log(`Nota guardada en servidor: ${result.filename}`);
+                console.log(`Note saved on server: ${result.filename}`);
             }
         } catch (error) {
             console.error('Error al guardar nota en servidor:', error);
@@ -485,7 +485,7 @@ class NotesApp {
         this.currentNote = null;
         this.setupDefaultNote();
         this.hideDeleteModal();
-        this.showNotification('Nota eliminada');
+        this.showNotification('Note deleted');
     }
     
     async deleteNoteFromServer(noteId) {
@@ -721,10 +721,15 @@ class NotesApp {
             return;
         }
 
-        // Verificar configuración según el modelo seleccionado
-        const model = this.config.postprocessModel || 'gpt-4o-mini';
-        const isGemini = model.startsWith('gemini');
-        const isOpenAI = model.startsWith('gpt');
+        // Verify configuration
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+        if (!provider || !model) {
+            this.showNotification('Please, select a post-processing provider and model', 'error');
+            return;
+        }
+        const isGemini = provider === 'google';
+        const isOpenAI = provider === 'openai';
 
         if (isOpenAI && !this.config.openaiApiKey) {
             this.showNotification('Please configure your OpenAI API key', 'warning');
