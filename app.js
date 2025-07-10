@@ -2092,7 +2092,7 @@ class NotesApp {
                 model
             );
         } catch (error) {
-            throw new Error(`Error en transcripción: ${error.message}`);
+            throw new Error(`Transcription error: ${error.message}`);
         }
     }
 
@@ -2120,7 +2120,7 @@ class NotesApp {
             return result;
         } catch (error) {
             console.error('Error in local transcription:', error);
-            throw new Error(`Error en transcripción local: ${error.message}`);
+            throw new Error(`Error in local transcription: ${error.message}`);
         }
     }
 
@@ -2166,13 +2166,13 @@ class NotesApp {
             return result.transcription;
         } catch (error) {
             console.error('Error in SenseVoice transcription:', error);
-            throw new Error(`Error en transcripción SenseVoice: ${error.message}`);
+            throw new Error(`Error in SenseVoice transcription: ${error.message}`);
         }
     }
 
     async handleStreamingTranscription(audioBlob, options) {
         try {
-            this.showProcessingOverlay('Iniciando transcripción en tiempo real...');
+            this.showProcessingOverlay('Starting real-time transcription...');
             
             // Añadir indicador de streaming en el estado de grabación
             const statusElement = document.getElementById('recording-status').querySelector('.status-text');
@@ -2236,7 +2236,7 @@ class NotesApp {
         } catch (error) {
             // Limpiar indicadores en caso de error
             const statusElement = document.getElementById('recording-status').querySelector('.status-text');
-            statusElement.textContent = 'Error en transcripción';
+            statusElement.textContent = 'Transcription error';
             
             // Remover elemento temporal si existe
             const tempElement = document.querySelector('.streaming-transcription');
@@ -2372,7 +2372,7 @@ class NotesApp {
             tempSpan.style.padding = '2px 4px';
             tempSpan.style.borderRadius = '3px';
             tempSpan.style.border = '1px dashed #1976d2';
-            tempSpan.textContent = '⏳ Mejorando...';
+            tempSpan.textContent = '⏳ Improving...';
             
             // Reemplazar el texto seleccionado con el elemento temporal
             rangeToReplace.deleteContents();

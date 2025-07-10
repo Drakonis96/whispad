@@ -506,14 +506,14 @@ class NotesApp {
         
         recordBtn.classList.remove('btn--error');
         recordIcon.className = 'fas fa-microphone';
-        recordText.textContent = 'Grabar';
-        recordingStatus.querySelector('.status-text').textContent = 'Transcribiendo...';
+        recordText.textContent = 'Record';
+        recordingStatus.querySelector('.status-text').textContent = 'Transcribing...';
         recordingIndicator.classList.remove('active');
         
         // Simular procesamiento
         setTimeout(() => {
             this.insertTranscription();
-            recordingStatus.querySelector('.status-text').textContent = 'Listo para grabar';
+            recordingStatus.querySelector('.status-text').textContent = 'Ready to record';
         }, 1500);
     }
     
@@ -554,11 +554,11 @@ class NotesApp {
     improveText(action) {
         // Verificar si hay texto seleccionado
         if (!this.selectedText || !this.selectedRange) {
-            this.showNotification('Selecciona texto para mejorarlo con IA', 'warning');
+            this.showNotification('Please select text to improve with AI', 'warning');
             return;
         }
         
-        this.showProcessingOverlay(`Mejorando texto con IA...`);
+        this.showProcessingOverlay(`Improving text with AI...`);
         
         // Simular procesamiento de IA
         setTimeout(() => {
