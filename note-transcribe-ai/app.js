@@ -91,7 +91,10 @@ class NotesApp {
             responseStyle: 'balanced',
             lmstudioHost: '127.0.0.1',
             lmstudioPort: '1234',
-            lmstudioModels: ''
+            lmstudioModels: '',
+            ollamaHost: '127.0.0.1',
+            ollamaPort: '11434',
+            ollamaModels: ''
         };
         
         this.init();
@@ -290,6 +293,9 @@ class NotesApp {
         const lmstudioHost = document.getElementById('lmstudio-host').value.trim();
         const lmstudioPort = document.getElementById('lmstudio-port').value.trim();
         const lmstudioModels = document.getElementById('lmstudio-models').value.trim();
+        const ollamaHost = document.getElementById('ollama-host').value.trim();
+        const ollamaPort = document.getElementById('ollama-port').value.trim();
+        const ollamaModels = document.getElementById('ollama-models').value.trim();
 
         this.config = {
             transcriptionProvider,
@@ -304,7 +310,10 @@ class NotesApp {
             responseStyle,
             lmstudioHost,
             lmstudioPort,
-            lmstudioModels
+            lmstudioModels,
+            ollamaHost,
+            ollamaPort,
+            ollamaModels
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
@@ -322,6 +331,9 @@ class NotesApp {
         document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
         document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
         document.getElementById('lmstudio-models').value = this.config.lmstudioModels || '';
+        document.getElementById('ollama-host').value = this.config.ollamaHost || '127.0.0.1';
+        document.getElementById('ollama-port').value = this.config.ollamaPort || '11434';
+        document.getElementById('ollama-models').value = this.config.ollamaModels || '';
         
         // Configuración avanzada
         document.getElementById('temperature-range').value = this.config.temperature || 0.3;
