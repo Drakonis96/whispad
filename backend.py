@@ -805,7 +805,7 @@ def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt
         else:
             return jsonify({"error": f"Ollama error {response.status_code}"}), response.status_code
     except requests.RequestException as e:
-        return jsonify({"error": f"Error de conexi\xF3n con Ollama: {str(e)}"}), 500
+        return jsonify({"error": f"Error de conexión con Ollama: {str(e)}"}), 500
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
@@ -859,7 +859,7 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
                     except json.JSONDecodeError:
                         continue
         except requests.RequestException as e:
-            yield f"data: {json.dumps({'error': f'Error de conexi\xF3n con Ollama: {str(e)}'})}\n\n"
+            yield f"data: {json.dumps({'error': f'Error de conexión con Ollama: {str(e)}'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
 
