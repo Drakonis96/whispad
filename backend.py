@@ -1303,7 +1303,7 @@ def download_sensevoice():
             try:
                 # Import huggingface_hub here to avoid startup dependency
                 try:
-                    from huggingface_hub import snapshot_download
+                    from huggingface_hub import HfApi, hf_hub_download
                     import subprocess
                     import sys
                 except ImportError:
@@ -1311,7 +1311,7 @@ def download_sensevoice():
                     yield f"data: {json.dumps({'status': 'Installing huggingface_hub...'})}\n\n"
                     try:
                         subprocess.check_call([sys.executable, "-m", "pip", "install", "huggingface_hub"])
-                        from huggingface_hub import snapshot_download
+                        from huggingface_hub import HfApi, hf_hub_download
                     except Exception as install_error:
                         yield f"data: {json.dumps({'error': f'Failed to install huggingface_hub: {str(install_error)}'})}\n\n"
                         return
@@ -1323,26 +1323,33 @@ def download_sensevoice():
                 # Create models directory
                 models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
                 os.makedirs(models_dir, exist_ok=True)
-                
+
                 # Create SenseVoice specific directory
                 sensevoice_dir = os.path.join(models_dir, 'SenseVoiceSmall')
-                
+
                 yield f"data: {json.dumps({'status': 'Starting SenseVoice Small download...'})}\n\n"
-                yield f"data: {json.dumps({'progress': 10})}\n\n"
-                
+                yield f"data: {json.dumps({'progress': 0})}\n\n"
+
                 # Download the model from Hugging Face
                 repo_id = "FunAudioLLM/SenseVoiceSmall"
-                yield f"data: {json.dumps({'status': f'Downloading from {repo_id}...'})}\n\n"
-                yield f"data: {json.dumps({'progress': 30})}\n\n"
-                
-                # Download the snapshot
-                snapshot_download(
-                    repo_id=repo_id,
-                    local_dir=sensevoice_dir,
-                    repo_type="model",
-                )
+                yield f"data: {json.dumps({'status': f'Listing files in {repo_id}...'})}\n\n"
 
-                yield f"data: {json.dumps({'progress': 80})}\n\n"
+                api = HfApi()
+                files = api.list_repo_files(repo_id=repo_id, repo_type="model")
+                total_files = len(files)
+                if total_files == 0:
+                    yield f"data: {json.dumps({'error': 'No files found in repository'})}\n\n"
+                    return
+
+                yield f"data: {json.dumps({'status': f'Total files: {total_files}'})}\n\n"
+
+                downloaded = 0
+                for file in files:
+                    hf_hub_download(repo_id=repo_id, filename=file, repo_type="model", local_dir=sensevoice_dir, local_dir_use_symlinks=False)
+                    downloaded += 1
+                    progress = int(downloaded * 100 / total_files)
+                    yield f"data: {json.dumps({'progress': progress})}\n\n"
+
                 yield f"data: {json.dumps({'status': 'Download completed successfully!'})}\n\n"
                 yield f"data: {json.dumps({'progress': 100})}\n\n"
                 yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall', 'path': sensevoice_dir})}\n\n"
