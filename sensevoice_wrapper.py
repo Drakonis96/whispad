@@ -20,7 +20,7 @@ class SenseVoiceWrapper:
         self.supported_languages = {
             'auto': 'Auto-detect',
             'zh': 'Chinese (Mandarin)',
-            'yue': 'Chinese (Cantonese)', 
+            'yue': 'Chinese (Cantonese)',
             'en': 'English',
             'ja': 'Japanese',
             'ko': 'Korean',
