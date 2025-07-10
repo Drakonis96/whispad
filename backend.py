@@ -1298,6 +1298,7 @@ def download_sensevoice():
     """Download SenseVoice model from Hugging Face with progress via SSE"""
     try:
         def generate():
+            global sensevoice_wrapper, SENSEVOICE_AVAILABLE
             try:
                 # Import huggingface_hub here to avoid startup dependency
                 try:
@@ -1341,6 +1342,13 @@ def download_sensevoice():
                 )
                 
                 yield f"data: {json.dumps({'progress': 80})}\n\n"
+
+                # Update availability and preload model
+                SENSEVOICE_AVAILABLE = sensevoice_wrapper.is_available()
+                if SENSEVOICE_AVAILABLE:
+                    sensevoice_wrapper.model_loaded = False
+                    sensevoice_wrapper._load_model()
+
                 yield f"data: {json.dumps({'status': 'Download completed successfully!'})}\n\n"
                 yield f"data: {json.dumps({'progress': 100})}\n\n"
                 yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall', 'path': sensevoice_dir})}\n\n"
