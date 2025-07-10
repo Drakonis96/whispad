@@ -20,7 +20,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Real-time voice-to-text transcription from the browser.
 - Write and edit markdown notes.
 - Integrated note manager: create, search, tag, save, restore and download in Markdown format.
-- Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
+- Automatic text enhancement using AI (OpenAI, Google, OpenRouter or local providers like Ollama and LM Studio) with streaming responses.
 - A blue marker indicating where the transcription will be inserted.
 - Compatible with multiple providers: OpenAI, Google, SenseVoice and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
 - **NEW: SenseVoice Integration** - Advanced multilingual speech recognition with emotion detection and audio event recognition for 50+ languages.
@@ -90,6 +90,7 @@ Copy `env.example` to `.env` and add your API keys:
 cp env.example .env
 ```
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
+If you plan to use local models through **Ollama** or **LM Studio**, also configure `OLLAMA_HOST`, `OLLAMA_PORT`, `LMSTUDIO_HOST` and `LMSTUDIO_PORT`.
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.

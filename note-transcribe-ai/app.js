@@ -84,6 +84,8 @@ class NotesApp {
             postprocessModel: '',
             openaiApiKey: '',
             googleApiKey: '',
+            ollamaUrl: '',
+            lmstudioUrl: '',
             // Configuración avanzada de post-procesamiento
             temperature: 0.3,
             maxTokens: 1000,
@@ -278,6 +280,8 @@ class NotesApp {
         const postprocessModel = document.getElementById('postprocess-model').value;
         const openaiApiKey = document.getElementById('openai-api-key').value;
         const googleApiKey = document.getElementById('google-api-key').value;
+        const ollamaUrl = document.getElementById('ollama-url').value;
+        const lmstudioUrl = document.getElementById('lmstudio-url').value;
         
         // Configuración avanzada
         const temperature = parseFloat(document.getElementById('temperature-range').value);
@@ -292,6 +296,8 @@ class NotesApp {
             postprocessModel,
             openaiApiKey,
             googleApiKey,
+            ollamaUrl,
+            lmstudioUrl,
             temperature,
             maxTokens,
             topP,
@@ -310,6 +316,8 @@ class NotesApp {
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('openai-api-key').value = this.config.openaiApiKey;
         document.getElementById('google-api-key').value = this.config.googleApiKey || '';
+        document.getElementById('ollama-url').value = this.config.ollamaUrl || '';
+        document.getElementById('lmstudio-url').value = this.config.lmstudioUrl || '';
         
         // Configuración avanzada
         document.getElementById('temperature-range').value = this.config.temperature || 0.3;

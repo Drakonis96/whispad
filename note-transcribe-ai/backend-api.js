@@ -26,7 +26,7 @@ class BackendAPI {
             throw new Error('Error checking API status');
         } catch (error) {
             console.error('Error checking APIs:', error);
-            return { openai: false, google: false, deepseek: false, openrouter: false };
+            return { openai: false, google: false, deepseek: false, openrouter: false, ollama: true, lmstudio: true };
         }
     }
 
@@ -53,7 +53,7 @@ class BackendAPI {
         }
     }
 
-    async improveText(text, improvementType, provider = 'openai', stream = true, model = null) {
+    async improveText(text, improvementType, provider = 'openai', stream = true, model = null, customPrompt = null, host = null, port = null) {
         try {
             if (stream) {
                 return this.improveTextStream(text, improvementType, provider, model);
@@ -78,6 +78,11 @@ class BackendAPI {
             if (model) {
                 requestBody.model = model;
             }
+            if (customPrompt) {
+                requestBody.custom_prompt = customPrompt;
+            }
+            if (host) requestBody.host = host;
+            if (port) requestBody.port = port;
 
             const response = await fetch(`${this.baseUrl}/api/improve-text`, {
                 method: 'POST',
@@ -100,7 +105,7 @@ class BackendAPI {
         }
     }
 
-    async improveTextStream(text, improvementType, provider = 'openai', model = null) {
+    async improveTextStream(text, improvementType, provider = 'openai', model = null, customPrompt = null, host = null, port = null) {
         try {
             const requestBody = {
                 text: text,
@@ -112,6 +117,11 @@ class BackendAPI {
             if (model) {
                 requestBody.model = model;
             }
+            if (customPrompt) {
+                requestBody.custom_prompt = customPrompt;
+            }
+            if (host) requestBody.host = host;
+            if (port) requestBody.port = port;
 
             const response = await fetch(`${this.baseUrl}/api/improve-text`, {
                 method: 'POST',

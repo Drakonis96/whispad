@@ -91,6 +91,8 @@ class NotesApp {
             postprocessProvider: '',
             transcriptionModel: '',
             postprocessModel: '',
+            ollamaUrl: '',
+            lmstudioUrl: '',
             transcriptionLanguage: 'auto', // auto-detectar por defecto
             // Nuevas opciones para GPT-4o transcription
             streamingEnabled: true,
@@ -542,6 +544,8 @@ class NotesApp {
         const transcriptionModel = document.getElementById('transcription-model').value;
         const postprocessModel = document.getElementById('postprocess-model').value;
         const transcriptionLanguage = document.getElementById('transcription-language').value;
+        const ollamaUrl = document.getElementById('ollama-url').value;
+        const lmstudioUrl = document.getElementById('lmstudio-url').value;
         
         // Nuevas opciones para GPT-4o
         const streamingEnabled = document.getElementById('streaming-enabled').checked;
@@ -565,6 +569,8 @@ class NotesApp {
             postprocessProvider,
             transcriptionModel,
             postprocessModel,
+            ollamaUrl,
+            lmstudioUrl,
             transcriptionLanguage,
             streamingEnabled,
             transcriptionPrompt,
@@ -590,6 +596,8 @@ class NotesApp {
         document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
+        document.getElementById('ollama-url').value = this.config.ollamaUrl || '';
+        document.getElementById('lmstudio-url').value = this.config.lmstudioUrl || '';
         
         // Nuevas opciones para GPT-4o
         document.getElementById('streaming-enabled').checked = this.config.streamingEnabled !== false; // true por defecto
@@ -2333,6 +2341,8 @@ class NotesApp {
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
+        const isOllama = provider === 'ollama';
+        const isLMStudio = provider === 'lmstudio';
 
         // Verificar que el backend esté disponible
         const backendAvailable = await this.checkBackendStatus();
@@ -2355,6 +2365,13 @@ class NotesApp {
             this.showNotification('OpenRouter API not configured in backend', 'warning');
             this.showConfigModal();
             return;
+        }
+
+        if (isOllama && !this.availableAPIs?.ollama) {
+            this.showNotification('Ollama not available in backend', 'warning');
+        }
+        if (isLMStudio && !this.availableAPIs?.lmstudio) {
+            this.showNotification('LM Studio not available in backend', 'warning');
         }
 
         // Guardar estado actual para poder deshacer
@@ -2393,6 +2410,10 @@ class NotesApp {
                 improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
             } else if (isOpenRouter) {
                 improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
+            } else if (isOllama) {
+                improvedText = await this.improveWithOllamaStream(textToImprove, action, tempSpan);
+            } else if (isLMStudio) {
+                improvedText = await this.improveWithLMStudioStream(textToImprove, action, tempSpan);
             } else {
                 // Fallback a mejora local
                 improvedText = this.applyAIImprovement(textToImprove, action);
@@ -2762,6 +2783,134 @@ class NotesApp {
         } catch (error) {
             console.error('Error in improveWithOpenRouterStream:', error);
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
+        }
+    }
+
+    async improveWithOllama(text, action) {
+        try {
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.postprocessModel;
+            const url = this.config.ollamaUrl;
+            let host, port;
+            if (url) {
+                try {
+                    const u = new URL(url);
+                    host = u.hostname;
+                    port = u.port;
+                } catch {}
+            }
+            return await backendAPI.improveText(text, action, 'ollama', false, model, customPrompt, host, port);
+        } catch (error) {
+            throw new Error(`Error improving text with Ollama: ${error.message}`);
+        }
+    }
+
+    async improveWithOllamaStream(text, action, tempElement) {
+        try {
+            console.log('Starting Ollama stream for action:', action);
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.postprocessModel;
+            const url = this.config.ollamaUrl;
+            let host, port;
+            if (url) {
+                try {
+                    const u = new URL(url);
+                    host = u.hostname;
+                    port = u.port;
+                } catch {}
+            }
+            const response = await backendAPI.improveText(text, action, 'ollama', true, model, customPrompt, host, port);
+            if (!response.body) {
+                throw new Error('No response body received');
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let improvedText = '';
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (dataStr === '[DONE]') {
+                            return this.cleanAIResponse(improvedText);
+                        }
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.content) {
+                                improvedText += data.content;
+                                tempElement.textContent = this.cleanAIResponse(improvedText);
+                                tempElement.className = 'ai-generating-text';
+                            }
+                        } catch {}
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error in improveWithOllamaStream:', error);
+            throw new Error(`Error improving text with Ollama: ${error.message}`);
+        }
+    }
+
+    async improveWithLMStudio(text, action) {
+        const style = this.stylesConfig[action];
+        const customPrompt = (style && style.custom) ? style.prompt : null;
+        const model = this.config.postprocessModel;
+        const url = this.config.lmstudioUrl;
+        let host, port;
+        if (url) {
+            try {
+                const u = new URL(url);
+                host = u.hostname;
+                port = u.port;
+            } catch {}
+        }
+        return backendAPI.improveText(text, action, 'lmstudio', false, model, customPrompt, host, port);
+    }
+
+    async improveWithLMStudioStream(text, action, tempElement) {
+        const style = this.stylesConfig[action];
+        const customPrompt = (style && style.custom) ? style.prompt : null;
+        const model = this.config.postprocessModel;
+        const url = this.config.lmstudioUrl;
+        let host, port;
+        if (url) {
+            try {
+                const u = new URL(url);
+                host = u.hostname;
+                port = u.port;
+            } catch {}
+        }
+        const response = await backendAPI.improveText(text, action, 'lmstudio', true, model, customPrompt, host, port);
+        if (!response.body) throw new Error('No response body received');
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let improvedText = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') {
+                        return this.cleanAIResponse(improvedText);
+                    }
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            improvedText += data.content;
+                            tempElement.textContent = this.cleanAIResponse(improvedText);
+                            tempElement.className = 'ai-generating-text';
+                        }
+                    } catch {}
+                }
+            }
         }
     }
     
@@ -3216,7 +3365,9 @@ class NotesApp {
                 { value: 'deepseek/deepseek-chat-v3-0324:free', text: 'DeepSeek Chat v3 (Free)' },
                 { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
                 { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' }
-            ]
+            ],
+            'ollama': [],
+            'lmstudio': []
         };
         
         // Añadir opciones según el proveedor seleccionado
