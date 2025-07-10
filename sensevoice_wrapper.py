@@ -90,16 +90,8 @@ class SenseVoiceWrapper:
                             print(f"SenseVoice model found at: {model_dir}")
                             return True
             
-            # Try to check if FunASR can load the model using standard identifiers
-            try:
-                # This will check if the model can be loaded via FunASR without actually loading it
-                result = self._can_load_via_funasr()
-                if result:
-                    print("SenseVoice model available via FunASR")
-                return result
-            except:
-                pass
-                
+            # If model not found locally, do not expose the provider
+            # (behave like local Whisper models)
             print("SenseVoice model not found in any location")
             return False
         except Exception as e:
