@@ -585,11 +585,18 @@ class NotesApp {
     }
 
     showConfigModal() {
+        // Refresh available provider options in case they changed
+        this.populateTranscriptionProviders();
+
         document.getElementById('transcription-provider').value = this.config.transcriptionProvider;
         document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
+        document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
+
+        // Update model lists based on selected providers
+        this.updateTranscriptionModelOptions();
+
         document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
-        document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
         
         // Nuevas opciones para GPT-4o
         document.getElementById('streaming-enabled').checked = this.config.streamingEnabled !== false; // true por defecto
@@ -3329,16 +3336,18 @@ class NotesApp {
                 return false;
             }
             
-            this.availableAPIs = await backendAPI.checkAPIs();
-            
-            // Fetch available transcription providers
-            try {
-                this.availableTranscriptionProviders = await backendAPI.getTranscriptionProviders();
-                console.log('Available transcription providers:', this.availableTranscriptionProviders);
-            } catch (error) {
-                console.error('Error fetching transcription providers:', error);
-                this.availableTranscriptionProviders = { providers: [], default: null };
-            }
+        this.availableAPIs = await backendAPI.checkAPIs();
+
+        // Fetch available transcription providers
+        try {
+            this.availableTranscriptionProviders = await backendAPI.getTranscriptionProviders();
+            console.log('Available transcription providers:', this.availableTranscriptionProviders);
+            // Ensure dropdowns are populated on initial load
+            this.updateTranscriptionConfiguration();
+        } catch (error) {
+            console.error('Error fetching transcription providers:', error);
+            this.availableTranscriptionProviders = { providers: [], default: null };
+        }
             
             return true;
         } catch (error) {
