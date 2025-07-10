@@ -1399,28 +1399,40 @@ class NotesApp {
 
         // Store current selection
         const currentProvider = transcriptionProviderSelect.value;
-        
+
         // Clear existing options
         transcriptionProviderSelect.innerHTML = '';
-        
+
+        // Build a map of providers combining backend info and configured APIs
+        const providerMap = new Map();
+
+        if (this.availableAPIs?.openai) {
+            providerMap.set('openai', { id: 'openai', name: 'OpenAI' });
+        }
+        if (this.availableAPIs?.google) {
+            providerMap.set('google', { id: 'google', name: 'Google' });
+        }
+
         if (this.availableTranscriptionProviders?.providers) {
-            this.availableTranscriptionProviders.providers.forEach(provider => {
-                const option = document.createElement('option');
-                option.value = provider.id;
-                option.textContent = provider.name;
-                transcriptionProviderSelect.appendChild(option);
+            this.availableTranscriptionProviders.providers.forEach(p => {
+                providerMap.set(p.id, p);
             });
-            
-            // Restore selection if still available
-            if (Array.from(transcriptionProviderSelect.options).some(opt => opt.value === currentProvider)) {
-                transcriptionProviderSelect.value = currentProvider;
-            } else {
-                // Use default provider if current selection is no longer available
-                const defaultProvider = this.availableTranscriptionProviders.default;
-                if (defaultProvider) {
-                    transcriptionProviderSelect.value = defaultProvider;
-                }
-            }
+        }
+
+        providerMap.forEach(provider => {
+            const option = document.createElement('option');
+            option.value = provider.id;
+            option.textContent = provider.name;
+            transcriptionProviderSelect.appendChild(option);
+        });
+
+        const providerExists = Array.from(transcriptionProviderSelect.options).some(opt => opt.value === currentProvider);
+        if (providerExists) {
+            transcriptionProviderSelect.value = currentProvider;
+        } else if (this.availableTranscriptionProviders?.default && providerMap.has(this.availableTranscriptionProviders.default)) {
+            transcriptionProviderSelect.value = this.availableTranscriptionProviders.default;
+        } else if (transcriptionProviderSelect.options.length > 0) {
+            transcriptionProviderSelect.selectedIndex = 0;
         }
     }
 
