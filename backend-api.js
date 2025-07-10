@@ -169,12 +169,12 @@ class BackendAPI {
         }
     }
 
-    async improveText(text, improvementType, provider = 'openai', stream = true, model = null, customPrompt = null) {
+    async improveText(text, improvementType, provider = 'openai', stream = true, model = null, customPrompt = null, host = null, port = null) {
         try {
             if (stream) {
-                return this.improveTextStream(text, improvementType, provider, model, customPrompt);
+                return this.improveTextStream(text, improvementType, provider, model, customPrompt, host, port);
             } else {
-                return this.improveTextNonStream(text, improvementType, provider, model, customPrompt);
+                return this.improveTextNonStream(text, improvementType, provider, model, customPrompt, host, port);
             }
         } catch (error) {
             console.error('Error improving text:', error);
@@ -182,7 +182,7 @@ class BackendAPI {
         }
     }
 
-    async improveTextNonStream(text, improvementType, provider = 'openai', model = null, customPrompt = null) {
+    async improveTextNonStream(text, improvementType, provider = 'openai', model = null, customPrompt = null, host = null, port = null) {
         try {
             const requestBody = {
                 text: text,
@@ -197,6 +197,14 @@ class BackendAPI {
             
             if (customPrompt) {
                 requestBody.custom_prompt = customPrompt;
+            }
+
+            if (host) {
+                requestBody.host = host;
+            }
+
+            if (port) {
+                requestBody.port = port;
             }
 
             const response = await fetch(`${this.baseUrl}/api/improve-text`, {
@@ -220,7 +228,7 @@ class BackendAPI {
         }
     }
 
-    async improveTextStream(text, improvementType, provider = 'openai', model = null, customPrompt = null) {
+    async improveTextStream(text, improvementType, provider = 'openai', model = null, customPrompt = null, host = null, port = null) {
         try {
             const requestBody = {
                 text: text,
@@ -235,6 +243,13 @@ class BackendAPI {
             
             if (customPrompt) {
                 requestBody.custom_prompt = customPrompt;
+            }
+
+            if (host) {
+                requestBody.host = host;
+            }
+            if (port) {
+                requestBody.port = port;
             }
 
             const response = await fetch(`${this.baseUrl}/api/improve-text`, {

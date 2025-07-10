@@ -32,6 +32,8 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
+LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 
 # Inicializar el wrapper de whisper.cpp local
 try:
@@ -206,6 +208,11 @@ def improve_text():
             elif provider == 'openrouter':
                 model = data.get('model', 'google/gemma-3-27b-it:free')
                 return improve_text_openrouter_stream(text, improvement_type, model, custom_prompt)
+            elif provider == 'lmstudio':
+                model = data.get('model')
+                host = data.get('host', LMSTUDIO_HOST)
+                port = data.get('port', LMSTUDIO_PORT)
+                return improve_text_lmstudio_stream(text, improvement_type, model, host, port, custom_prompt)
             else:
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
@@ -216,6 +223,11 @@ def improve_text():
             elif provider == 'openrouter':
                 model = data.get('model', 'google/gemma-3-27b-it:free')
                 return improve_text_openrouter(text, improvement_type, model, custom_prompt)
+            elif provider == 'lmstudio':
+                model = data.get('model')
+                host = data.get('host', LMSTUDIO_HOST)
+                port = data.get('port', LMSTUDIO_PORT)
+                return improve_text_lmstudio(text, improvement_type, model, host, port, custom_prompt)
             else:
                 return jsonify({"error": "Proveedor no soportado"}), 400
             
@@ -635,6 +647,112 @@ def improve_text_openrouter_stream(text, improvement_type, model='google/gemma-3
         except Exception as e:
             yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
     
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prompt=None):
+    """Mejorar texto usando LM Studio local"""
+    if not host or not port or not model:
+        return jsonify({"error": "LM Studio host, port and model required"}), 400
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'claridad': f"Reescribe el siguiente texto de manera más clara y legible. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'formal': f"Reescribe el siguiente texto en un tono formal. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'casual': f"Reescribe el siguiente texto en un tono casual y amigable. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'academico': f"Reescribe el siguiente texto en estilo académico. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'narrativo': f"Mejora el siguiente texto narrativo o diálogo de novela, preservando el estilo literario y la voz narrativa. Mejora la fluidez, la descripción y la calidad literaria manteniendo la esencia del texto. Responde ÚNICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'academico_v2': f"Mejora el siguiente texto académico realizando cambios mínimos para preservar las palabras del autor. Usa palabras más precisas cuando sea necesario, mejora la estructura y elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Mantén el estilo y vocabulario original tanto como sea posible. Responde ÚNICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'resumir': f"Crea un resumen conciso del siguiente texto. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el resumen, sin explicaciones adicionales:\n\n{text}",
+            'expandir': f"Expande el siguiente texto añadiendo más detalles y contexto relevante. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto expandido, sin explicaciones adicionales:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Mejora el siguiente texto: {text}")
+
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = { 'Content-Type': 'application/json' }
+    payload = {
+        'model': model,
+        'messages': [{ 'role': 'user', 'content': prompt }],
+        'max_tokens': 1000,
+        'temperature': 0.7
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            result = response.json()
+            improved_text = result['choices'][0]['message']['content']
+            return jsonify({"improved_text": improved_text})
+        else:
+            return jsonify({"error": f"LM Studio error {response.status_code}"}), response.status_code
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error de conexión con LM Studio: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+def improve_text_lmstudio_stream(text, improvement_type, model, host, port, custom_prompt=None):
+    """Mejorar texto usando LM Studio con streaming"""
+    if not host or not port or not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'LM Studio host, port and model required'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'claridad': f"Reescribe el siguiente texto de manera más clara y legible. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'formal': f"Reescribe el siguiente texto en un tono formal. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'casual': f"Reescribe el siguiente texto en un tono casual y amigable. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'academico': f"Reescribe el siguiente texto en estilo académico. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto reescrito, sin explicaciones adicionales:\n\n{text}",
+            'narrativo': f"Mejora el siguiente texto narrativo o diálogo de novela, preservando el estilo literario y la voz narrativa. Mejora la fluidez, la descripción y la calidad literaria manteniendo la esencia del texto. Responde ÚNICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'academico_v2': f"Mejora el siguiente texto académico realizando cambios mínimos para preservar las palabras del autor. Usa palabras más precisas cuando sea necesario, mejora la estructura y elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Mantén el estilo y vocabulario original tanto como sea posible. Responde ÚNICAMENTE con el texto mejorado, sin explicaciones adicionales:\n\n{text}",
+            'resumir': f"Crea un resumen conciso del siguiente texto. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el resumen, sin explicaciones adicionales:\n\n{text}",
+            'expandir': f"Expande el siguiente texto añadiendo más detalles y contexto relevante. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Responde ÚNICAMENTE con el texto expandido, sin explicaciones adicionales:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Mejora el siguiente texto: {text}")
+
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = { 'Content-Type': 'application/json' }
+    payload = {
+        'model': model,
+        'messages': [{ 'role': 'user', 'content': prompt }],
+        'max_tokens': 1000,
+        'temperature': 0.7,
+        'stream': True
+    }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'LM Studio error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            if 'choices' in data and len(data['choices']) > 0:
+                                delta = data['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    content = delta['content']
+                                    yield f"data: {json.dumps({'content': content})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except requests.RequestException as e:
+            yield f"data: {json.dumps({'error': f'Error de conexión con LM Studio: {str(e)}'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
+
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
 @app.route('/api/transcribe-gpt4o', methods=['POST'])

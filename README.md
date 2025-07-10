@@ -59,6 +59,9 @@ This option is ideal if you don't want to worry about installing Python or depen
    ```
 4. Go to `https://localhost:5037` and start using WhisPad.
 5. To stop it, press `Ctrl+C` in the terminal or run `docker compose down`.
+6. If you want to use LM Studio for local AI text improvement, set the host to
+   `host.docker.internal` in the configuration page so the container can reach
+   your LM Studio instance.
 
 ## Installing from the Terminal
 If you prefer not to use Docker, you can also run it directly with Python:

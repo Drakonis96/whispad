@@ -88,7 +88,10 @@ class NotesApp {
             temperature: 0.3,
             maxTokens: 1000,
             topP: 0.95,
-            responseStyle: 'balanced'
+            responseStyle: 'balanced',
+            lmstudioHost: '127.0.0.1',
+            lmstudioPort: '1234',
+            lmstudioModels: ''
         };
         
         this.init();
@@ -284,6 +287,9 @@ class NotesApp {
         const maxTokens = parseInt(document.getElementById('max-tokens').value);
         const topP = parseFloat(document.getElementById('top-p-range').value);
         const responseStyle = document.getElementById('response-style').value;
+        const lmstudioHost = document.getElementById('lmstudio-host').value.trim();
+        const lmstudioPort = document.getElementById('lmstudio-port').value.trim();
+        const lmstudioModels = document.getElementById('lmstudio-models').value.trim();
 
         this.config = {
             transcriptionProvider,
@@ -295,7 +301,10 @@ class NotesApp {
             temperature,
             maxTokens,
             topP,
-            responseStyle
+            responseStyle,
+            lmstudioHost,
+            lmstudioPort,
+            lmstudioModels
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
@@ -310,6 +319,9 @@ class NotesApp {
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('openai-api-key').value = this.config.openaiApiKey;
         document.getElementById('google-api-key').value = this.config.googleApiKey || '';
+        document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
+        document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
+        document.getElementById('lmstudio-models').value = this.config.lmstudioModels || '';
         
         // Configuración avanzada
         document.getElementById('temperature-range').value = this.config.temperature || 0.3;
