@@ -34,26 +34,26 @@
             </div>
             
             <div class="notes-list" id="notes-list">
-                <!-- Las notas se insertarán aquí dinámicamente -->
+                <!-- Notes will be inserted here dynamically -->
             </div>
         </div>
         
-        <!-- Área principal -->
+        <!-- Main area -->
         <div class="main-content">
-            <!-- Panel superior de herramientas -->
+            <!-- Top toolbar -->
             <div class="toolbar">
                 <div class="toolbar-section">
-                <h3>Herramientas de Transcripción</h3>
+                <h3>Transcription Tools</h3>
                 <div class="transcription-controls">
                     <button class="btn btn--primary" id="record-btn">
                         <i class="fas fa-microphone" id="record-icon"></i>
-                        <span id="record-text">Grabar</span>
+                        <span id="record-text">Record</span>
                     </button>
                     <div class="recording-status" id="recording-status">
-                        <span class="status-text">Listo para grabar</span>
+                        <span class="status-text">Ready to record</span>
                         <div class="recording-indicator" id="recording-indicator"></div>
                     </div>
-                    <button class="btn btn--outline btn--sm" id="config-btn" title="Configurar proveedores">
+                    <button class="btn btn--outline btn--sm" id="config-btn" title="Configure providers">
                         <i class="fas fa-cog"></i>
                         Config
                     </button>
@@ -61,52 +61,52 @@
             </div>
                 
                 <div class="toolbar-section">
-                    <h3>Mejora con IA</h3>
+                    <h3>AI Enhancement</h3>
                     <div class="ai-controls">
-                        <button class="btn btn--secondary btn--sm ai-btn" data-action="claridad" title="Mejorar claridad del texto">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="claridad" title="Improve text clarity">
                             <span class="ai-icon">✨</span>
-                            Claridad
+                            Clarity
                         </button>
-                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academico_v2" title="Mejora académica con cambios mínimos, preservando palabras del autor">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academico_v2" title="Academic improvement with minimal changes, preserving author's words">
                             <span class="ai-icon">🎓</span>
-                            Académico v2
+                            Academic v2
                         </button>
-                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expandir" title="Expandir ideas y añadir detalles">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expandir" title="Expand ideas and add details">
                             <span class="ai-icon">✚</span>
-                            Expandir
+                            Expand
                         </button>
-                        <button class="btn btn--outline btn--sm" id="undo-ai-btn" title="Deshacer último cambio de IA" disabled>
+                        <button class="btn btn--outline btn--sm" id="undo-ai-btn" title="Undo last AI change" disabled>
                             <span class="ai-icon">↶</span>
-                            Deshacer
+                            Undo
                         </button>
                     </div>
                 </div>
             </div>
             
-            <!-- Área de edición -->
+            <!-- Editing area -->
             <div class="editor-container hidden">
                 <div class="editor-header">
                     <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
                     <div class="editor-actions">
                         <button class="btn btn--outline btn--sm" id="save-btn">
                             <i class="fas fa-save"></i>
-                            Guardar
+                            Save
                         </button>
                         <button class="btn btn--outline btn--sm" id="delete-btn">
                             <i class="fas fa-trash"></i>
-                            Eliminar
+                            Delete
                         </button>
                     </div>
                 </div>
                 
                 <div class="formatting-toolbar">
-                    <button class="format-btn" data-format="h1" title="Título 1">
+                    <button class="format-btn" data-format="h1" title="Heading 1">
                         <span class="header-text">H1</span>
                     </button>
-                    <button class="format-btn" data-format="h2" title="Título 2">
+                    <button class="format-btn" data-format="h2" title="Heading 2">
                         <span class="header-text">H2</span>
                     </button>
-                    <button class="format-btn" data-format="h3" title="Título 3">
+                    <button class="format-btn" data-format="h3" title="Heading 3">
                         <span class="header-text">H3</span>
                     </button>
                     <div class="format-separator"></div>
@@ -120,10 +120,10 @@
                         <i class="fas fa-underline"></i>
                     </button>
                     <div class="format-separator"></div>
-                    <button class="format-btn" data-format="ul" title="Lista con viñetas">
+                    <button class="format-btn" data-format="ul" title="Bulleted list">
                         <i class="fas fa-list-ul"></i>
                     </button>
-                    <button class="format-btn" data-format="ol" title="Lista numerada">
+                    <button class="format-btn" data-format="ol" title="Numbered list">
                         <i class="fas fa-list-ol"></i>
                     </button>
                 </div>
@@ -135,63 +135,63 @@
         </div>
     </div>
     
-    <!-- Modal de confirmación -->
+    <!-- Confirmation modal -->
     <div class="modal" id="delete-modal">
         <div class="modal-content">
-            <h3>Confirmar eliminación</h3>
-            <p>¿Estás seguro de que quieres eliminar esta nota? Esta acción no se puede deshacer.</p>
+            <h3>Confirm deletion</h3>
+            <p>Are you sure you want to delete this note? This action cannot be undone.</p>
             <div class="modal-actions">
-                <button class="btn btn--outline" id="cancel-delete">Cancelar</button>
-                <button class="btn btn--primary" id="confirm-delete">Eliminar</button>
+                <button class="btn btn--outline" id="cancel-delete">Cancel</button>
+                <button class="btn btn--primary" id="confirm-delete">Delete</button>
             </div>
         </div>
     </div>
     
-    <!-- Overlay de procesamiento -->
+    <!-- Processing overlay -->
     <div class="processing-overlay" id="processing-overlay">
         <div class="processing-content">
             <div class="spinner"></div>
-            <p id="processing-text">Procesando...</p>
+            <p id="processing-text">Processing...</p>
         </div>
     </div>
 
-    <!-- Modal de configuración -->
+    <!-- Configuration modal -->
     <div class="modal" id="config-modal">
         <div class="modal-content">
-            <h3>Configuración de Proveedores</h3>
+            <h3>Provider Configuration</h3>
             <div class="modal-body">
-                <h4 class="config-group-title">Configuración de Transcripción</h4>
+                <h4 class="config-group-title">Transcription Configuration</h4>
                 <div class="config-section">
-                    <h5>Proveedor de Transcripción</h5>
+                    <h5>Transcription Provider</h5>
                     <select class="form-control" id="transcription-provider">
-                        <option value="" selected>Seleccionar proveedor</option>
+                        <option value="" selected>Select provider</option>
                         <option value="openai">OpenAI</option>
                     </select>
                 </div>
                 <div class="config-section">
-                    <h5>Modelo de Transcripción</h5>
+                    <h5>Transcription Model</h5>
                     <select class="form-control" id="transcription-model">
-                        <option value="" selected>Seleccionar modelo</option>
+                        <option value="" selected>Select model</option>
                         <option value="whisper-1">Whisper-1 (OpenAI)</option>
                         <option value="gpt-4o-mini-transcribe">GPT-4o Mini - Fast</option>
                         <option value="gpt-4o-transcribe">GPT-4o - High Precision</option>
                     </select>
                 </div>
 
-                <h4 class="config-group-title">Configuración de Post-procesamiento</h4>
+                <h4 class="config-group-title">Post-processing Configuration</h4>
                 <div class="config-section">
-                    <h5>Proveedor de Post-procesamiento</h5>
+                    <h5>Post-processing Provider</h5>
                     <select class="form-control" id="postprocess-provider">
-                        <option value="" selected>Seleccionar proveedor</option>
+                        <option value="" selected>Select provider</option>
                         <option value="openai">OpenAI GPT</option>
                         <option value="google">Google Gemini</option>
                         <option value="openrouter">OpenRouter</option>
                     </select>
                 </div>
                 <div class="config-section">
-                    <h5>Modelo de Post-procesamiento</h5>
+                    <h5>Post-processing Model</h5>
                     <select class="form-control" id="postprocess-model">
-                        <option value="" selected>Seleccionar modelo</option>
+                        <option value="" selected>Select model</option>
                         <option value="gpt-4o-mini">GPT-4o Mini (OpenAI)</option>
                         <option value="gpt-4o">GPT-4o (OpenAI)</option>
                         <option value="gpt-4.1">GPT-4.1 (OpenAI)</option>
@@ -200,22 +200,22 @@
                     </select>
                 </div>
                 <div class="config-section">
-                    <h5>Configuración Avanzada de Post-procesamiento</h5>
+                    <h5>Advanced Post-processing Configuration</h5>
                     <div class="advanced-config">
                     <div class="config-row">
                         <div class="config-col">
-                            <label class="form-label">Temperatura (Creatividad)</label>
+                            <label class="form-label">Temperature (Creativity)</label>
                             <input type="range" class="range-control" id="temperature-range" min="0" max="1" step="0.1" value="0.3">
                             <span class="range-value" id="temperature-value">0.3</span>
-                            <small>0.0 = Más conservador, 1.0 = Más creativo</small>
+                            <small>0.0 = More conservative, 1.0 = More creative</small>
                         </div>
                         <div class="config-col">
-                            <label class="form-label">Máximo de Tokens</label>
+                            <label class="form-label">Maximum Tokens</label>
                             <select class="form-control" id="max-tokens">
-                                <option value="500">500 tokens (Respuestas cortas)</option>
-                                <option value="1000" selected>1000 tokens (Respuestas medianas)</option>
-                                <option value="2000">2000 tokens (Respuestas largas)</option>
-                                <option value="4000">4000 tokens (Respuestas muy largas)</option>
+                                <option value="500">500 tokens (Short responses)</option>
+                                <option value="1000" selected>1000 tokens (Medium responses)</option>
+                                <option value="2000">2000 tokens (Long responses)</option>
+                                <option value="4000">4000 tokens (Very long responses)</option>
                             </select>
                         </div>
                     </div>
@@ -224,15 +224,15 @@
                             <label class="form-label">Top P (Nucleus Sampling)</label>
                             <input type="range" class="range-control" id="top-p-range" min="0.1" max="1" step="0.05" value="0.95">
                             <span class="range-value" id="top-p-value">0.95</span>
-                            <small>Controla la diversidad del vocabulario</small>
+                            <small>Controls vocabulary diversity</small>
                         </div>
                         <div class="config-col">
-                            <label class="form-label">Tipo de Respuesta</label>
+                            <label class="form-label">Response Style</label>
                             <select class="form-control" id="response-style">
                                 <option value="factual">Factual (T:0.2, P:0.9)</option>
-                                <option value="balanced" selected>Balanceado (T:0.3, P:0.95)</option>
-                                <option value="creative">Creativo (T:0.7, P:0.95)</option>
-                                <option value="custom">Personalizado</option>
+                                <option value="balanced" selected>Balanced (T:0.3, P:0.95)</option>
+                                <option value="creative">Creative (T:0.7, P:0.95)</option>
+                                <option value="custom">Custom</option>
                             </select>
                         </div>
                     </div>
@@ -248,23 +248,23 @@
                         <label class="form-label">Google AI API Key</label>
                         <input type="password" class="form-control" id="google-api-key" placeholder="AI...">
                     </div>
-                    <small>Tus API keys se guardan localmente en tu navegador</small>
+                    <small>Your API keys are stored locally in your browser</small>
                 </div>
 
-                <h4 class="config-group-title">Opciones de Interfaz</h4>
+                <h4 class="config-group-title">Interface Options</h4>
                 <div class="config-section">
                     <div class="checkbox-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="show-mobile-record" checked>
                             <span class="checkmark"></span>
-                            Mostrar botón flotante de grabación en móvil
+                            Show floating record button on mobile
                         </label>
                     </div>
                 </div>
                 </div>
                 <div class="modal-actions">
-                    <button class="btn btn--outline" id="cancel-config">Cancelar</button>
-                    <button class="btn btn--primary" id="save-config">Guardar</button>
+                    <button class="btn btn--outline" id="cancel-config">Cancel</button>
+                    <button class="btn btn--primary" id="save-config">Save</button>
                 </div>
         </div>
     </div>

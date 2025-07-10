@@ -589,7 +589,7 @@ class NotesApp {
         try {
             // Verificar configuración
             if (this.config.transcriptionProvider === 'openai' && !this.config.openaiApiKey) {
-                this.showNotification('Por favor configura tu API key de OpenAI', 'warning');
+                this.showNotification('Please configure your OpenAI API key', 'warning');
                 this.showConfigModal();
                 return;
             }
@@ -621,8 +621,8 @@ class NotesApp {
             
             recordBtn.classList.add('btn--error');
             recordIcon.className = 'fas fa-stop';
-            recordText.textContent = 'Detener';
-            recordingStatus.querySelector('.status-text').textContent = 'Grabando...';
+            recordText.textContent = 'Stop';
+            recordingStatus.querySelector('.status-text').textContent = 'Recording...';
             recordingIndicator.classList.add('active');
 
         } catch (error) {
@@ -644,14 +644,14 @@ class NotesApp {
             
             recordBtn.classList.remove('btn--error');
             recordIcon.className = 'fas fa-microphone';
-            recordText.textContent = 'Grabar';
-            recordingStatus.querySelector('.status-text').textContent = 'Procesando...';
+            recordText.textContent = 'Record';
+            recordingStatus.querySelector('.status-text').textContent = 'Processing...';
             recordingIndicator.classList.remove('active');
         }
     }
 
     async transcribeAudio(audioBlob) {
-        this.showProcessingOverlay('Transcribiendo audio...');
+        this.showProcessingOverlay('Transcribing audio...');
         
         try {
             let transcription = '';
@@ -662,15 +662,15 @@ class NotesApp {
             
             if (transcription) {
                 this.insertTranscription(transcription);
-                this.showNotification('Transcripción completada');
+                this.showNotification('Transcription complete');
             }
             
         } catch (error) {
-            console.error('Error en transcripción:', error);
-            this.showNotification('Error al transcribir audio: ' + error.message, 'error');
+            console.error('Transcription error:', error);
+            this.showNotification('Error transcribing audio: ' + error.message, 'error');
         } finally {
             this.hideProcessingOverlay();
-            document.getElementById('recording-status').querySelector('.status-text').textContent = 'Listo para grabar';
+            document.getElementById('recording-status').querySelector('.status-text').textContent = 'Ready to record';
         }
     }
 
@@ -679,7 +679,7 @@ class NotesApp {
             // Usar el backend en lugar de la API directamente
             return await backendAPI.transcribeAudio(audioBlob);
         } catch (error) {
-            throw new Error(`Error en transcripción: ${error.message}`);
+            throw new Error(`Transcription error: ${error.message}`);
         }
     }
 
@@ -717,7 +717,7 @@ class NotesApp {
     async improveText(action) {
         // Verificar si hay texto seleccionado
         if (!this.selectedText || !this.selectedRange) {
-            this.showNotification('Selecciona texto para mejorarlo con IA', 'warning');
+            this.showNotification('Please select text to improve with AI', 'warning');
             return;
         }
 
@@ -727,13 +727,13 @@ class NotesApp {
         const isOpenAI = model.startsWith('gpt');
 
         if (isOpenAI && !this.config.openaiApiKey) {
-            this.showNotification('Por favor configura tu API key de OpenAI', 'warning');
+            this.showNotification('Please configure your OpenAI API key', 'warning');
             this.showConfigModal();
             return;
         }
 
         if (isGemini && !this.config.googleApiKey) {
-            this.showNotification('Por favor configura tu API key de Google AI', 'warning');
+            this.showNotification('Please configure your Google AI API key', 'warning');
             this.showConfigModal();
             return;
         }
@@ -741,7 +741,7 @@ class NotesApp {
         // Guardar estado actual para poder deshacer
         this.saveAIHistory();
 
-        this.showProcessingOverlay(`Mejorando texto con IA...`);
+        this.showProcessingOverlay(`Improving text with AI...`);
         
         try {
             let improvedText = '';
@@ -774,13 +774,13 @@ class NotesApp {
             this.updateUndoButton();
             
             this.hideProcessingOverlay();
-            this.showNotification(`Texto mejorado: ${configuracionMejoras[action].nombre}`);
+            this.showNotification(`Text improved: ${configuracionMejoras[action].nombre}`);
             this.handleEditorChange();
             
         } catch (error) {
             this.hideProcessingOverlay();
-            console.error('Error al mejorar texto:', error);
-            this.showNotification('Error al mejorar texto: ' + error.message, 'error');
+            console.error('Error improving text:', error);
+            this.showNotification('Error improving text: ' + error.message, 'error');
         }
     }
 
@@ -907,7 +907,7 @@ class NotesApp {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/\s+/g, ' ')
-                    .trim() + ' [Texto mejorado para mayor claridad]';
+                    .trim() + ' [Text improved for clarity]';
             },
             formal: (texto) => {
                 return texto
