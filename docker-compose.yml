@@ -16,5 +16,4 @@ services:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
-      - ./whisper-cpp-models/SenseVoiceSmall:/app/whisper-cpp-models/SenseVoiceSmall
     restart: unless-stopped
