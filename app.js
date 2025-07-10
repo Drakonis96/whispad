@@ -235,6 +235,22 @@ class NotesApp {
             }
             this.toggleRecording();
         });
+        // Upload audio file
+        const uploadBtn = document.getElementById('upload-audio-btn');
+        const uploadInput = document.getElementById('upload-audio-input');
+        if (uploadBtn && uploadInput) {
+            uploadBtn.addEventListener('click', () => {
+                this.captureInsertionRange();
+                uploadInput.click();
+            });
+            uploadInput.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    await this.transcribeAudio(file);
+                }
+                uploadInput.value = '';
+            });
+        }
         const mobileFab = document.getElementById('mobile-record-fab');
         if (mobileFab) {
             const handleMobileFab = () => {
