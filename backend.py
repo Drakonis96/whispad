@@ -32,6 +32,8 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
+LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 
 # Inicializar el wrapper de whisper.cpp local
 try:
@@ -206,6 +208,11 @@ def improve_text():
             elif provider == 'openrouter':
                 model = data.get('model', 'google/gemma-3-27b-it:free')
                 return improve_text_openrouter_stream(text, improvement_type, model, custom_prompt)
+            elif provider == 'lmstudio':
+                model = data.get('model', 'gpt-3.5-turbo')
+                host = data.get('host')
+                port = data.get('port')
+                return improve_text_lmstudio_stream(text, improvement_type, model, host, port, custom_prompt)
             else:
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
@@ -216,6 +223,11 @@ def improve_text():
             elif provider == 'openrouter':
                 model = data.get('model', 'google/gemma-3-27b-it:free')
                 return improve_text_openrouter(text, improvement_type, model, custom_prompt)
+            elif provider == 'lmstudio':
+                model = data.get('model', 'gpt-3.5-turbo')
+                host = data.get('host')
+                port = data.get('port')
+                return improve_text_lmstudio(text, improvement_type, model, host, port, custom_prompt)
             else:
                 return jsonify({"error": "Proveedor no soportado"}), 400
             
@@ -394,6 +406,104 @@ def improve_text_openai_stream(text, improvement_type, custom_prompt=None):
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
     
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def improve_text_lmstudio(text, improvement_type, model='gpt-3.5-turbo', host=None, port=None, custom_prompt=None):
+    """Mejorar texto usando un servidor LM Studio local"""
+    host = host or LMSTUDIO_HOST
+    port = port or LMSTUDIO_PORT
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'claridad': f"Reescribe el siguiente texto de manera más clara y legible. Elimina cualquier interjección o duda. Responde Únicamente con el texto mejorado:\n\n{text}",
+            'formal': f"Reescribe el siguiente texto en un tono formal eliminando interjecciones. Responde solo con el texto reescrito:\n\n{text}",
+            'casual': f"Reescribe el siguiente texto en un tono casual y amistoso eliminando interjecciones. Responde solo con el texto reescrito:\n\n{text}",
+            'academico': f"Reescribe el siguiente texto en estilo académico eliminando interjecciones. Responde solo con el texto reescrito:\n\n{text}",
+            'narrativo': f"Mejora el siguiente texto narrativo preservando el estilo. Responde solo con el texto mejorado:\n\n{text}",
+            'academico_v2': f"Mejora el siguiente texto académico realizando cambios mínimos y eliminando interjecciones. Responde solo con el texto mejorado:\n\n{text}",
+            'resumir': f"Crea un resumen conciso del siguiente texto y responde solo con el resumen:\n\n{text}",
+            'expandir': f"Expande el siguiente texto añadiendo detalles relevantes y responde solo con el texto expandido:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Mejora el siguiente texto: {text}")
+
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'model': model,
+        'messages': [{'role': 'user', 'content': prompt}],
+        'max_tokens': 1000,
+        'temperature': 0.7
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            result = response.json()
+            improved_text = result['choices'][0]['message']['content']
+            return jsonify({"improved_text": improved_text})
+        else:
+            return jsonify({"error": f"LM Studio error: {response.status_code}"}), response.status_code
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+def improve_text_lmstudio_stream(text, improvement_type, model='gpt-3.5-turbo', host=None, port=None, custom_prompt=None):
+    """Mejorar texto usando LM Studio con streaming"""
+    host = host or LMSTUDIO_HOST
+    port = port or LMSTUDIO_PORT
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'claridad': f"Reescribe el siguiente texto de manera más clara y legible. Elimina cualquier interjección o duda. Responde Únicamente con el texto mejorado:\n\n{text}",
+            'formal': f"Reescribe el siguiente texto en un tono formal eliminando interjecciones. Responde solo con el texto reescrito:\n\n{text}",
+            'casual': f"Reescribe el siguiente texto en un tono casual y amistoso eliminando interjecciones. Responde solo con el texto reescrito:\n\n{text}",
+            'academico': f"Reescribe el siguiente texto en estilo académico eliminando interjecciones. Responde solo con el texto reescrito:\n\n{text}",
+            'narrativo': f"Mejora el siguiente texto narrativo preservando el estilo. Responde solo con el texto mejorado:\n\n{text}",
+            'academico_v2': f"Mejora el siguiente texto académico realizando cambios mínimos y eliminando interjecciones. Responde solo con el texto mejorado:\n\n{text}",
+            'resumir': f"Crea un resumen conciso del siguiente texto y responde solo con el resumen:\n\n{text}",
+            'expandir': f"Expande el siguiente texto añadiendo detalles relevantes y responde solo con el texto expandido:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Mejora el siguiente texto: {text}")
+
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'model': model,
+        'messages': [{'role': 'user', 'content': prompt}],
+        'max_tokens': 1000,
+        'temperature': 0.7,
+        'stream': True
+    }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'LM Studio error: {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data.get('choices', [{}])[0].get('delta', {})
+                            if 'content' in delta:
+                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
+
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
 def improve_text_google_stream(text, improvement_type, custom_prompt=None):
@@ -979,7 +1089,8 @@ def check_apis():
         'openai': bool(OPENAI_API_KEY),
         'google': bool(GOOGLE_API_KEY),
         'deepseek': bool(DEEPSEEK_API_KEY),
-        'openrouter': bool(OPENROUTER_API_KEY)
+        'openrouter': bool(OPENROUTER_API_KEY),
+        'lmstudio': True
     }
     return jsonify(apis_status)
 

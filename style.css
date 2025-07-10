@@ -2240,6 +2240,21 @@ select.form-control {
     color: var(--color-text-secondary);
 }
 
+/* LM Studio specific styling */
+#lmstudio-options {
+    background-color: rgba(var(--color-primary-rgb), 0.05);
+    border: 1px solid rgba(var(--color-primary-rgb), 0.2);
+    border-radius: var(--radius-md);
+    padding: var(--space-16);
+    margin-top: var(--space-8);
+}
+
+#lmstudio-options .form-label {
+    color: var(--color-primary);
+    font-weight: 600;
+    margin-bottom: var(--space-12);
+}
+
 .sensevoice-feature-highlight {
     background: linear-gradient(135deg, 
         rgba(var(--color-primary-rgb), 0.1), 

@@ -311,7 +311,16 @@
                         <option value="openai">OpenAI GPT</option>
                         <option value="google">Google Gemini</option>
                         <option value="openrouter">OpenRouter</option>
+                        <option value="lmstudio">LM Studio (Local)</option>
                     </select>
+                </div>
+                <div class="model-config" id="lmstudio-options" style="display: none;">
+                    <label class="form-label">LM Studio Host</label>
+                    <input type="text" class="form-control" id="lmstudio-host" placeholder="127.0.0.1">
+                    <label class="form-label">LM Studio Port</label>
+                    <input type="number" class="form-control" id="lmstudio-port" placeholder="1234">
+                    <label class="form-label">Model Name</label>
+                    <input type="text" class="form-control" id="lmstudio-model" placeholder="gpt-3.5-turbo">
                 </div>
                 <div class="config-section">
                     <h5>Post-processing Model</h5>

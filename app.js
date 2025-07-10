@@ -100,7 +100,10 @@ class NotesApp {
             maxTokens: 1000,
             topP: 0.95,
             responseStyle: 'balanced',
-            showMobileRecordButton: true
+            showMobileRecordButton: true,
+            lmstudioHost: '127.0.0.1',
+            lmstudioPort: '1234',
+            lmstudioModel: 'gpt-3.5-turbo'
         };
         
         // Visible styles configuration
@@ -541,6 +544,9 @@ class NotesApp {
         const postprocessProvider = document.getElementById('postprocess-provider').value;
         const transcriptionModel = document.getElementById('transcription-model').value;
         const postprocessModel = document.getElementById('postprocess-model').value;
+        const lmstudioHost = document.getElementById('lmstudio-host')?.value.trim() || '127.0.0.1';
+        const lmstudioPort = document.getElementById('lmstudio-port')?.value.trim() || '1234';
+        const lmstudioModel = document.getElementById('lmstudio-model')?.value.trim() || 'gpt-3.5-turbo';
         const transcriptionLanguage = document.getElementById('transcription-language').value;
         
         // Nuevas opciones para GPT-4o
@@ -575,7 +581,10 @@ class NotesApp {
             maxTokens,
             topP,
             responseStyle,
-            showMobileRecordButton
+            showMobileRecordButton,
+            lmstudioHost,
+            lmstudioPort,
+            lmstudioModel
         };
 
         localStorage.setItem('notes-app-config', JSON.stringify(this.config));
@@ -589,6 +598,15 @@ class NotesApp {
         document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
         document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
+        if (document.getElementById('lmstudio-host')) {
+            document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
+        }
+        if (document.getElementById('lmstudio-port')) {
+            document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
+        }
+        if (document.getElementById('lmstudio-model')) {
+            document.getElementById('lmstudio-model').value = this.config.lmstudioModel || 'gpt-3.5-turbo';
+        }
         document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
         
         // Nuevas opciones para GPT-4o
@@ -2330,6 +2348,7 @@ class NotesApp {
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
+        const isLmstudio = provider === 'lmstudio';
 
         // Verificar que el backend esté disponible
         const backendAvailable = await this.checkBackendStatus();
@@ -2351,6 +2370,11 @@ class NotesApp {
         if (isOpenRouter && !this.availableAPIs?.openrouter) {
             this.showNotification('OpenRouter API not configured in backend', 'warning');
             this.showConfigModal();
+            return;
+        }
+
+        if (isLmstudio && !this.availableAPIs?.lmstudio) {
+            this.showNotification('LM Studio not available in backend', 'warning');
             return;
         }
 
@@ -2390,6 +2414,8 @@ class NotesApp {
                 improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
             } else if (isOpenRouter) {
                 improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
+            } else if (isLmstudio) {
+                improvedText = await this.improveWithLmstudioStream(textToImprove, action, tempSpan);
             } else {
                 // Fallback a mejora local
                 improvedText = this.applyAIImprovement(textToImprove, action);
@@ -2660,11 +2686,24 @@ class NotesApp {
             // Verificar si es un estilo personalizado y enviar su prompt
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
-            
+
             const model = this.config.postprocessModel;
             return await backendAPI.improveText(text, action, 'openrouter', false, model, customPrompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
+        }
+    }
+
+    async improveWithLmstudio(text, action) {
+        try {
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.lmstudioModel;
+            const host = this.config.lmstudioHost;
+            const port = this.config.lmstudioPort;
+            return await backendAPI.improveText(text, action, 'lmstudio', false, model, customPrompt, host, port);
+        } catch (error) {
+            throw new Error(`Error improving text with LM Studio: ${error.message}`);
         }
     }
 
@@ -2759,6 +2798,78 @@ class NotesApp {
         } catch (error) {
             console.error('Error in improveWithOpenRouterStream:', error);
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
+        }
+    }
+
+    async improveWithLmstudioStream(text, action, tempElement) {
+        try {
+            console.log('Starting LM Studio stream for action:', action);
+
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.lmstudioModel;
+            const host = this.config.lmstudioHost;
+            const port = this.config.lmstudioPort;
+            const response = await backendAPI.improveText(text, action, 'lmstudio', true, model, customPrompt, host, port);
+
+            if (!response.body) {
+                throw new Error('No response body received');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+
+            let improvedText = '';
+            let chunkCount = 0;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    console.log('LM Studio stream completed. Total chunks:', chunkCount);
+                    break;
+                }
+
+                chunkCount++;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                break;
+                            }
+
+                            const data = JSON.parse(dataStr);
+                            if (data.content) {
+                                improvedText += data.content;
+                                const cleanedText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = cleanedText;
+                                tempElement.className = 'ai-generating-text';
+                            }
+                            if (data.done) {
+                                const finalText = this.cleanAIResponse(improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
+                            }
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+                        } catch (parseError) {
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            const finalResult = this.cleanAIResponse(improvedText);
+            return finalResult;
+        } catch (error) {
+            console.error('Error in improveWithLmstudioStream:', error);
+            throw new Error(`Error improving text with LM Studio: ${error.message}`);
         }
     }
     
@@ -3213,7 +3324,8 @@ class NotesApp {
                 { value: 'deepseek/deepseek-chat-v3-0324:free', text: 'DeepSeek Chat v3 (Free)' },
                 { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
                 { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' }
-            ]
+            ],
+            'lmstudio': []
         };
         
         // Añadir opciones según el proveedor seleccionado
@@ -3224,6 +3336,15 @@ class NotesApp {
             option.textContent = model.text;
             postprocessModelSelect.appendChild(option);
         });
+
+        const lmstudioOptions = document.getElementById('lmstudio-options');
+        if (postprocessProvider === 'lmstudio') {
+            postprocessModelSelect.style.display = 'none';
+            if (lmstudioOptions) lmstudioOptions.style.display = 'block';
+        } else {
+            postprocessModelSelect.style.display = '';
+            if (lmstudioOptions) lmstudioOptions.style.display = 'none';
+        }
         
         // Seleccionar el modelo almacenado si está disponible
         const currentModel = this.config.postprocessModel;
