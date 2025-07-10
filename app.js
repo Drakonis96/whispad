@@ -376,6 +376,13 @@ class NotesApp {
         document.getElementById('add-style-btn').addEventListener('click', () => {
             this.addNewStyle();
         });
+
+        const updateModelsBtn = document.getElementById('update-lmstudio-models-btn');
+        if (updateModelsBtn) {
+            updateModelsBtn.addEventListener('click', () => {
+                this.updateLmStudioModelsList();
+            });
+        }
         
         // Auto-guardado cada 30 segundos
         setInterval(() => {
@@ -640,6 +647,8 @@ class NotesApp {
         
         // Mostrar/ocultar opciones SenseVoice según el proveedor seleccionado
         this.toggleSenseVoiceOptions();
+        // Mostrar/ocultar opciones LM Studio según el proveedor seleccionado
+        this.toggleLmStudioOptions();
 
         const modal = document.getElementById('config-modal');
         this.hideMobileFab();
@@ -3281,6 +3290,7 @@ class NotesApp {
         if (postprocessProvider) {
             postprocessProvider.addEventListener('change', () => {
                 this.updateModelOptions();
+                this.toggleLmStudioOptions();
             });
         }
         
@@ -3490,6 +3500,23 @@ class NotesApp {
         } else {
             this.restoreDefaultLanguageOptions();
         }
+    }
+
+    toggleLmStudioOptions() {
+        const provider = document.getElementById('postprocess-provider').value;
+        const lmstudioOptions = document.getElementById('lmstudio-options');
+
+        if (lmstudioOptions) {
+            lmstudioOptions.style.display = provider === 'lmstudio' ? 'block' : 'none';
+        }
+    }
+
+    updateLmStudioModelsList() {
+        const modelsInput = document.getElementById('lmstudio-models');
+        if (!modelsInput) return;
+
+        this.config.lmstudioModels = modelsInput.value.trim();
+        this.updateModelOptions();
     }
 
     updateLanguageOptionsForSenseVoice() {
