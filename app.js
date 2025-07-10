@@ -754,13 +754,17 @@ class NotesApp {
 
     addNewStyle() {
         const nameInput = document.getElementById('new-style-name');
+        const iconInput = document.getElementById('new-style-icon');
+        const descriptionInput = document.getElementById('new-style-description');
         const promptInput = document.getElementById('new-style-prompt');
-        
+
         const name = nameInput.value.trim();
+        const icon = iconInput.value.trim();
+        const description = descriptionInput.value.trim();
         const prompt = promptInput.value.trim();
-        
-        if (!name || !prompt) {
-            this.showNotification('Please complete both fields', 'error');
+
+        if (!name || !prompt || !description) {
+            this.showNotification('Please complete all fields', 'error');
             return;
         }
         
