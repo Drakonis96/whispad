@@ -7,6 +7,7 @@ import re
 import requests
 import json
 import time
+import threading
 from dotenv import load_dotenv
 import tempfile
 import base64
@@ -1338,20 +1339,23 @@ def download_sensevoice():
                 snapshot_download(
                     repo_id=repo_id,
                     local_dir=sensevoice_dir,
-                    repo_type="model"
+                    repo_type="model",
                 )
-                
+
                 yield f"data: {json.dumps({'progress': 80})}\n\n"
-
-                # Update availability and preload model
-                SENSEVOICE_AVAILABLE = sensevoice_wrapper.is_available()
-                if SENSEVOICE_AVAILABLE:
-                    sensevoice_wrapper.model_loaded = False
-                    sensevoice_wrapper._load_model()
-
                 yield f"data: {json.dumps({'status': 'Download completed successfully!'})}\n\n"
                 yield f"data: {json.dumps({'progress': 100})}\n\n"
                 yield f"data: {json.dumps({'done': True, 'filename': 'SenseVoiceSmall', 'path': sensevoice_dir})}\n\n"
+
+                # Update availability and load model in background
+                def _load_async():
+                    global SENSEVOICE_AVAILABLE
+                    SENSEVOICE_AVAILABLE = sensevoice_wrapper.is_available()
+                    if SENSEVOICE_AVAILABLE:
+                        sensevoice_wrapper.model_loaded = False
+                        sensevoice_wrapper._load_model()
+
+                threading.Thread(target=_load_async, daemon=True).start()
                 
             except Exception as e:
                 yield f"data: {json.dumps({'error': f'SenseVoice download failed: {str(e)}'})}\n\n"
