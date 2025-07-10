@@ -658,9 +658,6 @@ class NotesApp {
             
             if (this.config.transcriptionProvider === 'openai') {
                 transcription = await this.transcribeWithOpenAI(audioBlob);
-            } else if (this.config.transcriptionProvider === 'google') {
-                // TODO: Implementar Google Speech-to-Text
-                transcription = 'Transcripción con Google (no implementado aún)';
             }
             
             if (transcription) {

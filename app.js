@@ -2061,9 +2061,6 @@ class NotesApp {
                 transcription = await this.transcribeWithLocal(audioBlob);
             } else if (this.config.transcriptionProvider === 'sensevoice') {
                 transcription = await this.transcribeWithSenseVoice(audioBlob);
-            } else if (this.config.transcriptionProvider === 'google') {
-                // TODO: Implementar Google Speech-to-Text
-                transcription = 'Transcripción con Google (no implementado aún)';
             }
             
             if (transcription) {
@@ -3260,9 +3257,6 @@ class NotesApp {
         // Fallbacks for known providers
         if (provider === 'openai' && models.length === 0) {
             models = ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'];
-        }
-        if (provider === 'google' && models.length === 0) {
-            models = ['google-speech-to-text'];
         }
 
         // Add options to dropdown
