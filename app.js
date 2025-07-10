@@ -109,6 +109,9 @@ class NotesApp {
         this.overwrittenFiles = new Set();
 
         this.selectedTags = new Set();
+
+        // Store default language options
+        this.defaultLanguageOptions = [];
         
         this.init();
     }
@@ -116,6 +119,7 @@ class NotesApp {
     async init() {
         this.loadConfig();
         this.loadStylesConfig();
+        this.storeDefaultLanguageOptions();
         await this.loadNotes();
         this.setupEventListeners();
         this.setupConfigurationListeners();
@@ -3376,6 +3380,8 @@ class NotesApp {
         // Update language options for SenseVoice
         if (provider === 'sensevoice') {
             this.updateLanguageOptionsForSenseVoice();
+        } else {
+            this.restoreDefaultLanguageOptions();
         }
     }
 
@@ -3410,6 +3416,36 @@ class NotesApp {
         
         // Restore selection if it's supported, otherwise use auto
         if (sensevoiceLanguages.some(lang => lang.value === currentValue)) {
+            languageSelect.value = currentValue;
+        } else {
+            languageSelect.value = 'auto';
+        }
+    }
+
+    storeDefaultLanguageOptions() {
+        const languageSelect = document.getElementById('transcription-language');
+        if (!languageSelect) return;
+        this.defaultLanguageOptions = Array.from(languageSelect.options).map(opt => ({
+            value: opt.value,
+            text: opt.textContent
+        }));
+    }
+
+    restoreDefaultLanguageOptions() {
+        const languageSelect = document.getElementById('transcription-language');
+        if (!languageSelect || !this.defaultLanguageOptions.length) return;
+
+        const currentValue = languageSelect.value;
+        languageSelect.innerHTML = '';
+
+        this.defaultLanguageOptions.forEach(lang => {
+            const option = document.createElement('option');
+            option.value = lang.value;
+            option.textContent = lang.text;
+            languageSelect.appendChild(option);
+        });
+
+        if (this.defaultLanguageOptions.some(lang => lang.value === currentValue)) {
             languageSelect.value = currentValue;
         } else {
             languageSelect.value = 'auto';
