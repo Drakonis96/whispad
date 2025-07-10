@@ -837,7 +837,7 @@ class NotesApp {
         const now = new Date();
         const newNote = {
             id: Date.now(),
-            title: `Nota ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
+            title: `Note ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
             content: '',
             createdAt: now.toISOString(),
             updatedAt: now.toISOString(),
@@ -2331,6 +2331,10 @@ class NotesApp {
         // Verificar configuración según el modelo seleccionado
         const provider = this.config.postprocessProvider;
         const model = this.config.postprocessModel;
+        if (!provider || !model) {
+            this.showNotification('Please, select a post-processing provider and model', 'error');
+            return;
+        }
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';

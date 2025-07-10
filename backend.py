@@ -803,7 +803,7 @@ def save_note():
         
         # Generar nombre de archivo seguro basado en el título
         if not title:
-            title = "Nota sin título"
+            title = "Untitled Note"
         
         safe_filename = generate_safe_filename(title)
         new_filename = f"{safe_filename}.md"
