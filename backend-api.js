@@ -572,6 +572,36 @@ class BackendAPI {
             throw error;
         }
     }
+
+    async listModels() {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/list-models`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error listing models:', error);
+            throw error;
+        }
+    }
+
+    async deleteModel(name) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/delete-model`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error deleting model:', error);
+            throw error;
+        }
+    }
     async refreshProviders() {
         try {
             const response = await fetch(`${this.baseUrl}/api/refresh-providers`, {

@@ -1116,6 +1116,7 @@ class NotesApp {
         const modal = document.getElementById('upload-model-modal');
         this.hideMobileFab();
         modal.classList.add('active');
+        this.loadDownloadedModels();
     }
 
     hideUploadModelsModal() {
@@ -1644,6 +1645,56 @@ class NotesApp {
         } catch (err) {
             this.showNotification(`Error downloading ${displayName}`, 'error');
         }
+    }
+
+    async loadDownloadedModels() {
+        try {
+            const data = await backendAPI.listModels();
+            this.renderDownloadedModels(data.models || []);
+        } catch (error) {
+            console.error('Error loading models:', error);
+        }
+    }
+
+    renderDownloadedModels(models) {
+        const section = document.getElementById('downloaded-models-section');
+        const list = document.getElementById('downloaded-models-list');
+        if (!section || !list) return;
+
+        list.innerHTML = '';
+        if (!models || models.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+
+        models.forEach(m => {
+            const li = document.createElement('li');
+            li.className = 'model-item';
+            li.innerHTML = `
+                <span class="model-name">${m.name}</span>
+                <button class="btn btn--outline btn--sm delete-model-btn" data-name="${m.name}">
+                    <i class="fas fa-trash"></i>
+                </button>`;
+            list.appendChild(li);
+        });
+
+        list.querySelectorAll('.delete-model-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const name = btn.getAttribute('data-name');
+                if (confirm(`Delete model ${name}?`)) {
+                    try {
+                        await backendAPI.deleteModel(name);
+                        this.loadDownloadedModels();
+                        this.showNotification('Model deleted');
+                    } catch (err) {
+                        console.error('Error deleting model:', err);
+                        this.showNotification('Error deleting model', 'error');
+                    }
+                }
+            });
+        });
     }
 
     htmlToMarkdown(html, title) {

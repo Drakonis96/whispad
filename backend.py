@@ -12,6 +12,7 @@ import tempfile
 import base64
 import re
 from datetime import datetime
+import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 
@@ -1621,6 +1622,63 @@ def refresh_providers():
         
     except Exception as e:
         return jsonify({"error": f"Error refreshing providers: {str(e)}"}), 500
+
+# New endpoints to manage downloaded whisper.cpp models
+
+@app.route('/api/list-models', methods=['GET'])
+def list_models():
+    """List downloaded whisper.cpp models"""
+    try:
+        models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+        if not os.path.exists(models_dir):
+            return jsonify({"models": [], "count": 0})
+
+        models = []
+        for entry in os.listdir(models_dir):
+            path = os.path.join(models_dir, entry)
+            size = 0
+            if os.path.isfile(path):
+                size = os.path.getsize(path)
+            elif os.path.isdir(path):
+                for root_dir, _, files in os.walk(path):
+                    for f in files:
+                        try:
+                            size += os.path.getsize(os.path.join(root_dir, f))
+                        except OSError:
+                            pass
+            models.append({
+                "name": entry,
+                "size": size,
+                "is_dir": os.path.isdir(path)
+            })
+
+        return jsonify({"models": models, "count": len(models)})
+    except Exception as e:
+        return jsonify({"error": f"Error listing models: {str(e)}"}), 500
+
+
+@app.route('/api/delete-model', methods=['POST'])
+def delete_model():
+    """Delete a downloaded whisper.cpp model"""
+    try:
+        data = request.get_json() or {}
+        name = data.get('name')
+        if not name:
+            return jsonify({"error": "Nombre de modelo requerido"}), 400
+
+        models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+        target = os.path.join(models_dir, os.path.basename(name))
+
+        if os.path.isfile(target):
+            os.remove(target)
+        elif os.path.isdir(target):
+            shutil.rmtree(target)
+        else:
+            return jsonify({"error": "Modelo no encontrado"}), 404
+
+        return jsonify({"success": True, "deleted": os.path.basename(target)})
+    except Exception as e:
+        return jsonify({"error": f"Error deleting model: {str(e)}"}), 500
 
 @app.route('/api/get-note', methods=['GET'])
 def get_note():

@@ -2329,3 +2329,33 @@ select.form-control {
     font-size: var(--font-size-xs);
     margin: var(--space-4) var(--space-2);
 }
+
+/* Downloaded models list */
+.downloaded-models {
+    margin-top: var(--space-24);
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--space-16);
+}
+
+.model-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.model-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-8) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.model-item:last-child {
+    border-bottom: none;
+}
+
+.model-name {
+    font-size: var(--font-size-sm);
+    color: var(--color-text);
+}
