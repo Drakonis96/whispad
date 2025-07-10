@@ -53,6 +53,16 @@ except Exception as e:
     SENSEVOICE_AVAILABLE = False
     sensevoice_wrapper = None
 
+# Helper to check SenseVoice availability dynamically
+def sensevoice_available() -> bool:
+    """Return True if SenseVoice model files are present"""
+    global SENSEVOICE_AVAILABLE
+    try:
+        SENSEVOICE_AVAILABLE = sensevoice_wrapper is not None and sensevoice_wrapper.is_available()
+    except Exception:
+        SENSEVOICE_AVAILABLE = False
+    return SENSEVOICE_AVAILABLE
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Endpoint para verificar que el backend está funcionando"""
@@ -105,7 +115,7 @@ def transcribe_audio():
                 return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
         
         elif provider == 'sensevoice':
-            if not SENSEVOICE_AVAILABLE:
+            if not sensevoice_available():
                 return jsonify({"error": "SenseVoice no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
             
             # Usar SenseVoice
@@ -1339,6 +1349,9 @@ def download_sensevoice():
                     local_dir=sensevoice_dir,
                     repo_type="model"
                 )
+
+                # Update availability after successful download
+                sensevoice_available()
                 
                 yield f"data: {json.dumps({'progress': 80})}\n\n"
                 yield f"data: {json.dumps({'status': 'Download completed successfully!'})}\n\n"
@@ -1422,7 +1435,7 @@ def get_transcription_providers():
             })
         
         # Verificar SenseVoice
-        if SENSEVOICE_AVAILABLE and sensevoice_wrapper:
+        if sensevoice_available() and sensevoice_wrapper:
             model_info = sensevoice_wrapper.get_model_info()
             providers.append({
                 "id": "sensevoice",
@@ -1439,7 +1452,7 @@ def get_transcription_providers():
         
         return jsonify({
             "providers": providers,
-            "default": "openai" if OPENAI_API_KEY else ("sensevoice" if SENSEVOICE_AVAILABLE else ("local" if WHISPER_CPP_AVAILABLE else None))
+            "default": "openai" if OPENAI_API_KEY else ("sensevoice" if sensevoice_available() else ("local" if WHISPER_CPP_AVAILABLE else None))
         })
         
     except Exception as e:
