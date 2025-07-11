@@ -455,7 +455,28 @@ class NotesApp {
                             alert('Error updating user');
                         }
                     });
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'btn btn--error btn--sm';
+                    delBtn.textContent = 'Delete';
+                    delBtn.style.marginLeft = '6px';
+                    delBtn.addEventListener('click', async () => {
+                        if (!confirm('Delete user ' + u.username + '?')) return;
+                        const resp3 = await authFetch('/api/delete-user', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: u.username })
+                        });
+                        if (resp3.ok) {
+                            alert('User deleted');
+                            await refreshUserList();
+                        } else {
+                            alert('Error deleting user');
+                        }
+                    });
+
                     li.appendChild(saveBtn);
+                    li.appendChild(delBtn);
 
                     list.appendChild(li);
                 });

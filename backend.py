@@ -318,6 +318,31 @@ def update_user_providers():
     save_users(USERS)
     return jsonify({"success": True})
 
+
+@app.route('/api/delete-user', methods=['POST'])
+def delete_user():
+    """Remove a non-admin user and delete their notes folder"""
+    admin = get_current_username()
+    if not admin or not USERS.get(admin, {}).get('is_admin'):
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    username = data.get('username')
+    if not username or username not in USERS:
+        return jsonify({"error": "User not found"}), 404
+    if username == 'admin':
+        return jsonify({"error": "Cannot delete admin"}), 400
+
+    USERS.pop(username, None)
+    save_users(USERS)
+
+    user_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+    try:
+        shutil.rmtree(user_dir)
+    except FileNotFoundError:
+        pass
+
+    return jsonify({"success": True})
+
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
     """Endpoint para transcribir audio usando OpenAI o whisper.cpp local"""
