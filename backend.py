@@ -40,6 +40,7 @@ OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 # Opcional: enviar las notas guardadas a un flujo de trabajo externo
 WORKFLOW_WEBHOOK_URL = os.getenv('WORKFLOW_WEBHOOK_URL')
 WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
+WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 
 # ---------- Simple user management ---------
 USERS_FILE = 'users.json'
@@ -1299,6 +1300,7 @@ def save_note():
             headers = {"Content-Type": "application/json"}
             if WORKFLOW_WEBHOOK_TOKEN:
                 headers["Authorization"] = f"Bearer {WORKFLOW_WEBHOOK_TOKEN}"
+            webhook_user = WORKFLOW_WEBHOOK_USER or username
             try:
                 requests.post(
                     WORKFLOW_WEBHOOK_URL,
@@ -1307,7 +1309,7 @@ def save_note():
                         "title": title,
                         "content": content,
                         "tags": tags,
-                        "user": username,
+                        "user": webhook_user,
                     },
                     headers=headers,
                     timeout=5,

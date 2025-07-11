@@ -100,6 +100,7 @@ cp env.example .env
 ```
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
 If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
+You can override the username included in the webhook by defining `WORKFLOW_WEBHOOK_USER`.
 The webhook payload now includes the username so your workflow can fetch the note from the correct folder.
 
 ## Usage Guide
