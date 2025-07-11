@@ -1,3 +1,20 @@
+// Authentication token and current user
+let authToken = '';
+let currentUser = '';
+
+const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
+const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
+let allowedTranscriptionProviders = [];
+let allowedPostprocessProviders = [];
+
+function authFetch(url, options = {}) {
+    options.headers = options.headers || {};
+    if (authToken) {
+        options.headers['Authorization'] = authToken;
+    }
+    return fetch(url, options);
+}
+
 // Example data and configuration
 const ejemplosTranscripcion = [
     "This is a dictated note about the web development project we are working on in the office.",
@@ -146,7 +163,7 @@ class NotesApp {
     
     async migrateExistingNotes() {
         try {
-            const response = await fetch('/api/cleanup-notes', {
+            const response = await authFetch('/api/cleanup-notes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -369,6 +386,141 @@ class NotesApp {
         document.getElementById('styles-config-btn').addEventListener('click', () => {
             this.showStylesConfigModal();
         });
+
+        async function refreshUserList() {
+            const listResp = await authFetch('/api/list-users');
+            if (listResp.ok) {
+                const data = await listResp.json();
+                const list = document.getElementById('users-list');
+                list.innerHTML = '';
+                data.users.filter(u => u.username !== 'admin').forEach(u => {
+                    const li = document.createElement('li');
+                    li.className = 'user-item';
+                    const title = document.createElement('strong');
+                    title.textContent = u.username;
+                    li.appendChild(title);
+
+                    const tGroup = document.createElement('div');
+                    tGroup.className = 'provider-group';
+                    tGroup.append('Transcription: ');
+                    TRANSCRIPTION_PROVIDERS.forEach(p => {
+                        const label = document.createElement('label');
+                        label.style.marginRight = '6px';
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.value = p;
+                        cb.className = 'edit-transcription';
+                        if ((u.transcription_providers || []).includes(p)) cb.checked = true;
+                        label.appendChild(cb);
+                        label.append(' ' + p);
+                        tGroup.appendChild(label);
+                    });
+                    li.appendChild(tGroup);
+
+                    const ppGroup = document.createElement('div');
+                    ppGroup.className = 'provider-group';
+                    ppGroup.append('Post-process: ');
+                    POSTPROCESS_PROVIDERS.forEach(p => {
+                        const label = document.createElement('label');
+                        label.style.marginRight = '6px';
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.value = p;
+                        cb.className = 'edit-postprocess';
+                        if ((u.postprocess_providers || []).includes(p)) cb.checked = true;
+                        label.appendChild(cb);
+                        label.append(' ' + p);
+                        ppGroup.appendChild(label);
+                    });
+                    li.appendChild(ppGroup);
+
+                    const saveBtn = document.createElement('button');
+                    saveBtn.className = 'btn btn--primary btn--sm';
+                    saveBtn.textContent = 'Save';
+                    saveBtn.addEventListener('click', async () => {
+                        const tProviders = Array.from(li.querySelectorAll('.edit-transcription:checked')).map(c => c.value);
+                        const ppProviders = Array.from(li.querySelectorAll('.edit-postprocess:checked')).map(c => c.value);
+                        const resp2 = await authFetch('/api/update-user-providers', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: u.username,
+                                transcription_providers: tProviders,
+                                postprocess_providers: ppProviders
+                            })
+                        });
+                        if (resp2.ok) {
+                            alert('Updated ' + u.username);
+                        } else {
+                            alert('Error updating user');
+                        }
+                    });
+                    li.appendChild(saveBtn);
+
+                    list.appendChild(li);
+                });
+            }
+        }
+
+        document.getElementById('user-btn').addEventListener('click', async () => {
+            document.getElementById('user-modal').classList.add('active');
+            await refreshUserList();
+        });
+        document.getElementById('close-user-modal').addEventListener('click', () => {
+            document.getElementById('user-modal').classList.remove('active');
+        });
+
+        document.querySelectorAll('#user-modal .tab-buttons button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.getAttribute('data-tab');
+                document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
+                document.getElementById(tab).style.display = 'block';
+            });
+        });
+
+        document.getElementById('change-password-btn').addEventListener('click', async () => {
+            const newPass = document.getElementById('new-password').value;
+            if (!newPass) return;
+            const resp = await authFetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: newPass })
+            });
+            if (resp.ok) {
+                alert('Password updated');
+            } else {
+                alert('Error updating password');
+            }
+        });
+
+        document.getElementById('create-user-btn').addEventListener('click', async () => {
+            const u = document.getElementById('create-username').value.trim();
+            const p = document.getElementById('create-password').value;
+            if (!u || !p) return;
+            const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
+            const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
+            const resp = await authFetch('/api/create-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: u,
+                    password: p,
+                    transcription_providers: tProviders,
+                    postprocess_providers: ppProviders
+                })
+            });
+            if (resp.ok) {
+                alert('User created');
+                document.getElementById('create-username').value = '';
+                document.getElementById('create-password').value = '';
+                document.querySelectorAll('#create-tab input[type="checkbox"]').forEach(cb => cb.checked = false);
+                await refreshUserList();
+            } else {
+                alert('Error creating user');
+            }
+        });
+
+        document.getElementById('user-btn').classList.remove('hidden');
         
         document.getElementById('cancel-config').addEventListener('click', () => {
             this.hideConfigModal();
@@ -510,7 +662,7 @@ class NotesApp {
     // Gestión de notas
     async loadNotes() {
         try {
-            const response = await fetch('/api/list-saved-notes');
+            const response = await authFetch('/api/list-saved-notes');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -539,7 +691,7 @@ class NotesApp {
             ? `?id=${note.id}`
             : `?filename=${encodeURIComponent(note.filename)}`;
         try {
-            const response = await fetch(`/api/get-note${params}`);
+            const response = await authFetch(`/api/get-note${params}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -637,8 +789,33 @@ class NotesApp {
     }
 
     showConfigModal() {
-        document.getElementById('transcription-provider').value = this.config.transcriptionProvider;
-        document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
+        const tpSelect = document.getElementById('transcription-provider');
+        const ppSelect = document.getElementById('postprocess-provider');
+
+        tpSelect.querySelectorAll('option').forEach(opt => {
+            if (!opt.value) return;
+            if (allowedTranscriptionProviders.length && !allowedTranscriptionProviders.includes(opt.value)) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else {
+                opt.disabled = false;
+                opt.style.display = '';
+            }
+        });
+
+        ppSelect.querySelectorAll('option').forEach(opt => {
+            if (!opt.value) return;
+            if (allowedPostprocessProviders.length && !allowedPostprocessProviders.includes(opt.value)) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else {
+                opt.disabled = false;
+                opt.style.display = '';
+            }
+        });
+
+        tpSelect.value = this.config.transcriptionProvider;
+        ppSelect.value = this.config.postprocessProvider;
         document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
@@ -1013,7 +1190,7 @@ class NotesApp {
         if (!this.currentNote) return;
         
         try {
-            const response = await fetch('/api/save-note', {
+            const response = await authFetch('/api/save-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1064,7 +1241,7 @@ class NotesApp {
     
     async deleteNoteFromServer(noteId) {
         try {
-            const response = await fetch('/api/delete-note', {
+            const response = await authFetch('/api/delete-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1117,7 +1294,7 @@ class NotesApp {
 
     async downloadAllNotes() {
         try {
-            const response = await fetch('/api/download-all-notes');
+            const response = await authFetch('/api/download-all-notes');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -1281,7 +1458,7 @@ class NotesApp {
     async uploadNoteFile(file) {
         const formData = new FormData();
         formData.append('note', file, file.name);
-        const response = await fetch('/api/upload-note', { method: 'POST', body: formData });
+        const response = await authFetch('/api/upload-note', { method: 'POST', body: formData });
         if (!response.ok) {
             throw new Error('Upload failed');
         }
@@ -1542,6 +1719,7 @@ class NotesApp {
                 });
                 
                 xhr.open('POST', '/api/upload-model');
+                if (authToken) xhr.setRequestHeader('Authorization', authToken);
                 xhr.send(formData);
             });
             
@@ -1560,8 +1738,8 @@ class NotesApp {
         const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 minutes timeout
         
         try {
-            const response = await fetch('/api/upload-model', { 
-                method: 'POST', 
+            const response = await authFetch('/api/upload-model', {
+                method: 'POST',
                 body: formData,
                 signal: controller.signal
             });
@@ -3822,8 +4000,67 @@ class NotesApp {
 }
 
 // Inicializar la aplicación cuando se carga la página
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
     window.notesApp = new NotesApp();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const loginScreen = document.getElementById('login-screen');
+    const appContent = document.getElementById('app-content');
+    const loginBtn = document.getElementById('login-submit');
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    const currentUserBtn = document.getElementById('current-user-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    async function attemptLogin() {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        try {
+            const resp = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                authToken = data.token;
+                currentUser = username;
+                allowedTranscriptionProviders = data.transcription_providers || [];
+                allowedPostprocessProviders = data.postprocess_providers || [];
+                if (!data.is_admin) {
+                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                }
+                currentUserBtn.textContent = username;
+                currentUserBtn.classList.remove('hidden');
+                logoutBtn.classList.remove('hidden');
+                loginScreen.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                initApp();
+            } else {
+                alert('Login failed');
+            }
+        } catch (e) {
+            alert('Login error');
+        }
+    }
+
+    loginBtn.addEventListener('click', attemptLogin);
+    usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+
+    logoutBtn.addEventListener('click', async () => {
+        await authFetch('/api/logout', { method: 'POST' });
+        authToken = '';
+        currentUser = '';
+        allowedTranscriptionProviders = [];
+        allowedPostprocessProviders = [];
+        currentUserBtn.classList.add('hidden');
+        logoutBtn.classList.add('hidden');
+        document.getElementById('user-btn').classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+        appContent.classList.add('hidden');
+    });
 });
 
 // Actualizar botones de formato cuando cambia la selección

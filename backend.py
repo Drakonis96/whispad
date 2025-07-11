@@ -40,6 +40,64 @@ OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 # Opcional: enviar las notas guardadas a un flujo de trabajo externo
 WORKFLOW_WEBHOOK_URL = os.getenv('WORKFLOW_WEBHOOK_URL')
 WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
+WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
+
+# ---------- Simple user management ---------
+USERS_FILE = 'users.json'
+SESSIONS = {}
+
+def load_users():
+    if not os.path.exists(USERS_FILE):
+        default_users = {
+            "admin": {
+                "password": "whispad",
+                "is_admin": True,
+                "transcription_providers": ["openai", "local", "sensevoice"],
+                "postprocess_providers": ["openai"]
+            }
+        }
+        with open(USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_users, f, indent=2)
+        return default_users
+    try:
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_users(users):
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, indent=2)
+
+
+def migrate_notes_to_admin_folder():
+    """Move existing notes in saved_notes/ to saved_notes/admin"""
+    root_dir = os.path.join(os.getcwd(), 'saved_notes')
+    if not os.path.isdir(root_dir):
+        return
+
+    admin_dir = os.path.join(root_dir, 'admin')
+    moved = 0
+
+    for fname in os.listdir(root_dir):
+        path = os.path.join(root_dir, fname)
+        if os.path.isfile(path) and (fname.endswith('.md') or fname.endswith('.meta')):
+            os.makedirs(admin_dir, exist_ok=True)
+            shutil.move(path, os.path.join(admin_dir, fname))
+            moved += 1
+
+    if moved:
+        print(f"Migrated {moved} notes to {admin_dir}")
+
+
+USERS = load_users()
+migrate_notes_to_admin_folder()
+
+def get_current_username():
+    token = request.headers.get('Authorization')
+    if not token:
+        return None
+    return SESSIONS.get(token)
 
 # Inicializar el wrapper de whisper.cpp local
 try:
@@ -68,10 +126,109 @@ def health_check():
     """Endpoint para verificar que el backend está funcionando"""
     return jsonify({"status": "ok", "message": "Backend funcionando correctamente"})
 
+# --- Authentication and user management endpoints ---
+
+@app.route('/api/login', methods=['POST'])
+def login_user():
+    data = request.get_json() or {}
+    username = data.get('username')
+    password = data.get('password')
+    user = USERS.get(username)
+    if user and user.get('password') == password:
+        token = base64.urlsafe_b64encode(os.urandom(24)).decode('utf-8')
+        SESSIONS[token] = username
+        return jsonify({
+            "success": True,
+            "token": token,
+            "is_admin": user.get('is_admin', False),
+            "transcription_providers": user.get('transcription_providers', []),
+            "postprocess_providers": user.get('postprocess_providers', [])
+        })
+    return jsonify({"success": False}), 401
+
+
+@app.route('/api/logout', methods=['POST'])
+def logout_user():
+    token = request.headers.get('Authorization')
+    if token in SESSIONS:
+        SESSIONS.pop(token, None)
+    return jsonify({"success": True})
+
+
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    new_password = data.get('password')
+    if not new_password:
+        return jsonify({"error": "Password required"}), 400
+    USERS[username]['password'] = new_password
+    save_users(USERS)
+    return jsonify({"success": True})
+
+
+@app.route('/api/create-user', methods=['POST'])
+def create_user():
+    admin = get_current_username()
+    if not admin or not USERS.get(admin, {}).get('is_admin'):
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    username = data.get('username')
+    password = data.get('password')
+    if not username or not password:
+        return jsonify({"error": "Username and password required"}), 400
+    if username in USERS:
+        return jsonify({"error": "User exists"}), 400
+    USERS[username] = {
+        "password": password,
+        "is_admin": False,
+        "transcription_providers": data.get('transcription_providers', []),
+        "postprocess_providers": data.get('postprocess_providers', [])
+    }
+    save_users(USERS)
+    return jsonify({"success": True})
+
+
+@app.route('/api/list-users', methods=['GET'])
+def list_users():
+    admin = get_current_username()
+    if not admin or not USERS.get(admin, {}).get('is_admin'):
+        return jsonify({"error": "Unauthorized"}), 401
+    users = []
+    for name, info in USERS.items():
+        users.append({
+            "username": name,
+            "is_admin": info.get('is_admin', False),
+            "transcription_providers": info.get('transcription_providers', []),
+            "postprocess_providers": info.get('postprocess_providers', [])
+        })
+    return jsonify({"users": users})
+
+
+@app.route('/api/update-user-providers', methods=['POST'])
+def update_user_providers():
+    admin = get_current_username()
+    if not admin or not USERS.get(admin, {}).get('is_admin'):
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    username = data.get('username')
+    if username not in USERS:
+        return jsonify({"error": "User not found"}), 404
+    USERS[username]['transcription_providers'] = data.get('transcription_providers', USERS[username].get('transcription_providers', []))
+    USERS[username]['postprocess_providers'] = data.get('postprocess_providers', USERS[username].get('postprocess_providers', []))
+    save_users(USERS)
+    return jsonify({"success": True})
+
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
     """Endpoint para transcribir audio usando OpenAI o whisper.cpp local"""
     try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
         # Obtener el archivo de audio del request
         if 'audio' not in request.files:
             return jsonify({"error": "No se encontró archivo de audio"}), 400
@@ -83,6 +240,10 @@ def transcribe_audio():
         # Obtener parámetros del request
         language = request.form.get('language', None)  # None = detección automática
         provider = request.form.get('provider', 'openai')  # openai o local
+
+        allowed = USERS.get(username, {}).get('transcription_providers', [])
+        if allowed and provider not in allowed:
+            return jsonify({"error": "Transcription provider not allowed"}), 403
         model_name = request.form.get('model')
         
         # Verificar disponibilidad del proveedor
@@ -196,6 +357,10 @@ def transcribe_audio():
 def improve_text():
     """Endpoint para mejorar texto usando OpenAI o Google AI"""
     try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
         data = request.get_json()
         if not data or 'text' not in data or 'improvement_type' not in data:
             return jsonify({"error": "Faltan parámetros requeridos"}), 400
@@ -203,6 +368,10 @@ def improve_text():
         text = data['text']
         improvement_type = data['improvement_type']
         provider = data.get('provider', 'openai')  # openai o google
+
+        allowed = USERS.get(username, {}).get('postprocess_providers', [])
+        if allowed and provider not in allowed:
+            return jsonify({"error": "Post-process provider not allowed"}), 403
         stream = data.get('stream', False)  # Nuevo parámetro para streaming
         custom_prompt = data.get('custom_prompt')  # Nuevo parámetro para prompts personalizados
         
@@ -874,6 +1043,14 @@ def transcribe_audio_gpt4o():
     try:
         print(f"[DEBUG] Iniciando transcripción GPT-4o...")
         
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        allowed = USERS.get(username, {}).get('transcription_providers', [])
+        if allowed and 'openai' not in allowed:
+            return jsonify({"error": "Transcription provider not allowed"}), 403
+
         if not OPENAI_API_KEY:
             print(f"[ERROR] API key de OpenAI no configurada")
             return jsonify({"error": "API key de OpenAI no configurada"}), 500
@@ -1006,6 +1183,9 @@ def stream_transcription_response(response):
 def save_note():
     """Endpoint para guardar una nota como archivo .md en el directorio saved_notes"""
     try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.get_json()
         
         if not data:
@@ -1029,7 +1209,7 @@ def save_note():
             return jsonify({"error": "La nota debe tener al menos un título o contenido"}), 400
         
         # Crear directorio saved_notes si no existe
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         os.makedirs(saved_notes_dir, exist_ok=True)
         
         # Generar nombre de archivo seguro basado en el título
@@ -1123,7 +1303,13 @@ def save_note():
             try:
                 requests.post(
                     WORKFLOW_WEBHOOK_URL,
-                    json={"id": note_id, "title": title, "content": content, "tags": tags},
+                    json={
+                        "id": note_id,
+                        "title": title,
+                        "content": content,
+                        "tags": tags,
+                        "user": WORKFLOW_WEBHOOK_USER or username,
+                    },
                     headers=headers,
                     timeout=5,
                 )
@@ -1233,7 +1419,10 @@ def check_apis():
 def list_saved_notes():
     """Endpoint para listar las notas guardadas en el servidor"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         
         if not os.path.exists(saved_notes_dir):
             return jsonify({"notes": [], "message": "Directorio saved_notes no existe"})
@@ -1284,7 +1473,10 @@ def list_saved_notes():
 def cleanup_notes():
     """Endpoint para migrar notas existentes sin ID a la nueva estructura"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         if not os.path.exists(saved_notes_dir):
             return jsonify({"message": "No hay directorio de notas guardadas"}), 200
         
@@ -1329,6 +1521,9 @@ def cleanup_notes():
 def delete_note():
     """Endpoint para eliminar una nota del servidor"""
     try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.get_json()
         
         if not data:
@@ -1340,7 +1535,7 @@ def delete_note():
             return jsonify({"error": "ID de nota requerido"}), 400
         
         # Buscar el archivo correspondiente al note_id
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         
         if not os.path.exists(saved_notes_dir):
             return jsonify({"error": "Directorio de notas no existe"}), 404
@@ -1384,7 +1579,10 @@ def delete_note():
 def list_notes():
     """Endpoint para listar notas (guardadas y no guardadas) en el servidor"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         
         # Obtener todas las notas guardadas
         saved_notes = []
@@ -1431,7 +1629,10 @@ def list_notes():
 def download_all_notes():
     """Descarga todas las notas guardadas como un archivo ZIP"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         if not os.path.exists(saved_notes_dir):
             return jsonify({"error": "No hay notas guardadas"}), 404
 
@@ -1449,6 +1650,9 @@ def download_all_notes():
 def upload_note():
     """Sube una nota markdown al directorio saved_notes"""
     try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
         if 'note' not in request.files:
             return jsonify({"error": "No se recibió archivo"}), 400
 
@@ -1460,7 +1664,7 @@ def upload_note():
         if ext not in ['.md', '.meta']:
             return jsonify({"error": "Tipo de archivo no válido"}), 400
 
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         os.makedirs(saved_notes_dir, exist_ok=True)
         filepath = os.path.join(saved_notes_dir, note_file.filename)
         overwritten = os.path.exists(filepath)
@@ -1829,10 +2033,13 @@ def delete_model():
 def get_note():
     """Devuelve el contenido de una nota especificada por ID o nombre de archivo"""
     try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
         note_id = request.args.get('id')
         filename = request.args.get('filename')
 
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         if not os.path.exists(saved_notes_dir):
             return jsonify({"error": "Directorio de notas no existe"}), 404
 

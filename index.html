@@ -9,6 +9,62 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <!-- Login screen -->
+    <div class="login-screen" id="login-screen">
+        <div class="login-box">
+            <img src="logos/logo.png" alt="WhisPad Logo" class="login-logo">
+            <h3>Login</h3>
+            <div class="modal-body">
+                <input type="text" class="form-control" id="login-username" placeholder="Username">
+                <input type="password" class="form-control" id="login-password" placeholder="Password" style="margin-top:10px;">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--primary" id="login-submit">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User management modal -->
+    <div class="modal" id="user-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>User Management</h3>
+            <div class="modal-body">
+                <div class="tab-buttons">
+                    <button class="btn btn--outline btn--sm" data-tab="password-tab">Change Password</button>
+                    <button class="btn btn--outline btn--sm admin-only" data-tab="create-tab">Create User</button>
+                    <button class="btn btn--outline btn--sm admin-only" data-tab="list-tab">Existing Users</button>
+                </div>
+                <div class="tab-content" id="password-tab">
+                    <input type="password" class="form-control" id="new-password" placeholder="New password">
+                    <button class="btn btn--primary btn--sm" id="change-password-btn" style="margin-top:10px;">Save</button>
+                </div>
+                <div class="tab-content admin-only" id="create-tab" style="display:none;">
+                    <input type="text" class="form-control" id="create-username" placeholder="Username">
+                    <input type="password" class="form-control" id="create-password" placeholder="Password" style="margin-top:10px;">
+                    <div class="provider-select">
+                        <p>Transcription Providers</p>
+                        <label><input type="checkbox" class="create-transcription-provider" value="openai"> OpenAI</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="local"> Local</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="sensevoice"> SenseVoice</label>
+                        <p style="margin-top:10px;">Post-process Providers</p>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="openai"> OpenAI</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="google"> Google</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="openrouter"> OpenRouter</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="lmstudio"> LM Studio</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="ollama"> Ollama</label>
+                    </div>
+                    <button class="btn btn--primary btn--sm" id="create-user-btn" style="margin-top:10px;">Create</button>
+                </div>
+                <div class="tab-content admin-only" id="list-tab" style="display:none;">
+                    <ul id="users-list"></ul>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-user-modal">Close</button>
+            </div>
+        </div>
+    </div>
+    <div id="app-content" class="hidden">
     <!-- App Header -->
     <header class="app-header">
         <div class="app-brand">
@@ -25,6 +81,11 @@
             <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Manage whisper.cpp models">
                 <i class="fas fa-download"></i>&nbsp;Models
             </button>
+            <button class="btn btn--outline btn--sm hidden" id="user-btn" title="User management">
+                <i class="fas fa-users"></i>&nbsp;Users
+            </button>
+            <button class="btn btn--outline btn--sm hidden" id="current-user-btn"></button>
+            <button class="btn btn--error btn--sm hidden" id="logout-btn">Logout</button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -529,6 +590,7 @@
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
+    </div> <!-- end app-content -->
     <script src="backend-api.js"></script>
     <script src="app.js"></script>
 </body>
