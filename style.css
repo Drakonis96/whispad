@@ -525,6 +525,20 @@ pre code {
   background: var(--color-secondary);
 }
 
+.btn--error {
+  background: var(--color-error);
+  color: var(--color-btn-primary-text);
+}
+
+.btn--error:hover {
+  background: rgba(var(--color-error-rgb), 0.9);
+}
+
+.btn--error:active {
+  background: var(--color-error);
+  opacity: 0.9;
+}
+
 .btn--sm {
   padding: var(--space-4) var(--space-12);
   font-size: var(--font-size-sm);
@@ -1243,6 +1257,72 @@ select.form-control {
     max-width: 700px;
     box-shadow: var(--shadow-lg);
     position: relative;
+}
+
+
+/* Login screen */
+.login-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.login-screen.hidden {
+    display: none;
+}
+
+.login-box {
+    text-align: center;
+    background-color: var(--color-surface);
+    padding: var(--space-24);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 80%;
+    max-width: 400px;
+}
+
+.login-logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto var(--space-16) auto;
+}
+
+.login-box h3 {
+    margin-bottom: var(--space-32);
+}
+
+/* Align login button */
+.login-box .modal-actions {
+    justify-content: center;
+    margin-top: var(--space-16);
+}
+
+.password-wrapper {
+    position: relative;
+}
+
+.toggle-password {
+    position: absolute;
+    top: 50%;
+    right: var(--space-8);
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+}
+
+.toggle-password:focus {
+    outline: none;
 }
 
 .modal-content--wide {
@@ -2358,4 +2438,32 @@ select.form-control {
 .model-name {
     font-size: var(--font-size-sm);
     color: var(--color-text);
+}
+
+/* User modal */
+.tab-buttons {
+    display: flex;
+    gap: var(--space-8);
+    margin-bottom: var(--space-16);
+}
+.tab-content {
+    margin-top: var(--space-8);
+}
+
+.provider-select label {
+    display: inline-block;
+    margin-right: var(--space-8);
+}
+
+.provider-group {
+    margin: var(--space-8) 0;
+}
+
+.user-item {
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-8) 0;
+}
+
+.user-item:last-child {
+    border-bottom: none;
 }

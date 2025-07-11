@@ -9,6 +9,69 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <!-- Login screen -->
+    <div class="login-screen" id="login-screen">
+        <div class="login-box">
+            <img src="logos/logo.png" alt="WhisPad Logo" class="login-logo">
+            <h3>Login</h3>
+            <div class="modal-body">
+                <input type="text" class="form-control" id="login-username" placeholder="Username">
+                <div class="password-wrapper" style="margin-top:10px;">
+                    <input type="password" class="form-control" id="login-password" placeholder="Password">
+                    <button type="button" class="toggle-password" id="toggle-password" aria-label="Show password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn--primary" id="login-submit">Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User management modal -->
+    <div class="modal" id="user-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>User Management</h3>
+            <div class="modal-body">
+                <div class="tab-buttons">
+                    <button class="btn btn--outline btn--sm" data-tab="password-tab">Change Password</button>
+                    <button class="btn btn--outline btn--sm admin-only" data-tab="create-tab">Create User</button>
+                    <button class="btn btn--outline btn--sm admin-only" data-tab="list-tab">Existing Users</button>
+                </div>
+                <div class="tab-content" id="password-tab">
+                    <input type="password" class="form-control" id="current-password" placeholder="Current password">
+                    <input type="password" class="form-control" id="new-password" placeholder="New password" style="margin-top:10px;">
+                    <input type="password" class="form-control" id="confirm-password" placeholder="Confirm new password" style="margin-top:10px;">
+                    <button class="btn btn--primary btn--sm" id="change-password-btn" style="margin-top:10px;">Save</button>
+                </div>
+                <div class="tab-content admin-only" id="create-tab" style="display:none;">
+                    <input type="text" class="form-control" id="create-username" placeholder="Username">
+                    <input type="password" class="form-control" id="create-password" placeholder="Password" style="margin-top:10px;">
+                    <div class="provider-select">
+                        <p>Transcription Providers</p>
+                        <label><input type="checkbox" class="create-transcription-provider" value="openai"> OpenAI</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="local"> Local Whisper</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="sensevoice"> SenseVoice</label>
+                        <p style="margin-top:10px;">Post-process Providers</p>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="openai"> OpenAI</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="google"> Google</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="openrouter"> OpenRouter</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="lmstudio"> LM Studio</label>
+                        <label><input type="checkbox" class="create-postprocess-provider" value="ollama"> Ollama</label>
+                    </div>
+                    <button type="button" class="btn btn--primary btn--sm" id="create-user-btn" style="margin-top:10px;">Create</button>
+                </div>
+                <div class="tab-content admin-only" id="list-tab" style="display:none;">
+                    <ul id="users-list"></ul>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-user-modal">Close</button>
+            </div>
+        </div>
+    </div>
+    <div id="app-content" class="hidden">
     <!-- App Header -->
     <header class="app-header">
         <div class="app-brand">
@@ -22,9 +85,14 @@
             <button class="btn btn--outline btn--sm" id="restore-btn" title="Restore notes from files">
                 <i class="fas fa-upload"></i>&nbsp;Restore
             </button>
-            <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Manage whisper.cpp models">
+            <button class="btn btn--outline btn--sm admin-only" id="upload-models-btn" title="Manage whisper.cpp models">
                 <i class="fas fa-download"></i>&nbsp;Models
             </button>
+            <button class="btn btn--outline btn--sm hidden" id="user-btn" title="User management">
+                <i class="fas fa-users"></i>&nbsp;Users
+            </button>
+            <button class="btn btn--outline btn--sm hidden" id="current-user-btn"></button>
+            <button class="btn btn--error btn--sm hidden" id="logout-btn">Logout</button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -206,7 +274,7 @@
                             <option value="gpt-4o-transcribe">GPT-4o - High Precision</option>
                         </select>
                     </div>
-                    <div class="model-config">
+                    <div class="model-config restricted-option">
                         <label class="form-label">Transcription Options</label>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
@@ -216,7 +284,7 @@
                             </label>
                         </div>
                     </div>
-                    <div class="model-config">
+                    <div class="model-config restricted-option">
                         <label class="form-label">Transcription Context (GPT-4o)</label>
                         <textarea class="form-control" id="transcription-prompt" placeholder="E.g.: Technical conversation about artificial intelligence..." rows="2"></textarea>
                     </div>
@@ -285,7 +353,7 @@
                         </select>
                         <small>Select the language you will speak to improve accuracy</small>
                     </div>
-                    <div class="model-config" id="sensevoice-options" style="display: none;">
+                    <div class="model-config restricted-option" id="sensevoice-options" style="display: none;">
                         <label class="form-label">SenseVoice Features</label>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
@@ -330,7 +398,7 @@
                         <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
                     </select>
                 </div>
-                <div class="config-section" id="lmstudio-options" style="display: none;">
+                <div class="config-section restricted-option" id="lmstudio-options" style="display: none;">
                     <h5>LM Studio Server</h5>
                     <div class="api-key-group">
                         <label class="form-label">Host</label>
@@ -346,7 +414,7 @@
                         <button class="btn btn--primary btn--sm" id="update-lmstudio-models-btn">Update Models</button>
                 </div>
                 </div>
-                <div class="config-section" id="ollama-options" style="display: none;">
+                <div class="config-section restricted-option" id="ollama-options" style="display: none;">
                     <h5>Ollama Server</h5>
                     <div class="api-key-group">
                         <label class="form-label">Host</label>
@@ -362,7 +430,7 @@
                         <button class="btn btn--primary btn--sm" id="update-ollama-models-btn">Update Models</button>
                     </div>
                 </div>
-                <div class="config-section">
+                <div class="config-section restricted-option">
                     <h5>Advanced Post-processing Configuration</h5>
                     <div class="advanced-config">
                         <div class="config-row">
@@ -402,7 +470,7 @@
                     </div>
                 </div>
                 <h4 class="config-group-title">Interface Options</h4>
-                <div class="config-section">
+                <div class="config-section restricted-option">
                     <div class="checkbox-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="show-mobile-record" checked>
@@ -529,6 +597,7 @@
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
+    </div> <!-- end app-content -->
     <script src="backend-api.js"></script>
     <script src="app.js"></script>
 </body>

@@ -1,3 +1,32 @@
+// Authentication token and current user
+let authToken = '';
+let currentUser = '';
+let isAdmin = false;
+
+const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
+const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
+let allowedTranscriptionProviders = [];
+let allowedPostprocessProviders = [];
+let defaultProviderConfig = {};
+
+const PROVIDER_LABELS = {
+    openai: 'OpenAI',
+    local: 'Local Whisper',
+    sensevoice: 'SenseVoice',
+    google: 'Google',
+    openrouter: 'OpenRouter',
+    lmstudio: 'LM Studio',
+    ollama: 'Ollama'
+};
+
+function authFetch(url, options = {}) {
+    options.headers = options.headers || {};
+    if (authToken) {
+        options.headers['Authorization'] = authToken;
+    }
+    return fetch(url, options);
+}
+
 // Example data and configuration
 const ejemplosTranscripcion = [
     "This is a dictated note about the web development project we are working on in the office.",
@@ -74,6 +103,9 @@ class NotesApp {
         this.currentNote = null;
         this.isRecording = false;
         this.autoSaveTimeout = null;
+        this.saveInProgress = false;
+        this.pendingSave = false;
+        this.lastSaveHash = '';
         this.searchTerm = '';
         this.selectedText = '';
         this.selectedRange = null;
@@ -146,7 +178,7 @@ class NotesApp {
     
     async migrateExistingNotes() {
         try {
-            const response = await fetch('/api/cleanup-notes', {
+            const response = await authFetch('/api/cleanup-notes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -369,6 +401,178 @@ class NotesApp {
         document.getElementById('styles-config-btn').addEventListener('click', () => {
             this.showStylesConfigModal();
         });
+
+        async function refreshUserList() {
+            const listResp = await authFetch('/api/list-users');
+            if (listResp.ok) {
+                const data = await listResp.json();
+                const list = document.getElementById('users-list');
+                list.innerHTML = '';
+                data.users.filter(u => u.username !== 'admin').forEach(u => {
+                    const li = document.createElement('li');
+                    li.className = 'user-item';
+                    const title = document.createElement('strong');
+                    title.textContent = u.username;
+                    li.appendChild(title);
+
+                    const tGroup = document.createElement('div');
+                    tGroup.className = 'provider-group';
+                    tGroup.append('Transcription: ');
+                    TRANSCRIPTION_PROVIDERS.forEach(p => {
+                        const label = document.createElement('label');
+                        label.style.marginRight = '6px';
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.value = p;
+                        cb.className = 'edit-transcription';
+                        if ((u.transcription_providers || []).includes(p)) cb.checked = true;
+                        label.appendChild(cb);
+                        label.append(' ' + (PROVIDER_LABELS[p] || p));
+                        tGroup.appendChild(label);
+                    });
+                    li.appendChild(tGroup);
+
+                    const ppGroup = document.createElement('div');
+                    ppGroup.className = 'provider-group';
+                    ppGroup.append('Post-process: ');
+                    POSTPROCESS_PROVIDERS.forEach(p => {
+                        const label = document.createElement('label');
+                        label.style.marginRight = '6px';
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.value = p;
+                        cb.className = 'edit-postprocess';
+                        if ((u.postprocess_providers || []).includes(p)) cb.checked = true;
+                        label.appendChild(cb);
+                        label.append(' ' + (PROVIDER_LABELS[p] || p));
+                        ppGroup.appendChild(label);
+                    });
+                    li.appendChild(ppGroup);
+
+                    const saveBtn = document.createElement('button');
+                    saveBtn.className = 'btn btn--primary btn--sm';
+                    saveBtn.textContent = 'Save';
+                    saveBtn.addEventListener('click', async () => {
+                        const tProviders = Array.from(li.querySelectorAll('.edit-transcription:checked')).map(c => c.value);
+                        const ppProviders = Array.from(li.querySelectorAll('.edit-postprocess:checked')).map(c => c.value);
+                        const resp2 = await authFetch('/api/update-user-providers', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: u.username,
+                                transcription_providers: tProviders,
+                                postprocess_providers: ppProviders
+                            })
+                        });
+                        if (resp2.ok) {
+                            alert('Updated ' + u.username);
+                        } else {
+                            alert('Error updating user');
+                        }
+                    });
+
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'btn btn--error btn--sm';
+                    delBtn.textContent = 'Delete';
+                    delBtn.style.marginLeft = '6px';
+                    delBtn.addEventListener('click', async () => {
+                        if (!confirm('Delete user ' + u.username + '?')) return;
+                        const resp3 = await authFetch('/api/delete-user', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ username: u.username })
+                        });
+                        if (resp3.ok) {
+                            alert('User deleted');
+                            await refreshUserList();
+                        } else {
+                            alert('Error deleting user');
+                        }
+                    });
+
+                    li.appendChild(saveBtn);
+                    li.appendChild(delBtn);
+
+                    list.appendChild(li);
+                });
+            }
+        }
+
+        document.getElementById('user-btn').addEventListener('click', async () => {
+            document.getElementById('user-modal').classList.add('active');
+            document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById('password-tab').style.display = 'block';
+            await refreshUserList();
+        });
+        document.getElementById('close-user-modal').addEventListener('click', () => {
+            document.getElementById('user-modal').classList.remove('active');
+        });
+
+        document.querySelectorAll('#user-modal .tab-buttons button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.getAttribute('data-tab');
+                document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
+                document.getElementById(tab).style.display = 'block';
+            });
+        });
+
+        document.getElementById('change-password-btn').addEventListener('click', async () => {
+            const current = document.getElementById('current-password').value;
+            const newPass = document.getElementById('new-password').value;
+            const confirmPass = document.getElementById('confirm-password').value;
+            if (!current || !newPass || !confirmPass) return;
+            if (newPass !== confirmPass) {
+                alert('Passwords do not match');
+                return;
+            }
+            const resp = await authFetch('/api/change-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ current_password: current, new_password: newPass })
+            });
+            if (resp.ok) {
+                alert('Password updated');
+                document.getElementById('current-password').value = '';
+                document.getElementById('new-password').value = '';
+                document.getElementById('confirm-password').value = '';
+            } else {
+                const data = await resp.json().catch(() => ({}));
+                alert(data.error || 'Error updating password');
+            }
+        });
+
+        const createUserBtn = document.getElementById('create-user-btn');
+        createUserBtn.addEventListener('click', async () => {
+            const u = document.getElementById('create-username').value.trim();
+            const p = document.getElementById('create-password').value;
+            if (!u || !p) return;
+            createUserBtn.disabled = true;
+            const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
+            const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
+            const resp = await authFetch('/api/create-user', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: u,
+                    password: p,
+                    transcription_providers: tProviders,
+                    postprocess_providers: ppProviders
+                })
+            });
+            createUserBtn.disabled = false;
+            if (resp.ok) {
+                alert('User created');
+                document.getElementById('create-username').value = '';
+                document.getElementById('create-password').value = '';
+                document.querySelectorAll('#create-tab input[type="checkbox"]').forEach(cb => cb.checked = false);
+                await refreshUserList();
+            } else {
+                const data = await resp.json().catch(() => ({}));
+                alert(data.error || 'Error creating user');
+            }
+        });
+
+        document.getElementById('user-btn').classList.remove('hidden');
         
         document.getElementById('cancel-config').addEventListener('click', () => {
             this.hideConfigModal();
@@ -510,7 +714,7 @@ class NotesApp {
     // Gestión de notas
     async loadNotes() {
         try {
-            const response = await fetch('/api/list-saved-notes');
+            const response = await authFetch('/api/list-saved-notes');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -539,7 +743,7 @@ class NotesApp {
             ? `?id=${note.id}`
             : `?filename=${encodeURIComponent(note.filename)}`;
         try {
-            const response = await fetch(`/api/get-note${params}`);
+            const response = await authFetch(`/api/get-note${params}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -570,7 +774,8 @@ class NotesApp {
 
     // Configuración
     loadConfig() {
-        const saved = localStorage.getItem('notes-app-config');
+        const storageKey = `notes-app-config-${currentUser}`;
+        const saved = localStorage.getItem(storageKey);
         if (saved) {
             this.config = { ...this.config, ...JSON.parse(saved) };
         }
@@ -630,15 +835,48 @@ class NotesApp {
             ollamaModels
         };
 
-        localStorage.setItem('notes-app-config', JSON.stringify(this.config));
+        const storageKey = `notes-app-config-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.config));
         this.updateMobileFabVisibility();
         this.hideConfigModal();
         this.showNotification('Configuration saved');
     }
 
     showConfigModal() {
-        document.getElementById('transcription-provider').value = this.config.transcriptionProvider;
-        document.getElementById('postprocess-provider').value = this.config.postprocessProvider;
+        this.loadConfig();
+        const tpSelect = document.getElementById('transcription-provider');
+        const ppSelect = document.getElementById('postprocess-provider');
+
+        tpSelect.querySelectorAll('option').forEach(opt => {
+            if (!opt.value) return;
+            if (allowedTranscriptionProviders.length === 0) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else if (!allowedTranscriptionProviders.includes(opt.value)) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else {
+                opt.disabled = false;
+                opt.style.display = '';
+            }
+        });
+
+        ppSelect.querySelectorAll('option').forEach(opt => {
+            if (!opt.value) return;
+            if (allowedPostprocessProviders.length === 0) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else if (!allowedPostprocessProviders.includes(opt.value)) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else {
+                opt.disabled = false;
+                opt.style.display = '';
+            }
+        });
+
+        tpSelect.value = this.config.transcriptionProvider;
+        ppSelect.value = this.config.postprocessProvider;
         document.getElementById('transcription-model').value = this.config.transcriptionModel || '';
         document.getElementById('postprocess-model').value = this.config.postprocessModel || '';
         document.getElementById('transcription-language').value = this.config.transcriptionLanguage || 'auto';
@@ -687,6 +925,27 @@ class NotesApp {
         // Mostrar/ocultar opciones Ollama según el proveedor seleccionado
         this.toggleOllamaOptions();
 
+        if (!isAdmin) {
+            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
+                el.disabled = true;
+            });
+
+            if (allowedPostprocessProviders.includes('lmstudio')) {
+                document.querySelectorAll('#lmstudio-options input, #lmstudio-options select, #lmstudio-options textarea, #update-lmstudio-models-btn').forEach(el => {
+                    el.disabled = false;
+                });
+            }
+            if (allowedPostprocessProviders.includes('ollama')) {
+                document.querySelectorAll('#ollama-options input, #ollama-options select, #ollama-options textarea, #update-ollama-models-btn').forEach(el => {
+                    el.disabled = false;
+                });
+            }
+        } else {
+            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
+                el.disabled = false;
+            });
+        }
+
         const modal = document.getElementById('config-modal');
         this.hideMobileFab();
         modal.classList.add('active');
@@ -699,6 +958,7 @@ class NotesApp {
     }
     
     showStylesConfigModal() {
+        this.loadStylesConfig();
         this.renderStylesConfig();
         const modal = document.getElementById('styles-config-modal');
         this.hideMobileFab();
@@ -766,7 +1026,8 @@ class NotesApp {
 
     saveStylesConfig() {
         // Guardar configuración en localStorage
-        localStorage.setItem('notes-app-styles-config', JSON.stringify(this.stylesConfig));
+        const storageKey = `notes-app-styles-config-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.stylesConfig));
         
         // Actualizar botones de IA
         this.updateAIButtons();
@@ -778,7 +1039,8 @@ class NotesApp {
     }
 
     loadStylesConfig() {
-        const saved = localStorage.getItem('notes-app-styles-config');
+        const storageKey = `notes-app-styles-config-${currentUser}`;
+        const saved = localStorage.getItem(storageKey);
         if (saved) {
             const savedConfig = JSON.parse(saved);
             
@@ -968,16 +1230,22 @@ class NotesApp {
     
     handleEditorChange() {
         if (!this.currentNote) return;
-        
+
+        const content = document.getElementById('editor').innerHTML;
+        if (content === this.currentNote.content) return;
+
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
             this.saveCurrentNote(true);
         }, 2000);
     }
-    
+
     handleTitleChange() {
         if (!this.currentNote) return;
-        
+
+        const title = document.getElementById('note-title').value.trim();
+        if (title === this.currentNote.title) return;
+
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
             this.saveCurrentNote(true);
@@ -986,9 +1254,15 @@ class NotesApp {
     
     saveCurrentNote(silent = false) {
         if (!this.currentNote) return;
-        
+
+        clearTimeout(this.autoSaveTimeout);
+
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('editor').innerHTML;
+
+        if (silent && title === this.currentNote.title && content === this.currentNote.content) {
+            return;
+        }
         
         this.currentNote.title = title || 'Untitled Note';
         this.currentNote.content = content;
@@ -1011,27 +1285,40 @@ class NotesApp {
     
     async saveNoteToServer(silent = false) {
         if (!this.currentNote) return;
-        
+
+        const payload = {
+            id: this.currentNote.id,
+            title: this.currentNote.title,
+            content: this.currentNote.content,
+            tags: this.currentNote.tags || []
+        };
+
+        const hash = JSON.stringify(payload);
+        if (this.lastSaveHash === hash && silent) {
+            return;
+        }
+        this.lastSaveHash = hash;
+
+        if (this.saveInProgress) {
+            this.pendingSave = true;
+            return;
+        }
+
+        this.saveInProgress = true;
+
         try {
-            const response = await fetch('/api/save-note', {
+            const response = await authFetch('/api/save-note', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    id: this.currentNote.id,
-                    title: this.currentNote.title,
-                    content: this.currentNote.content,
-                    tags: this.currentNote.tags || []
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const result = await response.json();
-            
+
             if (!silent && result.success) {
                 console.log(`Note saved to server: ${result.filename}`);
             }
@@ -1039,6 +1326,12 @@ class NotesApp {
             console.error('Error saving note to server:', error);
             if (!silent) {
                 this.showNotification('Error saving note to server', 'error');
+            }
+        } finally {
+            this.saveInProgress = false;
+            if (this.pendingSave) {
+                this.pendingSave = false;
+                this.saveNoteToServer(true);
             }
         }
     }
@@ -1064,7 +1357,7 @@ class NotesApp {
     
     async deleteNoteFromServer(noteId) {
         try {
-            const response = await fetch('/api/delete-note', {
+            const response = await authFetch('/api/delete-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1117,7 +1410,7 @@ class NotesApp {
 
     async downloadAllNotes() {
         try {
-            const response = await fetch('/api/download-all-notes');
+            const response = await authFetch('/api/download-all-notes');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -1281,7 +1574,7 @@ class NotesApp {
     async uploadNoteFile(file) {
         const formData = new FormData();
         formData.append('note', file, file.name);
-        const response = await fetch('/api/upload-note', { method: 'POST', body: formData });
+        const response = await authFetch('/api/upload-note', { method: 'POST', body: formData });
         if (!response.ok) {
             throw new Error('Upload failed');
         }
@@ -1542,6 +1835,7 @@ class NotesApp {
                 });
                 
                 xhr.open('POST', '/api/upload-model');
+                if (authToken) xhr.setRequestHeader('Authorization', authToken);
                 xhr.send(formData);
             });
             
@@ -1560,8 +1854,8 @@ class NotesApp {
         const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 minutes timeout
         
         try {
-            const response = await fetch('/api/upload-model', { 
-                method: 'POST', 
+            const response = await authFetch('/api/upload-model', {
+                method: 'POST',
                 body: formData,
                 signal: controller.signal
             });
@@ -2617,8 +2911,8 @@ class NotesApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            let improvedText = '';
             let chunkCount = 0;
+            const state = { improvedText: '', inThink: false, thinkBuffer: '', tempElement };
             
             while (true) {
                 const { done, value } = await reader.read();
@@ -2631,7 +2925,7 @@ class NotesApp {
                 const chunk = decoder.decode(value);
                 console.log('Received chunk:', chunkCount, chunk);
                 const lines = chunk.split('\n');
-                
+
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         try {
@@ -2640,35 +2934,26 @@ class NotesApp {
                                 console.log('Received [DONE] signal');
                                 break;
                             }
-                            
+
                             const data = JSON.parse(dataStr);
                             console.log('Parsed data:', data);
-                            
+
                             if (data.content) {
-                                improvedText += data.content;
-                                // Limpiar y actualizar el texto en tiempo real
-                                const cleanedText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleanedText;
-                                console.log('Updated temp element with:', cleanedText.substring(0, 50) + '...');
-                                
+                                this.processThinkChunk(data.content, state);
                                 // Mantener la clase de generación durante el streaming
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
                                 console.log('Stream marked as done');
-                                // Asegurar que el texto final esté limpio
-                                const finalText = this.cleanAIResponse(improvedText);
+                                const finalText = this.cleanAIResponse(state.improvedText);
                                 tempElement.textContent = finalText;
                                 console.log('Final text set:', finalText);
-                                
-                                // Cambiar a clase de texto completado
+
                                 tempElement.className = 'ai-generated-text';
-                                
-                                // Después de la transición, quitar todas las clases
                                 setTimeout(() => {
                                     tempElement.className = '';
                                 }, 1000);
-                                
+
                                 return finalText;
                             }
                             if (data.error) {
@@ -2677,14 +2962,13 @@ class NotesApp {
                             }
                         } catch (parseError) {
                             console.warn('Failed to parse JSON:', parseError, 'Line:', line);
-                            // Ignorar errores de parsing de JSON
                             continue;
                         }
                     }
                 }
             }
             
-            const finalResult = this.cleanAIResponse(improvedText);
+            const finalResult = this.cleanAIResponse(state.improvedText);
             console.log('Returning final result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -2723,8 +3007,8 @@ class NotesApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            let improvedText = '';
             let chunkCount = 0;
+            const state = { improvedText: '', inThink: false, thinkBuffer: '', tempElement };
             
             while (true) {
                 const { done, value } = await reader.read();
@@ -2746,19 +3030,13 @@ class NotesApp {
                             console.log('Parsed Gemini data:', data);
                             
                             if (data.content) {
-                                improvedText += data.content;
-                                // Limpiar y actualizar el texto en tiempo real
-                                const cleanedText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleanedText;
-                                console.log('Updated Gemini temp element with:', cleanedText.substring(0, 50) + '...');
-                                
-                                // Mantener la clase de generación durante el streaming
+                                this.processThinkChunk(data.content, state);
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
                                 console.log('Gemini stream marked as done');
                                 // Asegurar que el texto final esté limpio
-                                const finalText = this.cleanAIResponse(improvedText);
+                                const finalText = this.cleanAIResponse(state.improvedText);
                                 tempElement.textContent = finalText;
                                 console.log('Final Gemini text set:', finalText);
                                 
@@ -2785,7 +3063,7 @@ class NotesApp {
                 }
             }
             
-            const finalResult = this.cleanAIResponse(improvedText);
+            const finalResult = this.cleanAIResponse(state.improvedText);
             console.log('Returning final Gemini result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -2851,8 +3129,8 @@ class NotesApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
-            let improvedText = '';
             let chunkCount = 0;
+            const state = { improvedText: '', inThink: false, thinkBuffer: '', tempElement };
             
             while (true) {
                 const { done, value } = await reader.read();
@@ -2879,19 +3157,13 @@ class NotesApp {
                             console.log('Parsed OpenRouter data:', data);
                             
                             if (data.content) {
-                                improvedText += data.content;
-                                // Limpiar y actualizar el texto en tiempo real
-                                const cleanedText = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleanedText;
-                                console.log('Updated OpenRouter temp element with:', cleanedText.substring(0, 50) + '...');
-                                
-                                // Mantener la clase de generación durante el streaming
+                                this.processThinkChunk(data.content, state);
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
                                 console.log('OpenRouter stream marked as done');
                                 // Asegurar que el texto final esté limpio
-                                const finalText = this.cleanAIResponse(improvedText);
+                                const finalText = this.cleanAIResponse(state.improvedText);
                                 tempElement.textContent = finalText;
                                 console.log('Final OpenRouter text set:', finalText);
                                 
@@ -2918,7 +3190,7 @@ class NotesApp {
                 }
             }
             
-            const finalResult = this.cleanAIResponse(improvedText);
+            const finalResult = this.cleanAIResponse(state.improvedText);
             console.log('Returning final OpenRouter result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -2946,7 +3218,7 @@ class NotesApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
 
-            let improvedText = '';
+            const state = { improvedText: '', inThink: false, thinkBuffer: '', tempElement };
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -2961,13 +3233,11 @@ class NotesApp {
                             }
                             const data = JSON.parse(dataStr);
                             if (data.content) {
-                                improvedText += data.content;
-                                const cleaned = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleaned;
+                                this.processThinkChunk(data.content, state);
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
-                                const finalText = this.cleanAIResponse(improvedText);
+                                const finalText = this.cleanAIResponse(state.improvedText);
                                 tempElement.textContent = finalText;
                                 tempElement.className = 'ai-generated-text';
                                 setTimeout(() => { tempElement.className = ''; }, 1000);
@@ -2983,7 +3253,7 @@ class NotesApp {
                 }
             }
 
-            const finalResult = this.cleanAIResponse(improvedText);
+            const finalResult = this.cleanAIResponse(state.improvedText);
             return finalResult;
         } catch (error) {
             console.error('Error in improveWithLmStudioStream:', error);
@@ -3010,7 +3280,7 @@ class NotesApp {
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
 
-            let improvedText = '';
+            const state = { improvedText: '', inThink: false, thinkBuffer: '', tempElement };
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
@@ -3025,13 +3295,11 @@ class NotesApp {
                             }
                             const data = JSON.parse(dataStr);
                             if (data.content) {
-                                improvedText += data.content;
-                                const cleaned = this.cleanAIResponse(improvedText);
-                                tempElement.textContent = cleaned;
+                                this.processThinkChunk(data.content, state);
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
-                                const finalText = this.cleanAIResponse(improvedText);
+                                const finalText = this.cleanAIResponse(state.improvedText);
                                 tempElement.textContent = finalText;
                                 tempElement.className = 'ai-generated-text';
                                 setTimeout(() => { tempElement.className = ''; }, 1000);
@@ -3047,7 +3315,7 @@ class NotesApp {
                 }
             }
 
-            const finalResult = this.cleanAIResponse(improvedText);
+            const finalResult = this.cleanAIResponse(state.improvedText);
             return finalResult;
         } catch (error) {
             console.error('Error in improveWithOllamaStream:', error);
@@ -3084,14 +3352,57 @@ class NotesApp {
         for (const pattern of explicativePatterns) {
             cleaned = cleaned.replace(pattern, '');
         }
+
+        // Remove <think>...</think> sections if present
+        cleaned = cleaned.replace(/<think>.*?<\/think>/gis, '');
         
         // Quitar saltos de línea excesivos al principio y final
         cleaned = cleaned.replace(/^\n+|\n+$/g, '');
         
         console.log('cleanAIResponse input:', text.substring(0, 100) + '...');
         console.log('cleanAIResponse output:', cleaned.substring(0, 100) + '...');
-        
+
         return cleaned;
+    }
+
+    // Handle streaming chunks that may contain <think>...</think> segments
+    processThinkChunk(chunk, state) {
+        let text = chunk;
+        while (text.length > 0) {
+            if (state.inThink) {
+                const endIdx = text.indexOf('</think>');
+                if (endIdx !== -1) {
+                    state.thinkBuffer += text.slice(0, endIdx);
+                    this.updateProcessingText(state.thinkBuffer.trim());
+                    state.thinkBuffer = '';
+                    state.inThink = false;
+                    text = text.slice(endIdx + 8);
+                    this.updateProcessingText('Improving text with AI...');
+                } else {
+                    state.thinkBuffer += text;
+                    this.updateProcessingText(state.thinkBuffer.trim());
+                    return;
+                }
+            } else {
+                const startIdx = text.indexOf('<think>');
+                if (startIdx !== -1) {
+                    state.improvedText += text.slice(0, startIdx);
+                    if (state.tempElement) {
+                        const cleaned = this.cleanAIResponse(state.improvedText);
+                        state.tempElement.textContent = cleaned;
+                    }
+                    text = text.slice(startIdx + 7);
+                    state.inThink = true;
+                } else {
+                    state.improvedText += text;
+                    if (state.tempElement) {
+                        const cleaned = this.cleanAIResponse(state.improvedText);
+                        state.tempElement.textContent = cleaned;
+                    }
+                    text = '';
+                }
+            }
+        }
     }
     
     // Guardar estado actual para poder deshacer cambios de IA
@@ -3363,6 +3674,13 @@ class NotesApp {
         const textElement = document.getElementById('processing-text');
         textElement.textContent = text;
         overlay.classList.add('active');
+    }
+
+    updateProcessingText(text) {
+        const textElement = document.getElementById('processing-text');
+        if (textElement) {
+            textElement.textContent = text;
+        }
     }
     
     hideProcessingOverlay() {
@@ -3729,11 +4047,33 @@ class NotesApp {
     }
 
     updateOllamaModelsList() {
+        const hostInput = document.getElementById('ollama-host');
+        const portInput = document.getElementById('ollama-port');
         const modelsInput = document.getElementById('ollama-models');
-        if (!modelsInput) return;
+        if (!hostInput || !portInput || !modelsInput) return;
 
-        this.config.ollamaModels = modelsInput.value.trim();
-        this.updateModelOptions();
+        const host = hostInput.value.trim();
+        const port = portInput.value.trim();
+
+        backendAPI.listOllamaModels(host, port)
+            .then(data => {
+                let names = [];
+                if (Array.isArray(data.models)) {
+                    names = data.models.map(m => m.name || m.model || m);
+                }
+                if (names.length > 0) {
+                    modelsInput.value = names.join(',');
+                    this.config.ollamaModels = modelsInput.value.trim();
+                    this.updateModelOptions();
+                    this.showNotification('Ollama models updated');
+                } else {
+                    this.showNotification('No models found on Ollama', 'warning');
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching Ollama models:', err);
+                this.showNotification('Failed to fetch Ollama models', 'error');
+            });
     }
 
     updateLanguageOptionsForSenseVoice() {
@@ -3822,8 +4162,186 @@ class NotesApp {
 }
 
 // Inicializar la aplicación cuando se carga la página
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
     window.notesApp = new NotesApp();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const loginScreen = document.getElementById('login-screen');
+    const appContent = document.getElementById('app-content');
+    const loginBtn = document.getElementById('login-submit');
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    const togglePasswordBtn = document.getElementById('toggle-password');
+    const currentUserBtn = document.getElementById('current-user-btn');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    async function loadDefaultProviderConfig() {
+        try {
+            const resp = await authFetch('/api/default-provider-config');
+            if (resp.ok) {
+                defaultProviderConfig = await resp.json();
+            }
+        } catch (err) {
+            console.error('Error fetching default provider config:', err);
+        }
+    }
+
+    async function restoreSession() {
+        const saved = localStorage.getItem('notes-app-session');
+        if (!saved) return false;
+        try {
+            const session = JSON.parse(saved);
+            authToken = session.token;
+            const resp = await authFetch('/api/session-info');
+            if (!resp.ok) {
+                localStorage.removeItem('notes-app-session');
+                authToken = '';
+                return false;
+            }
+            const data = await resp.json();
+            currentUser = data.username;
+            allowedTranscriptionProviders = data.transcription_providers || [];
+            allowedPostprocessProviders = data.postprocess_providers || [];
+            isAdmin = data.is_admin;
+
+            await loadDefaultProviderConfig();
+            if (!isAdmin) {
+                const cfgKey = `notes-app-config-${currentUser}`;
+                let cfg = {};
+                const savedCfg = localStorage.getItem(cfgKey);
+                if (savedCfg) cfg = JSON.parse(savedCfg);
+                if (defaultProviderConfig.lmstudio_host) {
+                    cfg.lmstudioHost = defaultProviderConfig.lmstudio_host;
+                    cfg.lmstudioPort = defaultProviderConfig.lmstudio_port;
+                }
+                if (defaultProviderConfig.ollama_host) {
+                    cfg.ollamaHost = defaultProviderConfig.ollama_host;
+                    cfg.ollamaPort = defaultProviderConfig.ollama_port;
+                }
+                localStorage.setItem(cfgKey, JSON.stringify(cfg));
+            }
+            if (isAdmin) {
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    if (!el.classList.contains('tab-content')) {
+                        el.style.display = '';
+                    }
+                });
+            } else {
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    if (!el.classList.contains('tab-content')) {
+                        el.style.display = 'none';
+                    }
+                });
+            }
+            currentUserBtn.textContent = currentUser;
+            currentUserBtn.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+            loginScreen.classList.add('hidden');
+            appContent.classList.remove('hidden');
+            initApp();
+            return true;
+        } catch {
+            localStorage.removeItem('notes-app-session');
+            authToken = '';
+            return false;
+        }
+    }
+
+    restoreSession();
+
+    async function attemptLogin() {
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+        try {
+            const resp = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                authToken = data.token;
+                currentUser = username;
+                allowedTranscriptionProviders = data.transcription_providers || [];
+                allowedPostprocessProviders = data.postprocess_providers || [];
+                isAdmin = data.is_admin;
+                await loadDefaultProviderConfig();
+                if (!isAdmin) {
+                    const cfgKey = `notes-app-config-${currentUser}`;
+                    let cfg = {};
+                    const savedCfg = localStorage.getItem(cfgKey);
+                    if (savedCfg) cfg = JSON.parse(savedCfg);
+                    if (defaultProviderConfig.lmstudio_host) {
+                        cfg.lmstudioHost = defaultProviderConfig.lmstudio_host;
+                        cfg.lmstudioPort = defaultProviderConfig.lmstudio_port;
+                    }
+                    if (defaultProviderConfig.ollama_host) {
+                        cfg.ollamaHost = defaultProviderConfig.ollama_host;
+                        cfg.ollamaPort = defaultProviderConfig.ollama_port;
+                    }
+                    localStorage.setItem(cfgKey, JSON.stringify(cfg));
+                }
+                if (isAdmin) {
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        if (!el.classList.contains('tab-content')) {
+                            el.style.display = '';
+                        }
+                    });
+                } else {
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        if (!el.classList.contains('tab-content')) {
+                            el.style.display = 'none';
+                        }
+                    });
+                }
+                localStorage.setItem('notes-app-session', JSON.stringify({ token: authToken }));
+                currentUserBtn.textContent = username;
+                currentUserBtn.classList.remove('hidden');
+                logoutBtn.classList.remove('hidden');
+                loginScreen.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                initApp();
+            } else {
+                alert('Login failed');
+            }
+        } catch (e) {
+            alert('Login error');
+        }
+    }
+
+    loginBtn.addEventListener('click', attemptLogin);
+    usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    if (togglePasswordBtn) {
+        togglePasswordBtn.addEventListener('click', () => {
+            const isHidden = passwordInput.getAttribute('type') === 'password';
+            passwordInput.setAttribute('type', isHidden ? 'text' : 'password');
+            togglePasswordBtn.innerHTML = isHidden ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+    }
+
+    logoutBtn.addEventListener('click', async () => {
+        await authFetch('/api/logout', { method: 'POST' });
+        authToken = '';
+        currentUser = '';
+        allowedTranscriptionProviders = [];
+        allowedPostprocessProviders = [];
+        isAdmin = false;
+        localStorage.removeItem('notes-app-session');
+        usernameInput.value = '';
+        passwordInput.value = '';
+        currentUserBtn.classList.add('hidden');
+        logoutBtn.classList.add('hidden');
+        document.getElementById('user-btn').classList.add('hidden');
+        document.querySelectorAll('.admin-only').forEach(el => {
+            if (!el.classList.contains('tab-content')) {
+                el.style.display = 'none';
+            }
+        });
+        loginScreen.classList.remove('hidden');
+        appContent.classList.add('hidden');
+    });
 });
 
 // Actualizar botones de formato cuando cambia la selección

@@ -1,0 +1,8 @@
+{
+  "admin": {
+    "password": "whispad",
+    "is_admin": true,
+    "transcription_providers": ["openai", "local", "sensevoice"],
+    "postprocess_providers": ["openai", "google", "openrouter", "lmstudio", "ollama"]
+  }
+}
