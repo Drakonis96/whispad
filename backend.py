@@ -1350,7 +1350,6 @@ def save_note():
             # Buscar archivo existente para esta nota
             existing_filepath = find_existing_note_file(saved_notes_dir, note_id)
 
-            # Si existe un archivo pero el nombre ha cambiado, renombrarlo
             if existing_filepath and existing_filepath != new_filepath:
                 # Si el nuevo nombre ya existe y no es el archivo actual, agregar sufijo
                 if os.path.exists(new_filepath):
@@ -1365,20 +1364,17 @@ def save_note():
                             break
                         counter += 1
 
-            # Renombrar el archivo existente junto con su metadata
-            try:
-                os.rename(existing_filepath, new_filepath)
-                old_meta = f"{existing_filepath}.meta"
-                new_meta = f"{new_filepath}.meta"
-                if os.path.exists(old_meta):
-                    # Si ya existe un meta con el nuevo nombre, elimínalo para evitar duplicados
-                    if os.path.exists(new_meta):
-                        os.remove(new_meta)
-                    os.rename(old_meta, new_meta)
-            except OSError as e:
-                return jsonify({"error": f"Error al renombrar archivo: {str(e)}"}), 500
-
-            # Si no existe archivo para esta nota, crear uno nuevo
+                # Renombrar el archivo existente junto con su metadata
+                try:
+                    os.rename(existing_filepath, new_filepath)
+                    old_meta = f"{existing_filepath}.meta"
+                    new_meta = f"{new_filepath}.meta"
+                    if os.path.exists(old_meta):
+                        if os.path.exists(new_meta):
+                            os.remove(new_meta)
+                        os.rename(old_meta, new_meta)
+                except OSError as e:
+                    return jsonify({"error": f"Error al renombrar archivo: {str(e)}"}), 500
             elif not existing_filepath:
                 # Verificar que el nombre no esté en uso
                 if os.path.exists(new_filepath):
@@ -1393,7 +1389,6 @@ def save_note():
                             break
                         counter += 1
             else:
-                # El archivo existe y el nombre no ha cambiado
                 new_filepath = existing_filepath
                 new_filename = os.path.basename(new_filepath)
 
