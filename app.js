@@ -9,6 +9,16 @@ let allowedTranscriptionProviders = [];
 let allowedPostprocessProviders = [];
 let defaultProviderConfig = {};
 
+const PROVIDER_LABELS = {
+    openai: 'OpenAI',
+    local: 'Local Whisper',
+    sensevoice: 'SenseVoice',
+    google: 'Google',
+    openrouter: 'OpenRouter',
+    lmstudio: 'LM Studio',
+    ollama: 'Ollama'
+};
+
 function authFetch(url, options = {}) {
     options.headers = options.headers || {};
     if (authToken) {
@@ -417,7 +427,7 @@ class NotesApp {
                         cb.className = 'edit-transcription';
                         if ((u.transcription_providers || []).includes(p)) cb.checked = true;
                         label.appendChild(cb);
-                        label.append(' ' + p);
+                        label.append(' ' + (PROVIDER_LABELS[p] || p));
                         tGroup.appendChild(label);
                     });
                     li.appendChild(tGroup);
@@ -434,7 +444,7 @@ class NotesApp {
                         cb.className = 'edit-postprocess';
                         if ((u.postprocess_providers || []).includes(p)) cb.checked = true;
                         label.appendChild(cb);
-                        label.append(' ' + p);
+                        label.append(' ' + (PROVIDER_LABELS[p] || p));
                         ppGroup.appendChild(label);
                     });
                     li.appendChild(ppGroup);
@@ -916,16 +926,20 @@ class NotesApp {
         this.toggleOllamaOptions();
 
         if (!isAdmin) {
-            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea').forEach(el => {
+            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
                 el.disabled = true;
             });
-            document.querySelectorAll('#config-modal .restricted-option button').forEach(btn => {
-                if (btn.id === 'update-lmstudio-models-btn' || btn.id === 'update-ollama-models-btn') {
-                    btn.disabled = false;
-                } else {
-                    btn.disabled = true;
-                }
-            });
+
+            if (allowedPostprocessProviders.includes('lmstudio')) {
+                document.querySelectorAll('#lmstudio-options input, #lmstudio-options select, #lmstudio-options textarea, #update-lmstudio-models-btn').forEach(el => {
+                    el.disabled = false;
+                });
+            }
+            if (allowedPostprocessProviders.includes('ollama')) {
+                document.querySelectorAll('#ollama-options input, #ollama-options select, #ollama-options textarea, #update-ollama-models-btn').forEach(el => {
+                    el.disabled = false;
+                });
+            }
         } else {
             document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
                 el.disabled = false;
