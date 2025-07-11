@@ -68,7 +68,29 @@ def save_users(users):
     with open(USERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(users, f, indent=2)
 
+
+def migrate_notes_to_admin_folder():
+    """Move existing notes in saved_notes/ to saved_notes/admin"""
+    root_dir = os.path.join(os.getcwd(), 'saved_notes')
+    if not os.path.isdir(root_dir):
+        return
+
+    admin_dir = os.path.join(root_dir, 'admin')
+    moved = 0
+
+    for fname in os.listdir(root_dir):
+        path = os.path.join(root_dir, fname)
+        if os.path.isfile(path) and (fname.endswith('.md') or fname.endswith('.meta')):
+            os.makedirs(admin_dir, exist_ok=True)
+            shutil.move(path, os.path.join(admin_dir, fname))
+            moved += 1
+
+    if moved:
+        print(f"Migrated {moved} notes to {admin_dir}")
+
+
 USERS = load_users()
+migrate_notes_to_admin_folder()
 
 def get_current_username():
     token = request.headers.get('Authorization')
