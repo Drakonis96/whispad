@@ -27,6 +27,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Download or upload local (.bin) whisper.cpp models directly from the interface.
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
+- User login with per-user note folders and admin management tools.
 
 ## Disclaimer
 This application is currently in testing and is provided **as is**. I take no responsibility for any data loss that may occur when using it. Make sure you make frequent backups of your data.
@@ -41,7 +42,8 @@ If you are not comfortable with the terminal, the easiest method is to use **Doc
    docker compose up
    ```
 4. Docker will download the dependencies and show *"Starting services..."*. When everything is ready, open your browser at `https://localhost:5037`.
-5. To stop the application, press `Ctrl+C` in the terminal or use the *Stop* button in Docker Desktop.
+5. Sign in with **admin** / **whispad** the first time to access the app.
+6. To stop the application, press `Ctrl+C` in the terminal or use the *Stop* button in Docker Desktop.
 
 ## Installing with Docker Desktop
 This option is ideal if you don't want to worry about installing Python or dependencies manually.
@@ -58,8 +60,9 @@ This option is ideal if you don't want to worry about installing Python or depen
    docker compose up
    ```
 4. Go to `https://localhost:5037` and start using WhisPad.
-5. To stop it, press `Ctrl+C` in the terminal or run `docker compose down`.
-6. If you want to use LM Studio or Ollama for local AI text improvement, set the host to
+5. Log in with **admin** / **whispad** on first use.
+6. To stop it, press `Ctrl+C` in the terminal or run `docker compose down`.
+7. If you want to use LM Studio or Ollama for local AI text improvement, set the host to
    `host.docker.internal` in the configuration page so the container can reach
    your local instance.
    Use the **Update Models** button to fetch the list of available models from
@@ -88,6 +91,7 @@ If you prefer not to use Docker, you can also run it directly with Python:
    python backend.py
    ```
 6. Open `index.html` in your browser or serve the folder with `python -m http.server 5037` and visit `https://localhost:5037`.
+7. Log in with **admin** / **whispad** the first time you access the app.
 
 ## API Key Configuration
 Copy `env.example` to `.env` and add your API keys:
@@ -96,6 +100,7 @@ cp env.example .env
 ```
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
 If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
+The webhook payload now includes the username so your workflow can fetch the note from the correct folder.
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.

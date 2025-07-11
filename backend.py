@@ -1302,7 +1302,13 @@ def save_note():
             try:
                 requests.post(
                     WORKFLOW_WEBHOOK_URL,
-                    json={"id": note_id, "title": title, "content": content, "tags": tags},
+                    json={
+                        "id": note_id,
+                        "title": title,
+                        "content": content,
+                        "tags": tags,
+                        "user": username,
+                    },
                     headers=headers,
                     timeout=5,
                 )
