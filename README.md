@@ -62,6 +62,8 @@ This option is ideal if you don't want to worry about installing Python or depen
 6. If you want to use LM Studio or Ollama for local AI text improvement, set the host to
    `host.docker.internal` in the configuration page so the container can reach
    your local instance.
+   Use the **Update Models** button to fetch the list of available models from
+   `http://<lmstudio-host>:<port>/v1/models` automatically.
 
 ## Installing from the Terminal
 If you prefer not to use Docker, you can also run it directly with Python:

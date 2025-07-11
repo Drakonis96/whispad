@@ -3697,11 +3697,35 @@ class NotesApp {
     }
 
     updateLmStudioModelsList() {
+        const hostInput = document.getElementById('lmstudio-host');
+        const portInput = document.getElementById('lmstudio-port');
         const modelsInput = document.getElementById('lmstudio-models');
-        if (!modelsInput) return;
+        if (!hostInput || !portInput || !modelsInput) return;
 
-        this.config.lmstudioModels = modelsInput.value.trim();
-        this.updateModelOptions();
+        const host = hostInput.value.trim();
+        const port = portInput.value.trim();
+
+        backendAPI.listLmStudioModels(host, port)
+            .then(data => {
+                let ids = [];
+                if (data.data && Array.isArray(data.data)) {
+                    ids = data.data.map(m => m.id || m);
+                } else if (Array.isArray(data.models)) {
+                    ids = data.models.map(m => m.id || m);
+                }
+                if (ids.length > 0) {
+                    modelsInput.value = ids.join(',');
+                    this.config.lmstudioModels = modelsInput.value.trim();
+                    this.updateModelOptions();
+                    this.showNotification('LM Studio models updated');
+                } else {
+                    this.showNotification('No models found on LM Studio', 'warning');
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching LM Studio models:', err);
+                this.showNotification('Failed to fetch LM Studio models', 'error');
+            });
     }
 
     updateOllamaModelsList() {

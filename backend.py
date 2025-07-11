@@ -1766,6 +1766,24 @@ def list_models():
         return jsonify({"error": f"Error listing models: {str(e)}"}), 500
 
 
+@app.route('/api/lmstudio/models', methods=['GET'])
+def get_lmstudio_models():
+    """Query LM Studio for available models"""
+    host = request.args.get('host', LMSTUDIO_HOST)
+    port = request.args.get('port', LMSTUDIO_PORT)
+
+    try:
+        url = f"http://{host}:{port}/v1/models"
+        response = requests.get(url, timeout=5)
+        if response.status_code != 200:
+            return jsonify({"error": f"LM Studio error {response.status_code}"}), response.status_code
+        return jsonify(response.json())
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error de conexión con LM Studio: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
 @app.route('/api/delete-model', methods=['POST'])
 def delete_model():
     """Delete a downloaded whisper.cpp model"""
