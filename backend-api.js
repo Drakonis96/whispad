@@ -9,7 +9,7 @@ class BackendAPI {
 
     async checkHealth() {
         try {
-            const response = await fetch(`${this.baseUrl}/health`);
+            const response = await authFetch(`${this.baseUrl}/health`);
             return response.ok;
         } catch (error) {
             console.error('Error checking backend health:', error);
@@ -19,7 +19,7 @@ class BackendAPI {
 
     async checkAPIs() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/check-apis`);
+            const response = await authFetch(`${this.baseUrl}/api/check-apis`);
             if (response.ok) {
                 return await response.json();
             }
@@ -58,7 +58,7 @@ class BackendAPI {
 
             console.log('Sending transcription request:', { model, provider, language, filename });
 
-            const response = await fetch(`${this.baseUrl}/api/transcribe`, {
+            const response = await authFetch(`${this.baseUrl}/api/transcribe`, {
                 method: 'POST',
                 body: formData
             });
@@ -125,7 +125,7 @@ class BackendAPI {
                 filename 
             });
 
-            const response = await fetch(`${this.baseUrl}/api/transcribe`, {
+            const response = await authFetch(`${this.baseUrl}/api/transcribe`, {
                 method: 'POST',
                 body: formData
             });
@@ -158,7 +158,7 @@ class BackendAPI {
 
     async getTranscriptionProviders() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/transcription-providers`);
+            const response = await authFetch(`${this.baseUrl}/api/transcription-providers`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -207,7 +207,7 @@ class BackendAPI {
                 requestBody.port = port;
             }
 
-            const response = await fetch(`${this.baseUrl}/api/improve-text`, {
+            const response = await authFetch(`${this.baseUrl}/api/improve-text`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -252,7 +252,7 @@ class BackendAPI {
                 requestBody.port = port;
             }
 
-            const response = await fetch(`${this.baseUrl}/api/improve-text`, {
+            const response = await authFetch(`${this.baseUrl}/api/improve-text`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -332,7 +332,7 @@ class BackendAPI {
             
             console.log('� Usando respuesta normal (OpenAI no soporta streaming para transcripciones)');
             // Respuesta normal (no streaming)
-            const response = await fetch(`${this.baseUrl}/api/transcribe-gpt4o`, {
+            const response = await authFetch(`${this.baseUrl}/api/transcribe-gpt4o`, {
                 method: 'POST',
                 body: formData
             });
@@ -453,7 +453,7 @@ class BackendAPI {
 
     async downloadModelStream(size) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/download-model`, {
+            const response = await authFetch(`${this.baseUrl}/api/download-model`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ size })
@@ -481,7 +481,7 @@ class BackendAPI {
                     throw new Error(`Unknown model: ${model}`);
             }
 
-            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            const response = await authFetch(`${this.baseUrl}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ model })
@@ -575,7 +575,7 @@ class BackendAPI {
 
     async listModels() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/list-models`);
+            const response = await authFetch(`${this.baseUrl}/api/list-models`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -589,7 +589,7 @@ class BackendAPI {
     async listLmStudioModels(host, port) {
         try {
             const url = `${this.baseUrl}/api/lmstudio/models?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
-            const response = await fetch(url);
+            const response = await authFetch(url);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -602,7 +602,7 @@ class BackendAPI {
 
     async deleteModel(name) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/delete-model`, {
+            const response = await authFetch(`${this.baseUrl}/api/delete-model`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name })
@@ -618,7 +618,7 @@ class BackendAPI {
     }
     async refreshProviders() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/refresh-providers`, {
+            const response = await authFetch(`${this.baseUrl}/api/refresh-providers`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
