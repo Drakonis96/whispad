@@ -9,6 +9,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <script>
+        if (localStorage.getItem('whispad-auth') !== 'true') {
+            window.location.replace('authentication.html');
+        }
+    </script>
     <!-- App Header -->
     <header class="app-header">
         <div class="app-brand">
@@ -25,6 +30,11 @@
             <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Manage whisper.cpp models">
                 <i class="fas fa-download"></i>&nbsp;Models
             </button>
+            <button class="btn btn--outline btn--sm" id="users-btn" title="User administration">
+                <i class="fas fa-users"></i>&nbsp;Users
+            </button>
+            <button class="btn btn--outline btn--sm" id="username-btn" disabled></button>
+            <button class="btn btn--danger btn--sm" id="logout-btn">Logout</button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -526,10 +536,214 @@
         </div>
     </div>
 
+    <!-- Users management modal -->
+    <div class="modal" id="users-modal">
+        <div class="modal-content">
+            <h3>User Management</h3>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="change">Change Password</button>
+                <button class="tab-btn" data-tab="add">Add User</button>
+                <button class="tab-btn" data-tab="list">Users</button>
+            </div>
+            <div class="modal-body">
+                <div class="tab-panel active" id="tab-change">
+                    <div class="form-group">
+                        <label class="form-label" for="current-password">Current Password</label>
+                        <input type="password" id="current-password" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-password">New Password</label>
+                        <input type="password" id="new-password" class="form-control">
+                    </div>
+                    <button class="btn btn--primary" id="change-password-btn">Change</button>
+                </div>
+                <div class="tab-panel" id="tab-add">
+                    <div class="form-group">
+                        <label class="form-label" for="new-user">Username</label>
+                        <input type="text" id="new-user" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="new-user-password">Password</label>
+                        <input type="password" id="new-user-password" class="form-control">
+                    </div>
+                    <div class="form-group" id="provider-checkboxes"></div>
+                    <button class="btn btn--primary" id="add-user-btn">Add User</button>
+                </div>
+                <div class="tab-panel" id="tab-list">
+                    <div id="users-list"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-users-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
     <script src="backend-api.js"></script>
     <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const userBtn = document.getElementById('username-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            const usersBtn = document.getElementById('users-btn');
+            const usersModal = document.getElementById('users-modal');
+            const closeUsersModal = document.getElementById('close-users-modal');
+            const tabButtons = usersModal.querySelectorAll('.tab-btn');
+            const tabPanels = usersModal.querySelectorAll('.tab-panel');
+            const providerCheckboxes = document.getElementById('provider-checkboxes');
+            const usersList = document.getElementById('users-list');
+            const addUserBtn = document.getElementById('add-user-btn');
+            const changePassBtn = document.getElementById('change-password-btn');
+
+            const username = localStorage.getItem('whispad-user') || 'admin';
+            if (userBtn) {
+                userBtn.textContent = username;
+            }
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', () => {
+                    localStorage.removeItem('whispad-auth');
+                    localStorage.removeItem('whispad-user');
+                    window.location.replace('authentication.html');
+                });
+            }
+
+            if (usersBtn) {
+                usersBtn.addEventListener('click', () => {
+                    setupUsersModal();
+                    usersModal.classList.add('active');
+                });
+            }
+            if (closeUsersModal) {
+                closeUsersModal.addEventListener('click', () => {
+                    usersModal.classList.remove('active');
+                });
+            }
+
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    tabPanels.forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    usersModal.querySelector('#tab-' + btn.dataset.tab).classList.add('active');
+                });
+            });
+
+            function loadUsers() {
+                return JSON.parse(localStorage.getItem('whispad-users') || '{}');
+            }
+            function saveUsers(users) {
+                localStorage.setItem('whispad-users', JSON.stringify(users));
+            }
+            function populateProviderCheckboxes(container, selected) {
+                container.innerHTML = '';
+                if (!window.app || !app.availableTranscriptionProviders) return;
+                app.availableTranscriptionProviders.providers.forEach(p => {
+                    const id = 'chk-' + p.id;
+                    const label = document.createElement('label');
+                    label.innerHTML = `<input type="checkbox" value="${p.id}"> ${p.name}`;
+                    const input = label.querySelector('input');
+                    if (selected && selected.includes(p.id)) input.checked = true;
+                    container.appendChild(label);
+                });
+            }
+            function renderUsers() {
+                usersList.innerHTML = '';
+                const users = loadUsers();
+                Object.keys(users).forEach(u => {
+                    if (u === 'admin') return;
+                    const row = document.createElement('div');
+                    row.className = 'user-row';
+                    const name = document.createElement('span');
+                    name.textContent = u;
+                    const providersDiv = document.createElement('div');
+                    providersDiv.className = 'providers';
+                    (app.availableTranscriptionProviders?.providers || []).forEach(p => {
+                        const cb = document.createElement('input');
+                        cb.type = 'checkbox';
+                        cb.value = p.id;
+                        cb.checked = users[u].providers?.includes(p.id);
+                        cb.addEventListener('change', () => {
+                            const data = loadUsers();
+                            const arr = data[u].providers || [];
+                            if (cb.checked) {
+                                if (!arr.includes(p.id)) arr.push(p.id);
+                            } else {
+                                data[u].providers = arr.filter(pr => pr !== p.id);
+                            }
+                            saveUsers(data);
+                        });
+                        const lbl = document.createElement('label');
+                        lbl.appendChild(cb);
+                        lbl.append(' ' + p.name);
+                        providersDiv.appendChild(lbl);
+                    });
+                    const del = document.createElement('button');
+                    del.className = 'btn btn--danger btn--sm';
+                    del.textContent = 'Delete';
+                    del.addEventListener('click', () => {
+                        const data = loadUsers();
+                        delete data[u];
+                        saveUsers(data);
+                        renderUsers();
+                    });
+                    row.appendChild(name);
+                    row.appendChild(providersDiv);
+                    row.appendChild(del);
+                    usersList.appendChild(row);
+                });
+            }
+            function setupUsersModal() {
+                populateProviderCheckboxes(providerCheckboxes);
+                renderUsers();
+                if (username !== 'admin') {
+                    tabButtons.forEach(btn => { if (btn.dataset.tab !== 'change') btn.disabled = true; });
+                    tabPanels.forEach(p => { if (p.id !== 'tab-change') p.classList.remove('active'); });
+                    usersModal.querySelector('.tab-btn[data-tab="change"]').classList.add('active');
+                    document.getElementById('tab-change').classList.add('active');
+                } else {
+                    tabButtons.forEach(btn => btn.disabled = false);
+                }
+            }
+            if (addUserBtn) {
+                addUserBtn.addEventListener('click', () => {
+                    const uname = document.getElementById('new-user').value.trim();
+                    const pass = document.getElementById('new-user-password').value.trim();
+                    if (!uname || !pass) return;
+                    const users = loadUsers();
+                    if (users[uname] || uname === 'admin') return;
+                    const providers = Array.from(providerCheckboxes.querySelectorAll('input:checked')).map(c => c.value);
+                    users[uname] = { password: pass, providers };
+                    saveUsers(users);
+                    fetch(`/api/list-saved-notes?user=${encodeURIComponent(uname)}`).catch(() => {});
+                    document.getElementById('new-user').value = '';
+                    document.getElementById('new-user-password').value = '';
+                    renderUsers();
+                });
+            }
+            if (changePassBtn) {
+                changePassBtn.addEventListener('click', () => {
+                    const current = document.getElementById('current-password').value;
+                    const newp = document.getElementById('new-password').value;
+                    if (!newp) return;
+                    const users = loadUsers();
+                    if (username === 'admin') {
+                        if (current !== 'whispad' && users.admin?.password !== current) return;
+                        users.admin = users.admin || { providers: [] };
+                        users.admin.password = newp;
+                    } else {
+                        if (!users[username] || users[username].password !== current) return;
+                        users[username].password = newp;
+                    }
+                    saveUsers(users);
+                    alert('Password updated');
+                    document.getElementById('current-password').value = '';
+                    document.getElementById('new-password').value = '';
+                });
+            }
+        });
+    </script>
 </body>
 </html>

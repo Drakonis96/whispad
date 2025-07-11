@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WhisPad - Login</title>
+    <link rel="icon" type="image/png" href="logos/logo.png">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: var(--color-background);
+        }
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-form {
+            padding: var(--space-24);
+            border: 1px solid var(--color-card-border);
+            border-radius: var(--radius-lg);
+            background: var(--color-surface);
+            box-shadow: var(--shadow-sm);
+        }
+        .login-logo {
+            display: block;
+            margin: 0 auto var(--space-24);
+            width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="logos/logo.png" alt="WhisPad Logo" class="login-logo">
+        <form class="login-form" id="login-form">
+            <div class="form-group">
+                <label class="form-label" for="username">Username</label>
+                <input type="text" id="username" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="password">Password</label>
+                <input type="password" id="password" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn--primary btn--full-width">Login</button>
+        </form>
+    </div>
+    <script>
+        const form = document.getElementById('login-form');
+        function loadUsers() {
+            return JSON.parse(localStorage.getItem('whispad-users') || '{}');
+        }
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value.trim();
+            const users = loadUsers();
+            if ((user === 'admin' && pass === (users.admin?.password || 'whispad')) ||
+                (users[user] && users[user].password === pass)) {
+                localStorage.setItem('whispad-auth', 'true');
+                localStorage.setItem('whispad-user', user);
+                window.location.href = 'index.html';
+            } else {
+                alert('Invalid credentials');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -146,11 +146,13 @@ class NotesApp {
     
     async migrateExistingNotes() {
         try {
+            const user = localStorage.getItem('whispad-user') || 'admin';
             const response = await fetch('/api/cleanup-notes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ user })
             });
             
             if (response.ok) {
@@ -510,7 +512,8 @@ class NotesApp {
     // Gestión de notas
     async loadNotes() {
         try {
-            const response = await fetch('/api/list-saved-notes');
+            const user = localStorage.getItem('whispad-user') || 'admin';
+            const response = await fetch(`/api/list-saved-notes?user=${encodeURIComponent(user)}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -535,9 +538,10 @@ class NotesApp {
 
     async fetchNoteContent(note) {
         if (!note) return;
+        const user = localStorage.getItem('whispad-user') || 'admin';
         const params = note.id
-            ? `?id=${note.id}`
-            : `?filename=${encodeURIComponent(note.filename)}`;
+            ? `?id=${note.id}&user=${encodeURIComponent(user)}`
+            : `?filename=${encodeURIComponent(note.filename)}&user=${encodeURIComponent(user)}`;
         try {
             const response = await fetch(`/api/get-note${params}`);
             if (!response.ok) {
@@ -1013,6 +1017,7 @@ class NotesApp {
         if (!this.currentNote) return;
         
         try {
+            const user = localStorage.getItem('whispad-user') || 'admin';
             const response = await fetch('/api/save-note', {
                 method: 'POST',
                 headers: {
@@ -1022,7 +1027,8 @@ class NotesApp {
                     id: this.currentNote.id,
                     title: this.currentNote.title,
                     content: this.currentNote.content,
-                    tags: this.currentNote.tags || []
+                    tags: this.currentNote.tags || [],
+                    user
                 })
             });
             
@@ -1064,13 +1070,15 @@ class NotesApp {
     
     async deleteNoteFromServer(noteId) {
         try {
+            const user = localStorage.getItem('whispad-user') || 'admin';
             const response = await fetch('/api/delete-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    id: noteId
+                    id: noteId,
+                    user
                 })
             });
             
@@ -1117,7 +1125,8 @@ class NotesApp {
 
     async downloadAllNotes() {
         try {
-            const response = await fetch('/api/download-all-notes');
+            const user = localStorage.getItem('whispad-user') || 'admin';
+            const response = await fetch(`/api/download-all-notes?user=${encodeURIComponent(user)}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -1281,7 +1290,8 @@ class NotesApp {
     async uploadNoteFile(file) {
         const formData = new FormData();
         formData.append('note', file, file.name);
-        const response = await fetch('/api/upload-note', { method: 'POST', body: formData });
+        const user = localStorage.getItem('whispad-user') || 'admin';
+        const response = await fetch(`/api/upload-note?user=${encodeURIComponent(user)}`, { method: 'POST', body: formData });
         if (!response.ok) {
             throw new Error('Upload failed');
         }
@@ -1464,7 +1474,11 @@ class NotesApp {
         transcriptionProviderSelect.innerHTML = '';
         
         if (this.availableTranscriptionProviders?.providers) {
+            const currentUser = localStorage.getItem('whispad-user') || 'admin';
+            const users = JSON.parse(localStorage.getItem('whispad-users') || '{}');
+            const allowed = currentUser === 'admin' ? null : users[currentUser]?.providers;
             this.availableTranscriptionProviders.providers.forEach(provider => {
+                if (allowed && !allowed.includes(provider.id)) return;
                 const option = document.createElement('option');
                 option.value = provider.id;
                 option.textContent = provider.name;

@@ -515,6 +515,19 @@ pre code {
   background: var(--color-secondary-active);
 }
 
+.btn--danger {
+  background: var(--color-error);
+  color: var(--color-btn-primary-text);
+}
+
+.btn--danger:hover {
+  background: rgba(var(--color-error-rgb), 0.85);
+}
+
+.btn--danger:active {
+  background: rgba(var(--color-error-rgb), 0.75);
+}
+
 .btn--outline {
   background: transparent;
   border: 1px solid var(--color-border);
@@ -2359,3 +2372,26 @@ select.form-control {
     font-size: var(--font-size-sm);
     color: var(--color-text);
 }
+
+/* Users modal */
+.tabs {
+    display: flex;
+    gap: var(--space-8);
+    margin-bottom: var(--space-16);
+}
+.tab-btn {
+    padding: var(--space-8) var(--space-16);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    cursor: pointer;
+    border-radius: var(--radius-base);
+}
+.tab-btn.active {
+    background: var(--color-primary);
+    color: var(--color-btn-primary-text);
+    border-color: var(--color-primary);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+.user-row { display: flex; align-items: center; gap: var(--space-12); margin-bottom: var(--space-8); }
+.user-row .providers { flex-grow: 1; display: flex; gap: var(--space-8); flex-wrap: wrap; }

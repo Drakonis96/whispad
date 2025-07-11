@@ -28,6 +28,47 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
 cors_origins = os.getenv('CORS_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://localhost:5037').split(',')
 CORS(app, origins=cors_origins)
 
+# Directorios para notas
+SAVED_NOTES_ROOT = os.path.join(os.getcwd(), 'saved_notes')
+ADMIN_NOTES_DIR = os.path.join(SAVED_NOTES_ROOT, 'admin')
+
+def get_notes_dir_for_user(username: str) -> str:
+    """Return the notes directory for the given user, creating it if needed."""
+    if not username:
+        username = 'admin'
+    if username == 'admin':
+        os.makedirs(ADMIN_NOTES_DIR, exist_ok=True)
+        return ADMIN_NOTES_DIR
+    user_dir = os.path.join(SAVED_NOTES_ROOT, username)
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
+def get_request_username() -> str:
+    """Extract username from query params or JSON payload."""
+    if request.method == 'GET':
+        return request.args.get('user', 'admin')
+    data = request.get_json(silent=True) or {}
+    return data.get('user', 'admin')
+
+def migrate_notes_to_admin():
+    """Mueve notas existentes al directorio admin dentro de saved_notes."""
+    try:
+        os.makedirs(ADMIN_NOTES_DIR, exist_ok=True)
+        for filename in os.listdir(SAVED_NOTES_ROOT):
+            if filename == 'admin':
+                continue
+            if filename.endswith('.md') or filename.endswith('.meta'):
+                src = os.path.join(SAVED_NOTES_ROOT, filename)
+                dst = os.path.join(ADMIN_NOTES_DIR, filename)
+                try:
+                    shutil.move(src, dst)
+                except Exception as e:
+                    print(f"Error moving {filename} to admin: {e}")
+    except Exception as e:
+        print(f"Error migrating notes: {e}")
+
+migrate_notes_to_admin()
+
 # Configuración de APIs
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
@@ -1004,7 +1045,7 @@ def stream_transcription_response(response):
 
 @app.route('/api/save-note', methods=['POST'])
 def save_note():
-    """Endpoint para guardar una nota como archivo .md en el directorio saved_notes"""
+    """Endpoint para guardar una nota como archivo .md en saved_notes/admin"""
     try:
         data = request.get_json()
         
@@ -1028,9 +1069,9 @@ def save_note():
         if not title and not content:
             return jsonify({"error": "La nota debe tener al menos un título o contenido"}), 400
         
-        # Crear directorio saved_notes si no existe
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
-        os.makedirs(saved_notes_dir, exist_ok=True)
+        # Directorio de notas para el usuario
+        username = get_request_username()
+        saved_notes_dir = get_notes_dir_for_user(username)
         
         # Generar nombre de archivo seguro basado en el título
         if not title:
@@ -1233,10 +1274,11 @@ def check_apis():
 def list_saved_notes():
     """Endpoint para listar las notas guardadas en el servidor"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_request_username()
+        saved_notes_dir = get_notes_dir_for_user(username)
         
         if not os.path.exists(saved_notes_dir):
-            return jsonify({"notes": [], "message": "Directorio saved_notes no existe"})
+            return jsonify({"notes": [], "message": "Directorio saved_notes/admin no existe"})
         
         # Listar todos los archivos .md en el directorio
         notes = []
@@ -1284,7 +1326,8 @@ def list_saved_notes():
 def cleanup_notes():
     """Endpoint para migrar notas existentes sin ID a la nueva estructura"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_request_username()
+        saved_notes_dir = get_notes_dir_for_user(username)
         if not os.path.exists(saved_notes_dir):
             return jsonify({"message": "No hay directorio de notas guardadas"}), 200
         
@@ -1334,16 +1377,17 @@ def delete_note():
         if not data:
             return jsonify({"error": "No se recibieron datos"}), 400
         
+        username = get_request_username()
         note_id = data.get('id')
         
         if not note_id:
             return jsonify({"error": "ID de nota requerido"}), 400
         
         # Buscar el archivo correspondiente al note_id
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        saved_notes_dir = get_notes_dir_for_user(username)
         
         if not os.path.exists(saved_notes_dir):
-            return jsonify({"error": "Directorio de notas no existe"}), 404
+            return jsonify({"error": "Directorio de notas admin no existe"}), 404
         
         # Buscar archivo con este note_id en metadatos
         deleted_file = None
@@ -1384,7 +1428,8 @@ def delete_note():
 def list_notes():
     """Endpoint para listar notas (guardadas y no guardadas) en el servidor"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_request_username()
+        saved_notes_dir = get_notes_dir_for_user(username)
         
         # Obtener todas las notas guardadas
         saved_notes = []
@@ -1431,7 +1476,8 @@ def list_notes():
 def download_all_notes():
     """Descarga todas las notas guardadas como un archivo ZIP"""
     try:
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        username = get_request_username()
+        saved_notes_dir = get_notes_dir_for_user(username)
         if not os.path.exists(saved_notes_dir):
             return jsonify({"error": "No hay notas guardadas"}), 404
 
@@ -1447,7 +1493,7 @@ def download_all_notes():
 
 @app.route('/api/upload-note', methods=['POST'])
 def upload_note():
-    """Sube una nota markdown al directorio saved_notes"""
+    """Sube una nota markdown al directorio saved_notes/admin"""
     try:
         if 'note' not in request.files:
             return jsonify({"error": "No se recibió archivo"}), 400
@@ -1460,8 +1506,8 @@ def upload_note():
         if ext not in ['.md', '.meta']:
             return jsonify({"error": "Tipo de archivo no válido"}), 400
 
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
-        os.makedirs(saved_notes_dir, exist_ok=True)
+        username = get_request_username()
+        saved_notes_dir = get_notes_dir_for_user(username)
         filepath = os.path.join(saved_notes_dir, note_file.filename)
         overwritten = os.path.exists(filepath)
         note_file.save(filepath)
@@ -1831,10 +1877,11 @@ def get_note():
     try:
         note_id = request.args.get('id')
         filename = request.args.get('filename')
+        username = request.args.get('user', 'admin')
 
-        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes')
+        saved_notes_dir = get_notes_dir_for_user(username)
         if not os.path.exists(saved_notes_dir):
-            return jsonify({"error": "Directorio de notas no existe"}), 404
+            return jsonify({"error": "Directorio de notas admin no existe"}), 404
 
         filepath = None
         if note_id:

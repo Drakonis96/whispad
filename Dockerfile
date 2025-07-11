@@ -83,8 +83,8 @@ RUN mkdir -p /var/log/nginx && \
     chmod 666 /var/log/nginx/error.log
 
 # Crear directorio para notas guardadas con permisos apropiados
-RUN mkdir -p /app/saved_notes && \
-    chmod 777 /app/saved_notes
+RUN mkdir -p /app/saved_notes/admin && \
+    chmod 777 /app/saved_notes /app/saved_notes/admin
 
 # Hacer ejecutable el script de inicio
 RUN chmod +x start.sh

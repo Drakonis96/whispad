@@ -20,8 +20,8 @@ if [ ! -f /etc/nginx/certs/selfsigned.crt ]; then
 fi
 
 # Crear y configurar directorio para notas guardadas
-mkdir -p /app/saved_notes
-chmod 777 /app/saved_notes
+mkdir -p /app/saved_notes/admin
+chmod 777 /app/saved_notes /app/saved_notes/admin
 
 # Asegurar que los archivos estáticos tengan los permisos correctos
 echo "Configurando permisos de archivos estáticos..."
