@@ -983,7 +983,12 @@ class NotesApp {
     }
     
     saveToStorage() {
-        localStorage.setItem('notes-app-data', JSON.stringify(this.notes));
+        if (!currentUser) {
+            console.warn('Cannot save to storage: currentUser is not set');
+            return;
+        }
+        const storageKey = `notes-app-data-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.notes));
     }
     
     async createNewNote() {
@@ -4041,6 +4046,9 @@ document.addEventListener('DOMContentLoaded', () => {
             allowedPostprocessProviders = data.postprocess_providers || [];
             isAdmin = data.is_admin;
 
+            // Clear any old localStorage data from previous sessions
+            localStorage.removeItem('notes-app-data'); // Remove old global key
+
             await loadDefaultProviderConfig();
             if (!isAdmin) {
                 const cfgKey = `notes-app-config-${currentUser}`;
@@ -4103,6 +4111,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 allowedTranscriptionProviders = data.transcription_providers || [];
                 allowedPostprocessProviders = data.postprocess_providers || [];
                 isAdmin = data.is_admin;
+                
+                // Clear any old localStorage data from previous sessions
+                localStorage.removeItem('notes-app-data'); // Remove old global key
+                
                 await loadDefaultProviderConfig();
                 if (!isAdmin) {
                     const cfgKey = `notes-app-config-${currentUser}`;
@@ -4161,13 +4173,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     logoutBtn.addEventListener('click', async () => {
         await authFetch('/api/logout', { method: 'POST' });
+        
+        // Clear user-specific localStorage data
+        const userStorageKey = `notes-app-data-${currentUser}`;
+        localStorage.removeItem(userStorageKey);
+        localStorage.removeItem('notes-app-session');
+        
+        // Also clean up any old global localStorage data that might exist
+        localStorage.removeItem('notes-app-data');
+        
         authToken = '';
         currentUser = '';
         allowedTranscriptionProviders = [];
         allowedPostprocessProviders = [];
         isAdmin = false;
-        localStorage.removeItem('notes-app-session');
-        localStorage.removeItem('notes-app-data');
         usernameInput.value = '';
         passwordInput.value = '';
         currentUserBtn.classList.add('hidden');
