@@ -700,8 +700,9 @@ class NotesApp {
 
     async transcribeWithOpenAI(audioBlob) {
         try {
+            const model = this.config.transcriptionModel;
             // Usar el backend en lugar de la API directamente
-            return await backendAPI.transcribeAudio(audioBlob);
+            return await backendAPI.transcribeAudio(audioBlob, 'auto', model);
         } catch (error) {
             throw new Error(`Transcription error: ${error.message}`);
         }
@@ -825,7 +826,7 @@ class NotesApp {
             expandir: `Expande el siguiente texto añadiendo más detalles y contexto relevante. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`
         };
 
-        const model = this.config.postprocessModel || 'gpt-4o-mini';
+        const model = this.config.postprocessModel;
         
         // Aplicar configuración según el estilo de respuesta
         let temperature = this.config.temperature || 0.3;
@@ -884,7 +885,7 @@ class NotesApp {
             expandir: `Expande el siguiente texto añadiendo más detalles y contexto relevante. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`
         };
 
-        const model = this.config.postprocessModel || 'gemini-2.0-flash';
+        const model = this.config.postprocessModel;
         
         // Aplicar configuración según el estilo de respuesta
         let temperature = this.config.temperature || 0.3;

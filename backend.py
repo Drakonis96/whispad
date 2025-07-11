@@ -459,10 +459,13 @@ def transcribe_audio():
             if not OPENAI_API_KEY:
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
             
+            if not model_name:
+                return jsonify({"error": "Model name required"}), 400
             # Preparar la petición a OpenAI
+            model_to_use = model_name
             files = {
                 'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
-                'model': (None, 'whisper-1')
+                'model': (None, model_to_use)
             }
             
             # Solo añadir language si se especifica (None = auto-detectar)
@@ -484,7 +487,7 @@ def transcribe_audio():
                 return jsonify({
                     "transcription": result.get('text', ''),
                     "provider": "openai",
-                    "model": "whisper-1"
+                    "model": model_to_use
                 })
             else:
                 return jsonify({"error": "Error en la transcripción"}), response.status_code
@@ -516,11 +519,16 @@ def improve_text():
         
         if stream:
             if provider == 'openai':
-                return improve_text_openai_stream(text, improvement_type, custom_prompt)
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model name required"}), 400
+                return improve_text_openai_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
                 return improve_text_google_stream(text, improvement_type, custom_prompt)
             elif provider == 'openrouter':
-                model = data.get('model', 'google/gemma-3-27b-it:free')
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model name required"}), 400
                 return improve_text_openrouter_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'lmstudio':
                 model = data.get('model')
@@ -536,11 +544,16 @@ def improve_text():
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
             if provider == 'openai':
-                return improve_text_openai(text, improvement_type, custom_prompt)
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model name required"}), 400
+                return improve_text_openai(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
                 return improve_text_google(text, improvement_type, custom_prompt)
             elif provider == 'openrouter':
-                model = data.get('model', 'google/gemma-3-27b-it:free')
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model name required"}), 400
                 return improve_text_openrouter(text, improvement_type, model, custom_prompt)
             elif provider == 'lmstudio':
                 model = data.get('model')
@@ -558,7 +571,7 @@ def improve_text():
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-def improve_text_openai(text, improvement_type, custom_prompt=None):
+def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenAI"""
     if not OPENAI_API_KEY:
         return jsonify({"error": "API key de OpenAI no configurada"}), 500
@@ -586,8 +599,11 @@ def improve_text_openai(text, improvement_type, custom_prompt=None):
         'Content-Type': 'application/json'
     }
     
+    if not model:
+        return jsonify({"error": "Model name required"}), 400
+
     payload = {
-        'model': 'gpt-3.5-turbo',
+        'model': model,
         'messages': [
             {
                 'role': 'user',
@@ -656,7 +672,7 @@ def improve_text_google(text, improvement_type, custom_prompt=None):
     else:
         return jsonify({"error": "Error al mejorar el texto con Google AI"}), response.status_code
 
-def improve_text_openai_stream(text, improvement_type, custom_prompt=None):
+def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenAI con streaming"""
     if not OPENAI_API_KEY:
         return jsonify({"error": "API key de OpenAI no configurada"}), 500
@@ -684,8 +700,13 @@ def improve_text_openai_stream(text, improvement_type, custom_prompt=None):
         'Content-Type': 'application/json'
     }
     
+    if not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Model name required'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
     payload = {
-        'model': 'gpt-3.5-turbo',
+        'model': model,
         'messages': [
             {
                 'role': 'user',
@@ -815,7 +836,7 @@ def improve_text_google_stream(text, improvement_type, custom_prompt=None):
     
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
-def improve_text_openrouter(text, improvement_type, model='google/gemma-3-27b-it:free', custom_prompt=None):
+def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenRouter"""
     if not OPENROUTER_API_KEY:
         return jsonify({"error": "API key de OpenRouter no configurada"}), 500
@@ -845,6 +866,9 @@ def improve_text_openrouter(text, improvement_type, model='google/gemma-3-27b-it
         'X-Title': 'Note Transcribe AI'
     }
     
+    if not model:
+        return jsonify({"error": "Model name required"}), 400
+
     payload = {
         'model': model,
         'messages': [
@@ -883,7 +907,7 @@ def improve_text_openrouter(text, improvement_type, model='google/gemma-3-27b-it
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-def improve_text_openrouter_stream(text, improvement_type, model='google/gemma-3-27b-it:free', custom_prompt=None):
+def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenRouter con streaming"""
     if not OPENROUTER_API_KEY:
         def generate_error():
@@ -915,6 +939,11 @@ def improve_text_openrouter_stream(text, improvement_type, model='google/gemma-3
         'X-Title': 'Note Transcribe AI'
     }
     
+    if not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Model name required'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
     payload = {
         'model': model,
         'messages': [

@@ -30,7 +30,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai') {
+    async transcribeAudio(audioBlob, language = 'auto', model, provider = 'openai') {
         try {
             const formData = new FormData();
             
@@ -49,6 +49,9 @@ class BackendAPI {
             console.log('Audio blob type:', audioBlob.type, 'Using filename:', filename);
             
             formData.append('audio', audioBlob, filename);
+            if (!model) {
+                throw new Error('Model name required');
+            }
             formData.append('model', model);
             formData.append('provider', provider);
             
@@ -278,7 +281,7 @@ class BackendAPI {
             console.log('Options recibidas:', options);
             
             const {
-                model = 'gpt-4o-mini-transcribe',
+                model,
                 language = 'auto',
                 prompt = null,
                 responseFormat = 'json',
@@ -298,6 +301,9 @@ class BackendAPI {
                 stream = false;
             }
 
+            if (!model) {
+                throw new Error('Model name required');
+            }
             // Validar modelo
             if (!['gpt-4o-transcribe', 'gpt-4o-mini-transcribe'].includes(model)) {
                 throw new Error("Modelo no válido. Use 'gpt-4o-transcribe' o 'gpt-4o-mini-transcribe'");

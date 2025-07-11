@@ -2716,7 +2716,7 @@ class NotesApp {
             const customPrompt = (style && style.custom) ? style.prompt : null;
             
             // Usar el backend en lugar de la API directamente
-            return await backendAPI.improveText(text, action, 'openai', false, null, customPrompt);
+            return await backendAPI.improveText(text, action, 'openai', false, this.config.postprocessModel, customPrompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenAI: ${error.message}`);
         }
@@ -2730,7 +2730,7 @@ class NotesApp {
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
             
-            const response = await backendAPI.improveText(text, action, 'openai', true, null, customPrompt);
+            const response = await backendAPI.improveText(text, action, 'openai', true, this.config.postprocessModel, customPrompt);
             
             if (!response.body) {
                 throw new Error('No response body received');
@@ -3697,10 +3697,6 @@ class NotesApp {
             }
         }
 
-        // Fallbacks for known providers
-        if (provider === 'openai' && models.length === 0) {
-            models = ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'];
-        }
 
         // Add options to dropdown
         models.forEach(model => {
