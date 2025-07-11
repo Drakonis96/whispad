@@ -493,10 +493,12 @@ class NotesApp {
             }
         });
 
-        document.getElementById('create-user-btn').addEventListener('click', async () => {
+        const createUserBtn = document.getElementById('create-user-btn');
+        createUserBtn.addEventListener('click', async () => {
             const u = document.getElementById('create-username').value.trim();
             const p = document.getElementById('create-password').value;
             if (!u || !p) return;
+            createUserBtn.disabled = true;
             const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
             const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
             const resp = await authFetch('/api/create-user', {
@@ -509,6 +511,7 @@ class NotesApp {
                     postprocess_providers: ppProviders
                 })
             });
+            createUserBtn.disabled = false;
             if (resp.ok) {
                 alert('User created');
                 document.getElementById('create-username').value = '';
@@ -516,7 +519,8 @@ class NotesApp {
                 document.querySelectorAll('#create-tab input[type="checkbox"]').forEach(cb => cb.checked = false);
                 await refreshUserList();
             } else {
-                alert('Error creating user');
+                const data = await resp.json().catch(() => ({}));
+                alert(data.error || 'Error creating user');
             }
         });
 
@@ -4016,6 +4020,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginBtn = document.getElementById('login-submit');
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
+    const togglePasswordBtn = document.getElementById('toggle-password');
     const currentUserBtn = document.getElementById('current-user-btn');
     const logoutBtn = document.getElementById('logout-btn');
 
@@ -4094,6 +4099,13 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.addEventListener('click', attemptLogin);
     usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
     passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    if (togglePasswordBtn) {
+        togglePasswordBtn.addEventListener('click', () => {
+            const isHidden = passwordInput.getAttribute('type') === 'password';
+            passwordInput.setAttribute('type', isHidden ? 'text' : 'password');
+            togglePasswordBtn.innerHTML = isHidden ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+        });
+    }
 
     logoutBtn.addEventListener('click', async () => {
         await authFetch('/api/logout', { method: 'POST' });

@@ -1297,7 +1297,32 @@ select.form-control {
 }
 
 .login-box h3 {
-    margin-bottom: var(--space-24);
+    margin-bottom: var(--space-32);
+}
+
+/* Align login button */
+.login-box .modal-actions {
+    justify-content: center;
+    margin-top: var(--space-16);
+}
+
+.password-wrapper {
+    position: relative;
+}
+
+.toggle-password {
+    position: absolute;
+    top: 50%;
+    right: var(--space-8);
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+}
+
+.toggle-password:focus {
+    outline: none;
 }
 
 .modal-content--wide {

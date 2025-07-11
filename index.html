@@ -16,10 +16,15 @@
             <h3>Login</h3>
             <div class="modal-body">
                 <input type="text" class="form-control" id="login-username" placeholder="Username">
-                <input type="password" class="form-control" id="login-password" placeholder="Password" style="margin-top:10px;">
+                <div class="password-wrapper" style="margin-top:10px;">
+                    <input type="password" class="form-control" id="login-password" placeholder="Password">
+                    <button type="button" class="toggle-password" id="toggle-password" aria-label="Show password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
             </div>
             <div class="modal-actions">
-                <button class="btn btn--primary" id="login-submit">Login</button>
+                <button type="button" class="btn btn--primary" id="login-submit">Login</button>
             </div>
         </div>
     </div>
@@ -53,7 +58,7 @@
                         <label><input type="checkbox" class="create-postprocess-provider" value="lmstudio"> LM Studio</label>
                         <label><input type="checkbox" class="create-postprocess-provider" value="ollama"> Ollama</label>
                     </div>
-                    <button class="btn btn--primary btn--sm" id="create-user-btn" style="margin-top:10px;">Create</button>
+                    <button type="button" class="btn btn--primary btn--sm" id="create-user-btn" style="margin-top:10px;">Create</button>
                 </div>
                 <div class="tab-content admin-only" id="list-tab" style="display:none;">
                     <ul id="users-list"></ul>
