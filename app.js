@@ -401,178 +401,6 @@ class NotesApp {
         document.getElementById('styles-config-btn').addEventListener('click', () => {
             this.showStylesConfigModal();
         });
-
-        async function refreshUserList() {
-            const listResp = await authFetch('/api/list-users');
-            if (listResp.ok) {
-                const data = await listResp.json();
-                const list = document.getElementById('users-list');
-                list.innerHTML = '';
-                data.users.filter(u => u.username !== 'admin').forEach(u => {
-                    const li = document.createElement('li');
-                    li.className = 'user-item';
-                    const title = document.createElement('strong');
-                    title.textContent = u.username;
-                    li.appendChild(title);
-
-                    const tGroup = document.createElement('div');
-                    tGroup.className = 'provider-group';
-                    tGroup.append('Transcription: ');
-                    TRANSCRIPTION_PROVIDERS.forEach(p => {
-                        const label = document.createElement('label');
-                        label.style.marginRight = '6px';
-                        const cb = document.createElement('input');
-                        cb.type = 'checkbox';
-                        cb.value = p;
-                        cb.className = 'edit-transcription';
-                        if ((u.transcription_providers || []).includes(p)) cb.checked = true;
-                        label.appendChild(cb);
-                        label.append(' ' + (PROVIDER_LABELS[p] || p));
-                        tGroup.appendChild(label);
-                    });
-                    li.appendChild(tGroup);
-
-                    const ppGroup = document.createElement('div');
-                    ppGroup.className = 'provider-group';
-                    ppGroup.append('Post-process: ');
-                    POSTPROCESS_PROVIDERS.forEach(p => {
-                        const label = document.createElement('label');
-                        label.style.marginRight = '6px';
-                        const cb = document.createElement('input');
-                        cb.type = 'checkbox';
-                        cb.value = p;
-                        cb.className = 'edit-postprocess';
-                        if ((u.postprocess_providers || []).includes(p)) cb.checked = true;
-                        label.appendChild(cb);
-                        label.append(' ' + (PROVIDER_LABELS[p] || p));
-                        ppGroup.appendChild(label);
-                    });
-                    li.appendChild(ppGroup);
-
-                    const saveBtn = document.createElement('button');
-                    saveBtn.className = 'btn btn--primary btn--sm';
-                    saveBtn.textContent = 'Save';
-                    saveBtn.addEventListener('click', async () => {
-                        const tProviders = Array.from(li.querySelectorAll('.edit-transcription:checked')).map(c => c.value);
-                        const ppProviders = Array.from(li.querySelectorAll('.edit-postprocess:checked')).map(c => c.value);
-                        const resp2 = await authFetch('/api/update-user-providers', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                username: u.username,
-                                transcription_providers: tProviders,
-                                postprocess_providers: ppProviders
-                            })
-                        });
-                        if (resp2.ok) {
-                            alert('Updated ' + u.username);
-                        } else {
-                            alert('Error updating user');
-                        }
-                    });
-
-                    const delBtn = document.createElement('button');
-                    delBtn.className = 'btn btn--error btn--sm';
-                    delBtn.textContent = 'Delete';
-                    delBtn.style.marginLeft = '6px';
-                    delBtn.addEventListener('click', async () => {
-                        if (!confirm('Delete user ' + u.username + '?')) return;
-                        const resp3 = await authFetch('/api/delete-user', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ username: u.username })
-                        });
-                        if (resp3.ok) {
-                            alert('User deleted');
-                            await refreshUserList();
-                        } else {
-                            alert('Error deleting user');
-                        }
-                    });
-
-                    li.appendChild(saveBtn);
-                    li.appendChild(delBtn);
-
-                    list.appendChild(li);
-                });
-            }
-        }
-
-        document.getElementById('user-btn').addEventListener('click', async () => {
-            document.getElementById('user-modal').classList.add('active');
-            document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
-            document.getElementById('password-tab').style.display = 'block';
-            await refreshUserList();
-        });
-        document.getElementById('close-user-modal').addEventListener('click', () => {
-            document.getElementById('user-modal').classList.remove('active');
-        });
-
-        document.querySelectorAll('#user-modal .tab-buttons button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const tab = btn.getAttribute('data-tab');
-                document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
-                document.getElementById(tab).style.display = 'block';
-            });
-        });
-
-        document.getElementById('change-password-btn').addEventListener('click', async () => {
-            const current = document.getElementById('current-password').value;
-            const newPass = document.getElementById('new-password').value;
-            const confirmPass = document.getElementById('confirm-password').value;
-            if (!current || !newPass || !confirmPass) return;
-            if (newPass !== confirmPass) {
-                alert('Passwords do not match');
-                return;
-            }
-            const resp = await authFetch('/api/change-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ current_password: current, new_password: newPass })
-            });
-            if (resp.ok) {
-                alert('Password updated');
-                document.getElementById('current-password').value = '';
-                document.getElementById('new-password').value = '';
-                document.getElementById('confirm-password').value = '';
-            } else {
-                const data = await resp.json().catch(() => ({}));
-                alert(data.error || 'Error updating password');
-            }
-        });
-
-        const createUserBtn = document.getElementById('create-user-btn');
-        createUserBtn.addEventListener('click', async () => {
-            const u = document.getElementById('create-username').value.trim();
-            const p = document.getElementById('create-password').value;
-            if (!u || !p) return;
-            createUserBtn.disabled = true;
-            const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
-            const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
-            const resp = await authFetch('/api/create-user', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    username: u,
-                    password: p,
-                    transcription_providers: tProviders,
-                    postprocess_providers: ppProviders
-                })
-            });
-            createUserBtn.disabled = false;
-            if (resp.ok) {
-                alert('User created');
-                document.getElementById('create-username').value = '';
-                document.getElementById('create-password').value = '';
-                document.querySelectorAll('#create-tab input[type="checkbox"]').forEach(cb => cb.checked = false);
-                await refreshUserList();
-            } else {
-                const data = await resp.json().catch(() => ({}));
-                alert(data.error || 'Error creating user');
-            }
-        });
-
-        document.getElementById('user-btn').classList.remove('hidden');
         
         document.getElementById('cancel-config').addEventListener('click', () => {
             this.hideConfigModal();
@@ -4237,6 +4065,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUserBtn.textContent = currentUser;
             currentUserBtn.classList.remove('hidden');
             logoutBtn.classList.remove('hidden');
+            document.getElementById('user-btn').classList.remove('hidden');
             loginScreen.classList.add('hidden');
             appContent.classList.remove('hidden');
             initApp();
@@ -4299,6 +4128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentUserBtn.textContent = username;
                 currentUserBtn.classList.remove('hidden');
                 logoutBtn.classList.remove('hidden');
+                document.getElementById('user-btn').classList.remove('hidden');
                 loginScreen.classList.add('hidden');
                 appContent.classList.remove('hidden');
                 initApp();
@@ -4342,6 +4172,179 @@ document.addEventListener('DOMContentLoaded', () => {
         loginScreen.classList.remove('hidden');
         appContent.classList.add('hidden');
     });
+
+    async function refreshUserList() {
+        const listResp = await authFetch('/api/list-users');
+        if (listResp.ok) {
+            const data = await listResp.json();
+            const list = document.getElementById('users-list');
+            list.innerHTML = '';
+            data.users.filter(u => u.username !== 'admin').forEach(u => {
+                const li = document.createElement('li');
+                li.className = 'user-item';
+                const title = document.createElement('strong');
+                title.textContent = u.username;
+                li.appendChild(title);
+
+                const tGroup = document.createElement('div');
+                tGroup.className = 'provider-group';
+                tGroup.append('Transcription: ');
+                TRANSCRIPTION_PROVIDERS.forEach(p => {
+                    const label = document.createElement('label');
+                    label.style.marginRight = '6px';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.value = p;
+                    cb.className = 'edit-transcription';
+                    if ((u.transcription_providers || []).includes(p)) cb.checked = true;
+                    label.appendChild(cb);
+                    label.append(' ' + (PROVIDER_LABELS[p] || p));
+                    tGroup.appendChild(label);
+                });
+                li.appendChild(tGroup);
+
+                const ppGroup = document.createElement('div');
+                ppGroup.className = 'provider-group';
+                ppGroup.append('Post-process: ');
+                POSTPROCESS_PROVIDERS.forEach(p => {
+                    const label = document.createElement('label');
+                    label.style.marginRight = '6px';
+                    const cb = document.createElement('input');
+                    cb.type = 'checkbox';
+                    cb.value = p;
+                    cb.className = 'edit-postprocess';
+                    if ((u.postprocess_providers || []).includes(p)) cb.checked = true;
+                    label.appendChild(cb);
+                    label.append(' ' + (PROVIDER_LABELS[p] || p));
+                    ppGroup.appendChild(label);
+                });
+                li.appendChild(ppGroup);
+
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'btn btn--primary btn--sm';
+                saveBtn.textContent = 'Save';
+                saveBtn.addEventListener('click', async () => {
+                    const tProviders = Array.from(li.querySelectorAll('.edit-transcription:checked')).map(c => c.value);
+                    const ppProviders = Array.from(li.querySelectorAll('.edit-postprocess:checked')).map(c => c.value);
+                    const resp2 = await authFetch('/api/update-user-providers', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            username: u.username,
+                            transcription_providers: tProviders,
+                            postprocess_providers: ppProviders
+                        })
+                    });
+                    if (resp2.ok) {
+                        alert('Updated ' + u.username);
+                    } else {
+                        alert('Error updating user');
+                    }
+                });
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'btn btn--error btn--sm';
+                delBtn.textContent = 'Delete';
+                delBtn.style.marginLeft = '6px';
+                delBtn.addEventListener('click', async () => {
+                    if (!confirm('Delete user ' + u.username + '?')) return;
+                    const resp3 = await authFetch('/api/delete-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username: u.username })
+                    });
+                    if (resp3.ok) {
+                        alert('User deleted');
+                        await refreshUserList();
+                    } else {
+                        alert('Error deleting user');
+                    }
+                });
+
+                li.appendChild(saveBtn);
+                li.appendChild(delBtn);
+
+                list.appendChild(li);
+            });
+        }
+    }
+
+    document.getElementById('user-btn').addEventListener('click', async () => {
+        document.getElementById('user-modal').classList.add('active');
+        document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
+        document.getElementById('password-tab').style.display = 'block';
+        await refreshUserList();
+    });
+
+    document.getElementById('close-user-modal').addEventListener('click', () => {
+        document.getElementById('user-modal').classList.remove('active');
+    });
+
+    document.querySelectorAll('#user-modal .tab-buttons button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.getAttribute('data-tab');
+            document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById(tab).style.display = 'block';
+        });
+    });
+
+    document.getElementById('change-password-btn').addEventListener('click', async () => {
+        const current = document.getElementById('current-password').value;
+        const newPass = document.getElementById('new-password').value;
+        const confirmPass = document.getElementById('confirm-password').value;
+        if (!current || !newPass || !confirmPass) return;
+        if (newPass !== confirmPass) {
+            alert('Passwords do not match');
+            return;
+        }
+        const resp = await authFetch('/api/change-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: current, new_password: newPass })
+        });
+        if (resp.ok) {
+            alert('Password updated');
+            document.getElementById('current-password').value = '';
+            document.getElementById('new-password').value = '';
+            document.getElementById('confirm-password').value = '';
+        } else {
+            const data = await resp.json().catch(() => ({}));
+            alert(data.error || 'Error updating password');
+        }
+    });
+
+    const createUserBtn = document.getElementById('create-user-btn');
+    createUserBtn.addEventListener('click', async () => {
+        const u = document.getElementById('create-username').value.trim();
+        const p = document.getElementById('create-password').value;
+        if (!u || !p) return;
+        createUserBtn.disabled = true;
+        const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
+        const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
+        const resp = await authFetch('/api/create-user', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: u,
+                password: p,
+                transcription_providers: tProviders,
+                postprocess_providers: ppProviders
+            })
+        });
+        createUserBtn.disabled = false;
+        if (resp.ok) {
+            alert('User created');
+            document.getElementById('create-username').value = '';
+            document.getElementById('create-password').value = '';
+            document.querySelectorAll('#create-tab input[type="checkbox"]').forEach(cb => cb.checked = false);
+            await refreshUserList();
+        } else {
+            const data = await resp.json().catch(() => ({}));
+            alert(data.error || 'Error creating user');
+        }
+    });
+
+    document.getElementById('user-btn').classList.remove('hidden');
 });
 
 // Actualizar botones de formato cuando cambia la selección
