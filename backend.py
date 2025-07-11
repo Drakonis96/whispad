@@ -7,6 +7,7 @@ import re
 import requests
 import json
 import time
+import uuid
 from dotenv import load_dotenv
 import tempfile
 import base64
@@ -1193,7 +1194,7 @@ def save_note():
         
         title = data.get('title', '').strip()
         content = data.get('content', '').strip()
-        note_id = data.get('id', '')
+        note_id = data.get('id')
         tags = data.get('tags', [])
         if isinstance(tags, str):
             tags = [t.strip().lower() for t in tags.split(';') if t.strip()]
@@ -1203,7 +1204,8 @@ def save_note():
             tags = []
         
         if not note_id:
-            return jsonify({"error": "Se requiere un ID de nota"}), 400
+            # Generate a UUID if no ID was provided to ensure the note is saved
+            note_id = str(uuid.uuid4())
         
         if not title and not content:
             return jsonify({"error": "La nota debe tener al menos un título o contenido"}), 400
@@ -1292,6 +1294,17 @@ def save_note():
             "updated": datetime.now().isoformat(),
             "tags": tags
         }
+        if os.path.exists(meta_filepath):
+            try:
+                with open(meta_filepath, 'r', encoding='utf-8') as meta_file:
+                    existing_meta = json.load(meta_file)
+                if 'created' in existing_meta:
+                    metadata['created'] = existing_meta['created']
+            except Exception:
+                pass
+        else:
+            metadata['created'] = datetime.now().isoformat()
+
         with open(meta_filepath, 'w', encoding='utf-8') as meta_file:
             json.dump(metadata, meta_file, ensure_ascii=False, indent=2)
 

@@ -111,6 +111,37 @@ The webhook payload now includes the username so your workflow can fetch the not
 5. Download additional whisper.cpp models from the **Models** menu (you can still drag and drop your own files) and enjoy offline transcription.
 6. Use the **Restore** menu to import previously saved notes.
 
+### Testing the note saving API
+You can verify that notes are stored server side with a simple curl sequence:
+
+```bash
+# obtain an auth token
+TOKEN=$(curl -s -X POST http://localhost:8000/api/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"whispad"}' | jq -r '.token')
+
+# save a new note
+curl -X POST http://localhost:8000/api/save-note \
+  -H "Content-Type: application/json" \
+  -H "Authorization: $TOKEN" \
+  -d '{"title":"Sample","content":"Example note"}'
+```
+
+A minimal Python example looks like this:
+
+```python
+import requests
+
+tok = requests.post("http://localhost:8000/api/login",
+                    json={"username": "admin", "password": "whispad"}).json()["token"]
+res = requests.post("http://localhost:8000/api/save-note",
+                    headers={"Authorization": tok},
+                    json={"title": "Sample", "content": "From Python"})
+print(res.json())
+```
+
+Saved files will appear under `saved_notes/<username>`.
+
 With these instructions you should have WhisPad running in just a few minutes with or without Docker. Enjoy fast transcription and all the benefits of organizing your ideas in one place!
 
 ## Screenshots
