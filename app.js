@@ -7,6 +7,7 @@ const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
 const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
 let allowedTranscriptionProviders = [];
 let allowedPostprocessProviders = [];
+let defaultProviderConfig = {};
 
 function authFetch(url, options = {}) {
     options.headers = options.headers || {};
@@ -912,8 +913,15 @@ class NotesApp {
         this.toggleOllamaOptions();
 
         if (!isAdmin) {
-            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
+            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea').forEach(el => {
                 el.disabled = true;
+            });
+            document.querySelectorAll('#config-modal .restricted-option button').forEach(btn => {
+                if (btn.id === 'update-lmstudio-models-btn' || btn.id === 'update-ollama-models-btn') {
+                    btn.disabled = false;
+                } else {
+                    btn.disabled = true;
+                }
             });
         } else {
             document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
@@ -4021,11 +4029,33 @@ class NotesApp {
     }
 
     updateOllamaModelsList() {
+        const hostInput = document.getElementById('ollama-host');
+        const portInput = document.getElementById('ollama-port');
         const modelsInput = document.getElementById('ollama-models');
-        if (!modelsInput) return;
+        if (!hostInput || !portInput || !modelsInput) return;
 
-        this.config.ollamaModels = modelsInput.value.trim();
-        this.updateModelOptions();
+        const host = hostInput.value.trim();
+        const port = portInput.value.trim();
+
+        backendAPI.listOllamaModels(host, port)
+            .then(data => {
+                let names = [];
+                if (Array.isArray(data.models)) {
+                    names = data.models.map(m => m.name || m.model || m);
+                }
+                if (names.length > 0) {
+                    modelsInput.value = names.join(',');
+                    this.config.ollamaModels = modelsInput.value.trim();
+                    this.updateModelOptions();
+                    this.showNotification('Ollama models updated');
+                } else {
+                    this.showNotification('No models found on Ollama', 'warning');
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching Ollama models:', err);
+                this.showNotification('Failed to fetch Ollama models', 'error');
+            });
     }
 
     updateLanguageOptionsForSenseVoice() {
@@ -4128,6 +4158,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentUserBtn = document.getElementById('current-user-btn');
     const logoutBtn = document.getElementById('logout-btn');
 
+    async function loadDefaultProviderConfig() {
+        try {
+            const resp = await authFetch('/api/default-provider-config');
+            if (resp.ok) {
+                defaultProviderConfig = await resp.json();
+            }
+        } catch (err) {
+            console.error('Error fetching default provider config:', err);
+        }
+    }
+
     async function restoreSession() {
         const saved = localStorage.getItem('notes-app-session');
         if (!saved) return false;
@@ -4145,6 +4186,23 @@ document.addEventListener('DOMContentLoaded', () => {
             allowedTranscriptionProviders = data.transcription_providers || [];
             allowedPostprocessProviders = data.postprocess_providers || [];
             isAdmin = data.is_admin;
+
+            await loadDefaultProviderConfig();
+            if (!isAdmin) {
+                const cfgKey = `notes-app-config-${currentUser}`;
+                let cfg = {};
+                const savedCfg = localStorage.getItem(cfgKey);
+                if (savedCfg) cfg = JSON.parse(savedCfg);
+                if (defaultProviderConfig.lmstudio_host) {
+                    cfg.lmstudioHost = defaultProviderConfig.lmstudio_host;
+                    cfg.lmstudioPort = defaultProviderConfig.lmstudio_port;
+                }
+                if (defaultProviderConfig.ollama_host) {
+                    cfg.ollamaHost = defaultProviderConfig.ollama_host;
+                    cfg.ollamaPort = defaultProviderConfig.ollama_port;
+                }
+                localStorage.setItem(cfgKey, JSON.stringify(cfg));
+            }
             if (isAdmin) {
                 document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
             } else {
@@ -4182,6 +4240,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 allowedTranscriptionProviders = data.transcription_providers || [];
                 allowedPostprocessProviders = data.postprocess_providers || [];
                 isAdmin = data.is_admin;
+                await loadDefaultProviderConfig();
+                if (!isAdmin) {
+                    const cfgKey = `notes-app-config-${currentUser}`;
+                    let cfg = {};
+                    const savedCfg = localStorage.getItem(cfgKey);
+                    if (savedCfg) cfg = JSON.parse(savedCfg);
+                    if (defaultProviderConfig.lmstudio_host) {
+                        cfg.lmstudioHost = defaultProviderConfig.lmstudio_host;
+                        cfg.lmstudioPort = defaultProviderConfig.lmstudio_port;
+                    }
+                    if (defaultProviderConfig.ollama_host) {
+                        cfg.ollamaHost = defaultProviderConfig.ollama_host;
+                        cfg.ollamaPort = defaultProviderConfig.ollama_port;
+                    }
+                    localStorage.setItem(cfgKey, JSON.stringify(cfg));
+                }
                 if (isAdmin) {
                     document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
                 } else {

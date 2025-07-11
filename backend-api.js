@@ -600,6 +600,20 @@ class BackendAPI {
         }
     }
 
+    async listOllamaModels(host, port) {
+        try {
+            const url = `${this.baseUrl}/api/ollama/models?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
+            const response = await authFetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error listing Ollama models:', error);
+            throw error;
+        }
+    }
+
     async deleteModel(name) {
         try {
             const response = await authFetch(`${this.baseUrl}/api/delete-model`, {

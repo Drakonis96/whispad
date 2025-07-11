@@ -1002,6 +1002,24 @@ def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prom
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
+
+@app.route('/api/ollama/models', methods=['GET'])
+def get_ollama_models():
+    """Query Ollama for available models"""
+    host = request.args.get('host', OLLAMA_HOST)
+    port = request.args.get('port', OLLAMA_PORT)
+
+    try:
+        url = f"http://{host}:{port}/api/tags"
+        response = requests.get(url, timeout=5)
+        if response.status_code != 200:
+            return jsonify({"error": f"Ollama error {response.status_code}"}), response.status_code
+        return jsonify(response.json())
+    except requests.RequestException as e:
+        return jsonify({"error": f"Error de conexión con Ollama: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
 def improve_text_lmstudio_stream(text, improvement_type, model, host, port, custom_prompt=None):
     """Mejorar texto usando LM Studio con streaming"""
     if not host or not port or not model:
@@ -1536,6 +1554,17 @@ def check_apis():
         'openrouter': bool(OPENROUTER_API_KEY)
     }
     return jsonify(apis_status)
+
+
+@app.route('/api/default-provider-config', methods=['GET'])
+def default_provider_config():
+    """Return default host/port values for local providers"""
+    return jsonify({
+        "lmstudio_host": LMSTUDIO_HOST,
+        "lmstudio_port": LMSTUDIO_PORT,
+        "ollama_host": OLLAMA_HOST,
+        "ollama_port": OLLAMA_PORT,
+    })
 
 @app.route('/api/list-saved-notes', methods=['GET'])
 def list_saved_notes():
