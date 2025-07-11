@@ -37,6 +37,9 @@ LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
 LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
+# Opcional: enviar las notas guardadas a un flujo de trabajo externo
+WORKFLOW_WEBHOOK_URL = os.getenv('WORKFLOW_WEBHOOK_URL')
+WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
 
 # Inicializar el wrapper de whisper.cpp local
 try:
@@ -1111,7 +1114,22 @@ def save_note():
         }
         with open(meta_filepath, 'w', encoding='utf-8') as meta_file:
             json.dump(metadata, meta_file, ensure_ascii=False, indent=2)
-        
+
+        # Enviar la nota al webhook configurado, si está disponible
+        if WORKFLOW_WEBHOOK_URL:
+            headers = {"Content-Type": "application/json"}
+            if WORKFLOW_WEBHOOK_TOKEN:
+                headers["Authorization"] = f"Bearer {WORKFLOW_WEBHOOK_TOKEN}"
+            try:
+                requests.post(
+                    WORKFLOW_WEBHOOK_URL,
+                    json={"id": note_id, "title": title, "content": content, "tags": tags},
+                    headers=headers,
+                    timeout=5,
+                )
+            except Exception as e:
+                print(f"Webhook error: {e}")
+
         return jsonify({
             "success": True,
             "message": "Nota guardada correctamente",

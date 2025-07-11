@@ -93,6 +93,7 @@ Copy `env.example` to `.env` and add your API keys:
 cp env.example .env
 ```
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
+If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.
