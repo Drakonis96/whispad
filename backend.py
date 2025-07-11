@@ -525,7 +525,10 @@ def improve_text():
                     return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openai_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
-                return improve_text_google_stream(text, improvement_type, custom_prompt)
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
+                return improve_text_google_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'openrouter':
                 model = data.get('model')
                 if not model:
@@ -550,7 +553,10 @@ def improve_text():
                     return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openai(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
-                return improve_text_google(text, improvement_type, custom_prompt)
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
+                return improve_text_google(text, improvement_type, model, custom_prompt)
             elif provider == 'openrouter':
                 model = data.get('model')
                 if not model:
@@ -628,10 +634,13 @@ def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     else:
         return jsonify({"error": "Error al mejorar el texto"}), response.status_code
 
-def improve_text_google(text, improvement_type, custom_prompt=None):
+def improve_text_google(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando Google AI (Gemini)"""
     if not GOOGLE_API_KEY:
         return jsonify({"error": "API key de Google no configurada"}), 500
+
+    if not model:
+        return jsonify({"error": "Model not specified"}), 400
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
@@ -652,7 +661,7 @@ def improve_text_google(text, improvement_type, custom_prompt=None):
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
     
     # Nueva URL según la documentación oficial de Gemini
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GOOGLE_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
     
     headers = {
         'Content-Type': 'application/json'
@@ -752,11 +761,16 @@ def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None
     
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
-def improve_text_google_stream(text, improvement_type, custom_prompt=None):
+def improve_text_google_stream(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando Google AI con streaming (simulado)"""
     if not GOOGLE_API_KEY:
         def generate_error():
             yield f"data: {json.dumps({'error': 'API key de Google no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    if not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Model not specified'})}\n\n"
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
     
     # Google AI no soporta streaming nativamente, así que simularemos
@@ -780,7 +794,7 @@ def improve_text_google_stream(text, improvement_type, custom_prompt=None):
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GOOGLE_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
     
     headers = {
         'Content-Type': 'application/json'
