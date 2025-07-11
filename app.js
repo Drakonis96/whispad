@@ -501,17 +501,27 @@ class NotesApp {
         });
 
         document.getElementById('change-password-btn').addEventListener('click', async () => {
+            const current = document.getElementById('current-password').value;
             const newPass = document.getElementById('new-password').value;
-            if (!newPass) return;
+            const confirmPass = document.getElementById('confirm-password').value;
+            if (!current || !newPass || !confirmPass) return;
+            if (newPass !== confirmPass) {
+                alert('Passwords do not match');
+                return;
+            }
             const resp = await authFetch('/api/change-password', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: newPass })
+                body: JSON.stringify({ current_password: current, new_password: newPass })
             });
             if (resp.ok) {
                 alert('Password updated');
+                document.getElementById('current-password').value = '';
+                document.getElementById('new-password').value = '';
+                document.getElementById('confirm-password').value = '';
             } else {
-                alert('Error updating password');
+                const data = await resp.json().catch(() => ({}));
+                alert(data.error || 'Error updating password');
             }
         });
 

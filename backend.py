@@ -256,9 +256,12 @@ def change_password():
     if not username:
         return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json() or {}
-    new_password = data.get('password')
-    if not new_password:
+    current = data.get('current_password')
+    new_password = data.get('new_password')
+    if not current or not new_password:
         return jsonify({"error": "Password required"}), 400
+    if USERS.get(username, {}).get('password') != current:
+        return jsonify({"error": "Current password incorrect"}), 400
     USERS[username]['password'] = new_password
     save_users(USERS)
     return jsonify({"success": True})
