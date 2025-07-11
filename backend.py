@@ -112,6 +112,12 @@ def parse_note_id_from_md(path):
     return None
 
 
+def generate_note_id_from_filename(filename: str) -> str:
+    """Return a stable note ID derived from the filename"""
+    base = os.path.splitext(os.path.basename(filename))[0]
+    return re.sub(r"[^a-zA-Z0-9]+", "-", base).strip("-").lower()
+
+
 def create_missing_meta_files():
     """Ensure every note has a corresponding .meta file with an ID"""
     root_dir = os.path.join(os.getcwd(), 'saved_notes')
@@ -132,8 +138,7 @@ def create_missing_meta_files():
                 continue
             note_id = parse_note_id_from_md(md_path)
             if not note_id:
-                stat = os.stat(md_path)
-                note_id = str(int(stat.st_mtime * 1000))
+                note_id = generate_note_id_from_filename(fname)
             stat = os.stat(md_path)
             metadata = {
                 "id": note_id,
@@ -1584,8 +1589,7 @@ def list_saved_notes():
                 if not os.path.exists(meta):
                     note_id = parse_note_id_from_md(os.path.join(saved_notes_dir, fname))
                     if not note_id:
-                        stat = os.stat(os.path.join(saved_notes_dir, fname))
-                        note_id = str(int(stat.st_mtime * 1000))
+                        note_id = generate_note_id_from_filename(fname)
                     stat = os.stat(os.path.join(saved_notes_dir, fname))
                     meta_data = {
                         "id": note_id,
@@ -1662,8 +1666,7 @@ def cleanup_notes():
                 continue
             note_id = parse_note_id_from_md(md_path)
             if not note_id:
-                stat = os.stat(md_path)
-                note_id = str(int(stat.st_mtime * 1000))
+                note_id = generate_note_id_from_filename(filename)
             stat = os.stat(md_path)
             metadata = {
                 "id": note_id,
