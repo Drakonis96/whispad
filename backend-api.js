@@ -586,6 +586,20 @@ class BackendAPI {
         }
     }
 
+    async listLmStudioModels(host, port) {
+        try {
+            const url = `${this.baseUrl}/api/lmstudio/models?host=${encodeURIComponent(host)}&port=${encodeURIComponent(port)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error listing LM Studio models:', error);
+            throw error;
+        }
+    }
+
     async deleteModel(name) {
         try {
             const response = await fetch(`${this.baseUrl}/api/delete-model`, {
