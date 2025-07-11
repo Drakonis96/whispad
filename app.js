@@ -490,6 +490,8 @@ class NotesApp {
 
         document.getElementById('user-btn').addEventListener('click', async () => {
             document.getElementById('user-modal').classList.add('active');
+            document.querySelectorAll('#user-modal .tab-content').forEach(c => c.style.display = 'none');
+            document.getElementById('password-tab').style.display = 'block';
             await refreshUserList();
         });
         document.getElementById('close-user-modal').addEventListener('click', () => {
@@ -831,6 +833,7 @@ class NotesApp {
     }
 
     showConfigModal() {
+        this.loadConfig();
         const tpSelect = document.getElementById('transcription-provider');
         const ppSelect = document.getElementById('postprocess-provider');
 
@@ -941,6 +944,7 @@ class NotesApp {
     }
     
     showStylesConfigModal() {
+        this.loadStylesConfig();
         this.renderStylesConfig();
         const modal = document.getElementById('styles-config-modal');
         this.hideMobileFab();
@@ -4204,9 +4208,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 localStorage.setItem(cfgKey, JSON.stringify(cfg));
             }
             if (isAdmin) {
-                document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    if (!el.classList.contains('tab-content')) {
+                        el.style.display = '';
+                    }
+                });
             } else {
-                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.admin-only').forEach(el => {
+                    if (!el.classList.contains('tab-content')) {
+                        el.style.display = 'none';
+                    }
+                });
             }
             currentUserBtn.textContent = currentUser;
             currentUserBtn.classList.remove('hidden');
@@ -4257,9 +4269,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     localStorage.setItem(cfgKey, JSON.stringify(cfg));
                 }
                 if (isAdmin) {
-                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        if (!el.classList.contains('tab-content')) {
+                            el.style.display = '';
+                        }
+                    });
                 } else {
-                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+                    document.querySelectorAll('.admin-only').forEach(el => {
+                        if (!el.classList.contains('tab-content')) {
+                            el.style.display = 'none';
+                        }
+                    });
                 }
                 localStorage.setItem('notes-app-session', JSON.stringify({ token: authToken }));
                 currentUserBtn.textContent = username;
@@ -4300,7 +4320,11 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUserBtn.classList.add('hidden');
         logoutBtn.classList.add('hidden');
         document.getElementById('user-btn').classList.add('hidden');
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.admin-only').forEach(el => {
+            if (!el.classList.contains('tab-content')) {
+                el.style.display = 'none';
+            }
+        });
         loginScreen.classList.remove('hidden');
         appContent.classList.add('hidden');
     });
