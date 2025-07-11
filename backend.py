@@ -46,35 +46,44 @@ WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 # ---------- Simple user management ---------
 USERS_FILE = 'users.json'
 SESSIONS = {}
-# Lock to avoid concurrent writes that could create duplicate notes
+# Locks to avoid concurrent writes that could corrupt files
 SAVE_LOCK = threading.Lock()
+USERS_LOCK = threading.Lock()
 
 # Provider lists
 ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
 ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama"]
 
 def load_users():
+    """Load users from disk ensuring the admin account always exists."""
     if not os.path.exists(USERS_FILE):
-        default_users = {
-            "admin": {
-                "password": "whispad",
-                "is_admin": True,
-                "transcription_providers": ALL_TRANSCRIPTION_PROVIDERS,
-                "postprocess_providers": ALL_POSTPROCESS_PROVIDERS,
-            }
+        users = {}
+    else:
+        try:
+            with open(USERS_FILE, 'r', encoding='utf-8') as f:
+                users = json.load(f)
+        except Exception:
+            users = {}
+
+    if 'admin' not in users:
+        users['admin'] = {
+            'password': 'whispad',
+            'is_admin': True,
+            'transcription_providers': ALL_TRANSCRIPTION_PROVIDERS,
+            'postprocess_providers': ALL_POSTPROCESS_PROVIDERS,
         }
-        with open(USERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(default_users, f, indent=2)
-        return default_users
-    try:
-        with open(USERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
+        # Save immediately so the file is created or repaired
+        save_users(users)
+
+    return users
 
 def save_users(users):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users, f, indent=2)
+    """Persist users.json atomically to avoid corruption."""
+    temp_path = USERS_FILE + '.tmp'
+    with USERS_LOCK:
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            json.dump(users, f, indent=2)
+        os.replace(temp_path, USERS_FILE)
 
 
 def migrate_notes_to_admin_folder():
