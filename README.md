@@ -113,6 +113,26 @@ Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook p
 
 With these instructions you should have WhisPad running in just a few minutes with or without Docker. Enjoy fast transcription and all the benefits of organizing your ideas in one place!
 
+## Data Persistence and User Management
+
+WhisPad is designed to persist your data between container restarts, updates, and recreations through Docker volumes:
+
+### Persistent Data
+- **Notes**: Stored in `./saved_notes/` (mounted to `/app/saved_notes` in container)
+- **Users**: Stored in `./users.json` (mounted to `/app/users.json` in container) 
+- **Models**: Stored in `./whisper-cpp-models/` (mounted to `/app/whisper-cpp-models` in container)
+- **Logs**: Stored in `./logs/` (mounted to `/var/log/nginx` in container)
+
+### User Management
+- **Default Admin**: Username `admin`, password `whispad`
+- **User Configuration**: Admins can create users and assign different transcription/postprocessing providers
+- **Per-User Folders**: Each user's notes are isolated in their own folder under `saved_notes/`
+
+### Initial Setup
+If you don't have a `users.json` file, the application will automatically create one with the default admin account. You can also copy `users.json.template` to `users.json` and customize it as needed.
+
+**Important**: Change the default admin password immediately after first login for security!
+
 ## Screenshots
 
 Here are some screenshots of WhisPad in action:
