@@ -28,6 +28,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
 - User login with per-user note folders and admin management tools.
+- Admin has access to all providers and can manage which ones are available for each user.
 
 ## Disclaimer
 This application is currently in testing and is provided **as is**. I take no responsibility for any data loss that may occur when using it. Make sure you make frequent backups of your data.

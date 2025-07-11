@@ -46,14 +46,18 @@ WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 USERS_FILE = 'users.json'
 SESSIONS = {}
 
+# Provider lists
+ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
+ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama"]
+
 def load_users():
     if not os.path.exists(USERS_FILE):
         default_users = {
             "admin": {
                 "password": "whispad",
                 "is_admin": True,
-                "transcription_providers": ["openai", "local", "sensevoice"],
-                "postprocess_providers": ["openai"]
+                "transcription_providers": ALL_TRANSCRIPTION_PROVIDERS,
+                "postprocess_providers": ALL_POSTPROCESS_PROVIDERS,
             }
         }
         with open(USERS_FILE, 'w', encoding='utf-8') as f:
@@ -91,6 +95,9 @@ def migrate_notes_to_admin_folder():
 
 
 USERS = load_users()
+if "admin" in USERS:
+    USERS["admin"]["transcription_providers"] = ALL_TRANSCRIPTION_PROVIDERS
+    USERS["admin"]["postprocess_providers"] = ALL_POSTPROCESS_PROVIDERS
 migrate_notes_to_admin_folder()
 
 def get_current_username():
@@ -137,12 +144,18 @@ def login_user():
     if user and user.get('password') == password:
         token = base64.urlsafe_b64encode(os.urandom(24)).decode('utf-8')
         SESSIONS[token] = username
+        if username == 'admin':
+            tp = ALL_TRANSCRIPTION_PROVIDERS
+            pp = ALL_POSTPROCESS_PROVIDERS
+        else:
+            tp = user.get('transcription_providers', [])
+            pp = user.get('postprocess_providers', [])
         return jsonify({
             "success": True,
             "token": token,
             "is_admin": user.get('is_admin', False),
-            "transcription_providers": user.get('transcription_providers', []),
-            "postprocess_providers": user.get('postprocess_providers', [])
+            "transcription_providers": tp,
+            "postprocess_providers": pp
         })
     return jsonify({"success": False}), 401
 
@@ -179,7 +192,7 @@ def create_user():
     password = data.get('password')
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
-    if username in USERS:
+    if username in USERS or username == 'admin':
         return jsonify({"error": "User exists"}), 400
     USERS[username] = {
         "password": password,
@@ -216,6 +229,8 @@ def update_user_providers():
     username = data.get('username')
     if username not in USERS:
         return jsonify({"error": "User not found"}), 404
+    if username == 'admin':
+        return jsonify({"error": "Cannot modify admin"}), 400
     USERS[username]['transcription_providers'] = data.get('transcription_providers', USERS[username].get('transcription_providers', []))
     USERS[username]['postprocess_providers'] = data.get('postprocess_providers', USERS[username].get('postprocess_providers', []))
     save_users(USERS)
