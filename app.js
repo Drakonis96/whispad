@@ -42,56 +42,56 @@ const configuracionMejoras = {
         nombre: "Improve Clarity",
         descripcion: "Makes text clearer and more direct",
         icono: "✨",
-        prompt: "Rewrite the following text to be clearer, more direct and easier to understand. Keep the same meaning but improve clarity. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text to be clearer, more direct and easier to understand. Keep the same meaning but improve clarity. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: true
     },
     formal: {
         nombre: "Make Formal",
         descripcion: "Converts text to a more formal tone",
         icono: "🎩",
-        prompt: "Rewrite the following text using a formal and professional tone, appropriate for an academic or business context. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text using a formal and professional tone, appropriate for an academic or business context. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: false
     },
     casual: {
         nombre: "Make Casual",
         descripcion: "Converts text to a more casual tone",
         icono: "😊",
-        prompt: "Rewrite the following text using a casual and friendly tone, as if you were talking to a friend. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text using a casual and friendly tone, as if you were talking to a friend. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: false
     },
     academico: {
         nombre: "Academic",
         descripcion: "Converts text to academic style",
         icono: "🎓",
-        prompt: "Rewrite the following text using an academic style with precise terminology, formal structure and appropriate references. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text using an academic style with precise terminology, formal structure and appropriate references. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: false
     },
     narrativo: {
         nombre: "Narrative",
         descripcion: "Improves narrative texts and novel dialogues",
         icono: "📖",
-        prompt: "Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Improve fluency, description and literary quality while maintaining the essence of the text:",
+        prompt: "Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Improve fluency, description and literary quality while maintaining the essence of the text:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: false
     },
     academico_v2: {
         nombre: "Academic v2",
         descripcion: "Academic improvement with minimal changes, preserving author's words",
         icono: "🎓",
-        prompt: "Improve the following academic text making minimal changes to preserve the author's words. Use more precise words when necessary, improve structure and remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud. Keep the original style and vocabulary as much as possible:",
+        prompt: "Improve the following academic text making minimal changes to preserve the author's words. Use more precise words when necessary, improve structure and remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud. Keep the original style and vocabulary as much as possible:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: true
     },
     resumir: {
         nombre: "Summarize",
         descripcion: "Creates a concise summary of the text",
         icono: "📝",
-        prompt: "Create a concise and clear summary of the following text, maintaining the most important points. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Create a concise and clear summary of the following text, maintaining the most important points. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: false
     },
     expandir: {
         nombre: "Expand",
         descripcion: "Adds more details and context",
         icono: "✚",
-        prompt: "Expand the following text by adding more details, examples and relevant context to enrich the content. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Expand the following text by adding more details, examples and relevant context to enrich the content. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:. Preserve the original language of the following text exactly as it is. Do not translate or modify the language in any way. For example, if the text is in Spanish, keep it in Spanish; if it's in English, keep it in English.",
         visible: true
     }
 };
