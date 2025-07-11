@@ -525,6 +525,20 @@ pre code {
   background: var(--color-secondary);
 }
 
+.btn--error {
+  background: var(--color-error);
+  color: var(--color-btn-primary-text);
+}
+
+.btn--error:hover {
+  background: rgba(var(--color-error-rgb), 0.9);
+}
+
+.btn--error:active {
+  background: var(--color-error);
+  opacity: 0.9;
+}
+
 .btn--sm {
   padding: var(--space-4) var(--space-12);
   font-size: var(--font-size-sm);
@@ -1243,6 +1257,18 @@ select.form-control {
     max-width: 700px;
     box-shadow: var(--shadow-lg);
     position: relative;
+}
+
+#login-modal .modal-content {
+    text-align: center;
+}
+
+.login-logo {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto var(--space-16) auto;
 }
 
 .modal-content--wide {
@@ -2358,4 +2384,32 @@ select.form-control {
 .model-name {
     font-size: var(--font-size-sm);
     color: var(--color-text);
+}
+
+/* User modal */
+.tab-buttons {
+    display: flex;
+    gap: var(--space-8);
+    margin-bottom: var(--space-16);
+}
+.tab-content {
+    margin-top: var(--space-8);
+}
+
+.provider-select label {
+    display: inline-block;
+    margin-right: var(--space-8);
+}
+
+.provider-group {
+    margin: var(--space-8) 0;
+}
+
+.user-item {
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-8) 0;
+}
+
+.user-item:last-child {
+    border-bottom: none;
 }
