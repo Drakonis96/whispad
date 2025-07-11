@@ -794,7 +794,10 @@ class NotesApp {
 
         tpSelect.querySelectorAll('option').forEach(opt => {
             if (!opt.value) return;
-            if (allowedTranscriptionProviders.length && !allowedTranscriptionProviders.includes(opt.value)) {
+            if (allowedTranscriptionProviders.length === 0) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else if (!allowedTranscriptionProviders.includes(opt.value)) {
                 opt.disabled = true;
                 opt.style.display = 'none';
             } else {
@@ -805,7 +808,10 @@ class NotesApp {
 
         ppSelect.querySelectorAll('option').forEach(opt => {
             if (!opt.value) return;
-            if (allowedPostprocessProviders.length && !allowedPostprocessProviders.includes(opt.value)) {
+            if (allowedPostprocessProviders.length === 0) {
+                opt.disabled = true;
+                opt.style.display = 'none';
+            } else if (!allowedPostprocessProviders.includes(opt.value)) {
                 opt.disabled = true;
                 opt.style.display = 'none';
             } else {
@@ -4013,6 +4019,43 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentUserBtn = document.getElementById('current-user-btn');
     const logoutBtn = document.getElementById('logout-btn');
 
+    async function restoreSession() {
+        const saved = localStorage.getItem('notes-app-session');
+        if (!saved) return false;
+        try {
+            const session = JSON.parse(saved);
+            authToken = session.token;
+            const resp = await authFetch('/api/session-info');
+            if (!resp.ok) {
+                localStorage.removeItem('notes-app-session');
+                authToken = '';
+                return false;
+            }
+            const data = await resp.json();
+            currentUser = data.username;
+            allowedTranscriptionProviders = data.transcription_providers || [];
+            allowedPostprocessProviders = data.postprocess_providers || [];
+            if (data.is_admin) {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+            } else {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            }
+            currentUserBtn.textContent = currentUser;
+            currentUserBtn.classList.remove('hidden');
+            logoutBtn.classList.remove('hidden');
+            loginScreen.classList.add('hidden');
+            appContent.classList.remove('hidden');
+            initApp();
+            return true;
+        } catch {
+            localStorage.removeItem('notes-app-session');
+            authToken = '';
+            return false;
+        }
+    }
+
+    restoreSession();
+
     async function attemptLogin() {
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
@@ -4028,9 +4071,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentUser = username;
                 allowedTranscriptionProviders = data.transcription_providers || [];
                 allowedPostprocessProviders = data.postprocess_providers || [];
-                if (!data.is_admin) {
+                if (data.is_admin) {
+                    document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+                } else {
                     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
                 }
+                localStorage.setItem('notes-app-session', JSON.stringify({ token: authToken }));
                 currentUserBtn.textContent = username;
                 currentUserBtn.classList.remove('hidden');
                 logoutBtn.classList.remove('hidden');
@@ -4055,9 +4101,13 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = '';
         allowedTranscriptionProviders = [];
         allowedPostprocessProviders = [];
+        localStorage.removeItem('notes-app-session');
+        usernameInput.value = '';
+        passwordInput.value = '';
         currentUserBtn.classList.add('hidden');
         logoutBtn.classList.add('hidden');
         document.getElementById('user-btn').classList.add('hidden');
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         loginScreen.classList.remove('hidden');
         appContent.classList.add('hidden');
     });

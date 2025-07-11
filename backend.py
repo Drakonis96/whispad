@@ -168,6 +168,29 @@ def logout_user():
     return jsonify({"success": True})
 
 
+@app.route('/api/session-info', methods=['GET'])
+def session_info():
+    """Return information about the current session if the token is valid"""
+    token = request.headers.get('Authorization')
+    username = SESSIONS.get(token)
+    if not username:
+        return jsonify({"authenticated": False}), 401
+    user = USERS.get(username, {})
+    if username == 'admin':
+        tp = ALL_TRANSCRIPTION_PROVIDERS
+        pp = ALL_POSTPROCESS_PROVIDERS
+    else:
+        tp = user.get('transcription_providers', [])
+        pp = user.get('postprocess_providers', [])
+    return jsonify({
+        "authenticated": True,
+        "username": username,
+        "is_admin": user.get('is_admin', False),
+        "transcription_providers": tp,
+        "postprocess_providers": pp,
+    })
+
+
 @app.route('/api/change-password', methods=['POST'])
 def change_password():
     username = get_current_username()
