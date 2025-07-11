@@ -1305,13 +1305,11 @@ def stream_transcription_response(response):
 def save_note():
     """Endpoint para guardar una nota como archivo .md en el directorio saved_notes"""
     try:
-        # Prevent concurrent writes that may create duplicate notes
-        with SAVE_LOCK:
-            username = get_current_username()
-            if not username:
-                return jsonify({"error": "Unauthorized"}), 401
-            data = request.get_json()
-        
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        data = request.get_json()
+
         if not data:
             return jsonify({"error": "No se recibieron datos"}), 400
         
@@ -1334,34 +1332,36 @@ def save_note():
         
         # Crear directorio saved_notes si no existe
         saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
-        os.makedirs(saved_notes_dir, exist_ok=True)
-        
-        # Generar nombre de archivo seguro basado en el título
-        if not title:
-            title = "Untitled Note"
-        
-        safe_filename = generate_safe_filename(title)
-        new_filename = f"{safe_filename}.md"
-        new_filepath = os.path.join(saved_notes_dir, new_filename)
-        
-        # Buscar archivo existente para esta nota
-        existing_filepath = find_existing_note_file(saved_notes_dir, note_id)
-        
-        # Si existe un archivo pero el nombre ha cambiado, renombrarlo
-        if existing_filepath and existing_filepath != new_filepath:
-            # Si el nuevo nombre ya existe y no es el archivo actual, agregar sufijo
-            if os.path.exists(new_filepath):
-                counter = 1
-                while True:
-                    name_without_ext = os.path.splitext(new_filename)[0]
-                    temp_filename = f"{name_without_ext}-{counter}.md"
-                    temp_filepath = os.path.join(saved_notes_dir, temp_filename)
-                    if not os.path.exists(temp_filepath):
-                        new_filename = temp_filename
-                        new_filepath = temp_filepath
-                        break
-                    counter += 1
-            
+
+        with SAVE_LOCK:
+            os.makedirs(saved_notes_dir, exist_ok=True)
+
+            # Generar nombre de archivo seguro basado en el título
+            if not title:
+                title = "Untitled Note"
+
+            safe_filename = generate_safe_filename(title)
+            new_filename = f"{safe_filename}.md"
+            new_filepath = os.path.join(saved_notes_dir, new_filename)
+
+            # Buscar archivo existente para esta nota
+            existing_filepath = find_existing_note_file(saved_notes_dir, note_id)
+
+            # Si existe un archivo pero el nombre ha cambiado, renombrarlo
+            if existing_filepath and existing_filepath != new_filepath:
+                # Si el nuevo nombre ya existe y no es el archivo actual, agregar sufijo
+                if os.path.exists(new_filepath):
+                    counter = 1
+                    while True:
+                        name_without_ext = os.path.splitext(new_filename)[0]
+                        temp_filename = f"{name_without_ext}-{counter}.md"
+                        temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        if not os.path.exists(temp_filepath):
+                            new_filename = temp_filename
+                            new_filepath = temp_filepath
+                            break
+                        counter += 1
+
             # Renombrar el archivo existente junto con su metadata
             try:
                 os.rename(existing_filepath, new_filepath)
@@ -1374,50 +1374,50 @@ def save_note():
                     os.rename(old_meta, new_meta)
             except OSError as e:
                 return jsonify({"error": f"Error al renombrar archivo: {str(e)}"}), 500
-        
-        # Si no existe archivo para esta nota, crear uno nuevo
-        elif not existing_filepath:
-            # Verificar que el nombre no esté en uso
-            if os.path.exists(new_filepath):
-                counter = 1
-                while True:
-                    name_without_ext = os.path.splitext(new_filename)[0]
-                    temp_filename = f"{name_without_ext}-{counter}.md"
-                    temp_filepath = os.path.join(saved_notes_dir, temp_filename)
-                    if not os.path.exists(temp_filepath):
-                        new_filename = temp_filename
-                        new_filepath = temp_filepath
-                        break
-                    counter += 1
-        else:
-            # El archivo existe y el nombre no ha cambiado
-            new_filepath = existing_filepath
-            new_filename = os.path.basename(new_filepath)
-        
-        # Convertir HTML a Markdown básico si es necesario
-        markdown_content = html_to_markdown(content) if content else ""
-        
-        # Crear contenido del archivo markdown
-        file_content = f"# {title}\n\n"
-        if markdown_content:
-            file_content += markdown_content
-        else:
-            file_content += "*Esta nota está vacía*\n"
 
-        # Guardar el archivo markdown
-        with open(new_filepath, 'w', encoding='utf-8') as f:
-            f.write(file_content)
+            # Si no existe archivo para esta nota, crear uno nuevo
+            elif not existing_filepath:
+                # Verificar que el nombre no esté en uso
+                if os.path.exists(new_filepath):
+                    counter = 1
+                    while True:
+                        name_without_ext = os.path.splitext(new_filename)[0]
+                        temp_filename = f"{name_without_ext}-{counter}.md"
+                        temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        if not os.path.exists(temp_filepath):
+                            new_filename = temp_filename
+                            new_filepath = temp_filepath
+                            break
+                        counter += 1
+            else:
+                # El archivo existe y el nombre no ha cambiado
+                new_filepath = existing_filepath
+                new_filename = os.path.basename(new_filepath)
 
-        # Guardar metadata en un archivo paralelo .meta
-        meta_filepath = f"{new_filepath}.meta"
-        metadata = {
-            "id": note_id,
-            "title": title,
-            "updated": datetime.now().isoformat(),
-            "tags": tags
-        }
-        with open(meta_filepath, 'w', encoding='utf-8') as meta_file:
-            json.dump(metadata, meta_file, ensure_ascii=False, indent=2)
+            # Convertir HTML a Markdown básico si es necesario
+            markdown_content = html_to_markdown(content) if content else ""
+
+            # Crear contenido del archivo markdown
+            file_content = f"# {title}\n\n"
+            if markdown_content:
+                file_content += markdown_content
+            else:
+                file_content += "*Esta nota está vacía*\n"
+
+            # Guardar el archivo markdown
+            with open(new_filepath, 'w', encoding='utf-8') as f:
+                f.write(file_content)
+
+            # Guardar metadata en un archivo paralelo .meta
+            meta_filepath = f"{new_filepath}.meta"
+            metadata = {
+                "id": note_id,
+                "title": title,
+                "updated": datetime.now().isoformat(),
+                "tags": tags
+            }
+            with open(meta_filepath, 'w', encoding='utf-8') as meta_file:
+                json.dump(metadata, meta_file, ensure_ascii=False, indent=2)
 
         # Enviar la nota al webhook configurado, si está disponible
         if WORKFLOW_WEBHOOK_URL:
@@ -1440,12 +1440,12 @@ def save_note():
             except Exception as e:
                 print(f"Webhook error: {e}")
 
-            return jsonify({
-                "success": True,
-                "message": "Nota guardada correctamente",
-                "filename": new_filename,
-                "filepath": new_filepath
-            })
+        return jsonify({
+            "success": True,
+            "message": "Nota guardada correctamente",
+            "filename": new_filename,
+            "filepath": new_filepath
+        })
 
     except Exception as e:
         return jsonify({"error": f"Error al guardar la nota: {str(e)}"}), 500
