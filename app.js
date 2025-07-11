@@ -103,6 +103,7 @@ class NotesApp {
         this.currentNote = null;
         this.isRecording = false;
         this.autoSaveTimeout = null;
+        this.autoSaveInterval = null;
         this.saveInProgress = false;
         this.pendingSave = false;
         this.lastSaveHash = '';
@@ -443,7 +444,7 @@ class NotesApp {
         }
         
         // Auto-guardado cada 30 segundos
-        setInterval(() => {
+        this.autoSaveInterval = setInterval(() => {
             if (this.currentNote) {
                 this.saveCurrentNote(true);
             }
@@ -3987,6 +3988,13 @@ class NotesApp {
     showMobileFab() {
         this.updateMobileFabVisibility();
     }
+
+    destroy() {
+        if (this.autoSaveInterval) {
+            clearInterval(this.autoSaveInterval);
+            this.autoSaveInterval = null;
+        }
+    }
 }
 
 // Inicializar la aplicación cuando se carga la página
@@ -4169,12 +4177,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.style.display = 'none';
             }
         });
-        // Clear any loaded notes, tags and editor contents when logging out
+        // Clear any loaded notes and stop background tasks when logging out
         if (window.notesApp) {
+            if (typeof window.notesApp.destroy === 'function') {
+                window.notesApp.destroy();
+            }
             window.notesApp.notes = [];
             window.notesApp.currentNote = null;
             if (window.notesApp.selectedTags) window.notesApp.selectedTags.clear();
             window.notesApp.searchTerm = '';
+            window.notesApp = null;
         }
         const notesList = document.getElementById('notes-list');
         if (notesList) notesList.innerHTML = '';
