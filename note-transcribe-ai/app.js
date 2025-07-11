@@ -102,7 +102,7 @@ class NotesApp {
     
     async init() {
         this.loadConfig();
-        this.loadNotes();
+        await this.loadNotes();
         this.setupEventListeners();
         this.renderNotesList();
         this.setupDefaultNote();
@@ -134,8 +134,8 @@ class NotesApp {
     // Configurar event listeners
     setupEventListeners() {
         // Botón nueva nota
-        document.getElementById('new-note-btn').addEventListener('click', () => {
-            this.createNewNote();
+        document.getElementById('new-note-btn').addEventListener('click', async () => {
+            await this.createNewNote();
         });
         
         // Búsqueda
@@ -204,8 +204,8 @@ class NotesApp {
             this.hideDeleteModal();
         });
         
-        document.getElementById('confirm-delete').addEventListener('click', () => {
-            this.deleteCurrentNote();
+        document.getElementById('confirm-delete').addEventListener('click', async () => {
+            await this.deleteCurrentNote();
         });
         
         // Configuración
@@ -252,20 +252,59 @@ class NotesApp {
     }
     
     // Gestión de notas
-    loadNotes() {
-        const saved = localStorage.getItem('notes-app-data');
-        if (saved) {
-            this.notes = JSON.parse(saved);
-        } else {
-            // Example note on first run
-            this.notes = [{
-                id: 1,
-                title: "Example Note",
-                content: "This is a sample note to demonstrate the application's features. You can edit it, delete it or create new notes.",
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            }];
-            this.saveToStorage();
+    async loadNotes() {
+        try {
+            const response = await fetch('/api/list-saved-notes');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            this.notes = data.notes.map(note => ({
+                id: note.id || Date.now() + Math.random(),
+                filename: note.filename,
+                title: note.filename.replace(/\.md$/, ''),
+                content: '',
+                createdAt: note.created,
+                updatedAt: note.modified,
+                loaded: false
+            }));
+        } catch (error) {
+            console.error('Error loading notes from server:', error);
+            this.notes = [];
+        }
+    }
+
+    async fetchNoteContent(note) {
+        if (!note) return;
+        const params = note.id
+            ? `?id=${note.id}`
+            : `?filename=${encodeURIComponent(note.filename)}`;
+        try {
+            const response = await fetch(`/api/get-note${params}`);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const data = await response.json();
+            let markdown = data.content || '';
+
+            const metaIndex = markdown.indexOf('\n---');
+            if (metaIndex !== -1) {
+                markdown = markdown.substring(0, metaIndex).trim();
+            }
+
+            const lines = markdown.split(/\r?\n/);
+            if (lines.length && /^#\s/.test(lines[0])) {
+                note.title = lines.shift().replace(/^#\s*/, '').trim();
+            }
+            const body = lines.join('\n').trim();
+
+            note.content = this.markdownToHtml(body);
+            note.loaded = true;
+        } catch (err) {
+            console.error('Error loading note content:', err);
+            note.content = '';
+            note.loaded = true;
         }
     }
 
@@ -352,12 +391,13 @@ class NotesApp {
         const modal = document.getElementById('config-modal');
         modal.classList.remove('active');
     }
-    
+
     saveToStorage() {
-        localStorage.setItem('notes-app-data', JSON.stringify(this.notes));
+        // Notes are retrieved from the backend on each load. Avoid storing
+        // them locally to prevent stale data when users share a device.
     }
     
-    createNewNote() {
+    async createNewNote() {
         const now = new Date();
         const newNote = {
             id: Date.now(),
@@ -368,9 +408,8 @@ class NotesApp {
         };
         
         this.notes.unshift(newNote);
-        this.saveToStorage();
         this.renderNotesList();
-        this.selectNote(newNote.id);
+        await this.selectNote(newNote.id);
         
         // Enfocar el título para edición
         setTimeout(() => {
@@ -379,9 +418,12 @@ class NotesApp {
         }, 100);
     }
     
-    selectNote(noteId) {
+    async selectNote(noteId) {
         this.currentNote = this.notes.find(note => note.id === noteId);
         if (this.currentNote) {
+            if (!this.currentNote.loaded) {
+                await this.fetchNoteContent(this.currentNote);
+            }
             this.loadNoteToEditor();
             this.updateNoteSelection();
         }
@@ -447,8 +489,7 @@ class NotesApp {
         this.currentNote.content = content;
         this.currentNote.updatedAt = new Date().toISOString();
         
-        // Save to local storage
-        this.saveToStorage();
+        // Notes will be persisted on the server only
         this.renderNotesList();
         this.updateNoteSelection();
         
@@ -493,21 +534,20 @@ class NotesApp {
         }
     }
     
-    deleteCurrentNote() {
+    async deleteCurrentNote() {
         if (!this.currentNote) return;
         
         // Store the note ID before removing it from the array
         const noteIdToDelete = this.currentNote.id;
         
         this.notes = this.notes.filter(note => note.id !== this.currentNote.id);
-        this.saveToStorage();
         this.renderNotesList();
-        
+
         // Delete from server
-        this.deleteNoteFromServer(noteIdToDelete);
-        
+        await this.deleteNoteFromServer(noteIdToDelete);
+
         this.currentNote = null;
-        this.setupDefaultNote();
+        await this.setupDefaultNote();
         this.hideDeleteModal();
         this.showNotification('Note deleted');
     }
@@ -538,9 +578,9 @@ class NotesApp {
         }
     }
     
-    setupDefaultNote() {
+    async setupDefaultNote() {
         if (this.notes.length > 0) {
-            this.selectNote(this.notes[0].id);
+            await this.selectNote(this.notes[0].id);
         } else {
             document.getElementById('note-title').value = '';
             document.getElementById('editor').innerHTML = '';
@@ -587,9 +627,9 @@ class NotesApp {
         
         // Agregar event listeners a los items
         container.querySelectorAll('.note-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', async () => {
                 const noteId = parseInt(item.dataset.noteId);
-                this.selectNote(noteId);
+                await this.selectNote(noteId);
             });
         });
     }
@@ -1197,6 +1237,52 @@ class NotesApp {
     sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+
+    markdownToHtml(markdown) {
+        if (!markdown) return '';
+
+        const lines = markdown.split(/\r?\n/);
+        let html = '';
+        let inUl = false;
+        let inOl = false;
+
+        const closeLists = () => {
+            if (inUl) { html += '</ul>'; inUl = false; }
+            if (inOl) { html += '</ol>'; inOl = false; }
+        };
+
+        for (let line of lines) {
+            if (/^\s*-\s+/.test(line)) {
+                if (!inUl) { closeLists(); html += '<ul>'; inUl = true; }
+                html += `<li>${line.replace(/^\s*-\s+/, '')}</li>`;
+                continue;
+            }
+            if (/^\s*\d+\.\s+/.test(line)) {
+                if (!inOl) { closeLists(); html += '<ol>'; inOl = true; }
+                html += `<li>${line.replace(/^\s*\d+\.\s+/, '')}</li>`;
+                continue;
+            }
+
+            closeLists();
+
+            if (/^######\s+/.test(line)) { html += `<h6>${line.replace(/^######\s+/, '')}</h6>`; continue; }
+            if (/^#####\s+/.test(line)) { html += `<h5>${line.replace(/^#####\s+/, '')}</h5>`; continue; }
+            if (/^####\s+/.test(line)) { html += `<h4>${line.replace(/^####\s+/, '')}</h4>`; continue; }
+            if (/^###\s+/.test(line)) { html += `<h3>${line.replace(/^###\s+/, '')}</h3>`; continue; }
+            if (/^##\s+/.test(line)) { html += `<h2>${line.replace(/^##\s+/, '')}</h2>`; continue; }
+            if (/^#\s+/.test(line)) { html += `<h1>${line.replace(/^#\s+/, '')}</h1>`; continue; }
+
+            if (line.trim() === '') {
+                html += '<br>';
+            } else {
+                let processed = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+                processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>');
+                html += `<p>${processed}</p>`;
+            }
+        }
+        closeLists();
+        return html;
+    }
     
     // Configuración de listeners para controles avanzados
     setupConfigurationListeners() {
@@ -1347,7 +1433,7 @@ document.addEventListener('selectionchange', () => {
 });
 
 // Manejar atajos de teclado
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', async (e) => {
     if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
             case 's':
@@ -1359,7 +1445,7 @@ document.addEventListener('keydown', (e) => {
             case 'n':
                 e.preventDefault();
                 if (window.notesApp) {
-                    window.notesApp.createNewNote();
+                    await window.notesApp.createNewNote();
                 }
                 break;
         }
