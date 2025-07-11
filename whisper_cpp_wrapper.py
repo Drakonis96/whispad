@@ -41,8 +41,9 @@ class WhisperCppWrapper:
         self.base_dir = Path(__file__).parent
         
         # Set default paths
+        # Don't hardcode a default model. The model path must be provided
         if model_path is None:
-            self.model_path = self.base_dir / "whisper-cpp-models" / "ggml-tiny.bin"
+            self.model_path = None
         else:
             self.model_path = Path(model_path)
             
@@ -118,7 +119,7 @@ class WhisperCppWrapper:
             
             # Determine model to use
             used_model = Path(model_path) if model_path else self.model_path
-            if not used_model.exists():
+            if used_model is None or not used_model.exists():
                 raise Exception(f"Model file not found: {used_model}")
 
             # Prepare command - simpler approach with direct stdout output
