@@ -15,6 +15,7 @@ from datetime import datetime
 import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
+import threading
 
 # Cargar variables de entorno
 load_dotenv()
@@ -45,6 +46,8 @@ WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 # ---------- Simple user management ---------
 USERS_FILE = 'users.json'
 SESSIONS = {}
+# Lock to avoid concurrent writes that could create duplicate notes
+SAVE_LOCK = threading.Lock()
 
 # Provider lists
 ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
@@ -94,11 +97,67 @@ def migrate_notes_to_admin_folder():
         print(f"Migrated {moved} notes to {admin_dir}")
 
 
+def parse_note_id_from_md(path):
+    """Try to extract a note ID from the markdown file"""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        match = re.search(r"\*Nota ID:\s*(\d+)\*", content)
+        if not match:
+            match = re.search(r"\*Note ID:\s*(\d+)\*", content)
+        if match:
+            return match.group(1)
+    except Exception:
+        pass
+    return None
+
+
+def create_missing_meta_files():
+    """Ensure every note has a corresponding .meta file with an ID"""
+    root_dir = os.path.join(os.getcwd(), 'saved_notes')
+    if not os.path.isdir(root_dir):
+        return 0
+
+    created = 0
+    for user in os.listdir(root_dir):
+        user_dir = os.path.join(root_dir, user)
+        if not os.path.isdir(user_dir):
+            continue
+        for fname in os.listdir(user_dir):
+            if not fname.endswith('.md'):
+                continue
+            md_path = os.path.join(user_dir, fname)
+            meta_path = f"{md_path}.meta"
+            if os.path.exists(meta_path):
+                continue
+            note_id = parse_note_id_from_md(md_path)
+            if not note_id:
+                stat = os.stat(md_path)
+                note_id = str(int(stat.st_mtime * 1000))
+            stat = os.stat(md_path)
+            metadata = {
+                "id": note_id,
+                "title": os.path.splitext(fname)[0],
+                "updated": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "tags": []
+            }
+            try:
+                with open(meta_path, 'w', encoding='utf-8') as mf:
+                    json.dump(metadata, mf, ensure_ascii=False, indent=2)
+                created += 1
+            except Exception as e:
+                print(f"Error creating meta for {md_path}: {e}")
+    if created:
+        print(f"Created {created} metadata files")
+    return created
+
+
 USERS = load_users()
 if "admin" in USERS:
     USERS["admin"]["transcription_providers"] = ALL_TRANSCRIPTION_PROVIDERS
     USERS["admin"]["postprocess_providers"] = ALL_POSTPROCESS_PROVIDERS
 migrate_notes_to_admin_folder()
+create_missing_meta_files()
 
 def get_current_username():
     token = request.headers.get('Authorization')
@@ -1221,10 +1280,12 @@ def stream_transcription_response(response):
 def save_note():
     """Endpoint para guardar una nota como archivo .md en el directorio saved_notes"""
     try:
-        username = get_current_username()
-        if not username:
-            return jsonify({"error": "Unauthorized"}), 401
-        data = request.get_json()
+        # Prevent concurrent writes that may create duplicate notes
+        with SAVE_LOCK:
+            username = get_current_username()
+            if not username:
+                return jsonify({"error": "Unauthorized"}), 401
+            data = request.get_json()
         
         if not data:
             return jsonify({"error": "No se recibieron datos"}), 400
@@ -1354,13 +1415,13 @@ def save_note():
             except Exception as e:
                 print(f"Webhook error: {e}")
 
-        return jsonify({
-            "success": True,
-            "message": "Nota guardada correctamente",
-            "filename": new_filename,
-            "filepath": new_filepath
-        })
-        
+            return jsonify({
+                "success": True,
+                "message": "Nota guardada correctamente",
+                "filename": new_filename,
+                "filepath": new_filepath
+            })
+
     except Exception as e:
         return jsonify({"error": f"Error al guardar la nota: {str(e)}"}), 500
 
@@ -1461,9 +1522,30 @@ def list_saved_notes():
         if not username:
             return jsonify({"error": "Unauthorized"}), 401
         saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
-        
         if not os.path.exists(saved_notes_dir):
             return jsonify({"notes": [], "message": "Directorio saved_notes no existe"})
+
+        # Ensure missing metadata is created for this user's notes
+        for fname in os.listdir(saved_notes_dir):
+            if fname.endswith('.md'):
+                meta = f"{os.path.join(saved_notes_dir, fname)}.meta"
+                if not os.path.exists(meta):
+                    note_id = parse_note_id_from_md(os.path.join(saved_notes_dir, fname))
+                    if not note_id:
+                        stat = os.stat(os.path.join(saved_notes_dir, fname))
+                        note_id = str(int(stat.st_mtime * 1000))
+                    stat = os.stat(os.path.join(saved_notes_dir, fname))
+                    meta_data = {
+                        "id": note_id,
+                        "title": os.path.splitext(fname)[0],
+                        "updated": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        "tags": []
+                    }
+                    try:
+                        with open(meta, 'w', encoding='utf-8') as mf:
+                            json.dump(meta_data, mf, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
         
         # Listar todos los archivos .md en el directorio
         notes = []
@@ -1518,38 +1600,36 @@ def cleanup_notes():
         if not os.path.exists(saved_notes_dir):
             return jsonify({"message": "No hay directorio de notas guardadas"}), 200
         
-        migrated_count = 0
+        created = 0
         for filename in os.listdir(saved_notes_dir):
-            if filename.endswith('.md'):
-                filepath = os.path.join(saved_notes_dir, filename)
-                try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # Si la nota no tiene ID, agregarle uno basado en el timestamp del archivo
-                    if "*Nota ID:" not in content:
-                        # Generar un ID único basado en el timestamp del archivo
-                        stat = os.stat(filepath)
-                        note_id = int(stat.st_mtime * 1000)  # Timestamp en ms
-                        
-                        # Agregar el ID al final del archivo
-                        if content.endswith('\n'):
-                            content += f"\n---\n*Nota ID: {note_id}*\n"
-                        else:
-                            content += f"\n\n---\n*Nota ID: {note_id}*\n"
-                        
-                        with open(filepath, 'w', encoding='utf-8') as f:
-                            f.write(content)
-                        
-                        migrated_count += 1
-                
-                except (IOError, UnicodeDecodeError) as e:
-                    continue
-        
+            if not filename.endswith('.md'):
+                continue
+            md_path = os.path.join(saved_notes_dir, filename)
+            meta_path = f"{md_path}.meta"
+            if os.path.exists(meta_path):
+                continue
+            note_id = parse_note_id_from_md(md_path)
+            if not note_id:
+                stat = os.stat(md_path)
+                note_id = str(int(stat.st_mtime * 1000))
+            stat = os.stat(md_path)
+            metadata = {
+                "id": note_id,
+                "title": os.path.splitext(filename)[0],
+                "updated": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "tags": []
+            }
+            try:
+                with open(meta_path, 'w', encoding='utf-8') as meta_file:
+                    json.dump(metadata, meta_file, ensure_ascii=False, indent=2)
+                created += 1
+            except Exception:
+                continue
+
         return jsonify({
             "success": True,
-            "message": f"Migradas {migrated_count} notas a la nueva estructura",
-            "migrated_count": migrated_count
+            "message": f"Metadatos creados: {created}",
+            "migrated_count": created
         })
         
     except Exception as e:
