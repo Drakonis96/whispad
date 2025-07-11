@@ -92,6 +92,9 @@ class NotesApp {
         this.currentNote = null;
         this.isRecording = false;
         this.autoSaveTimeout = null;
+        this.saveInProgress = false;
+        this.pendingSave = false;
+        this.lastSaveHash = '';
         this.searchTerm = '';
         this.selectedText = '';
         this.selectedRange = null;
@@ -1201,16 +1204,22 @@ class NotesApp {
     
     handleEditorChange() {
         if (!this.currentNote) return;
-        
+
+        const content = document.getElementById('editor').innerHTML;
+        if (content === this.currentNote.content) return;
+
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
             this.saveCurrentNote(true);
         }, 2000);
     }
-    
+
     handleTitleChange() {
         if (!this.currentNote) return;
-        
+
+        const title = document.getElementById('note-title').value.trim();
+        if (title === this.currentNote.title) return;
+
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
             this.saveCurrentNote(true);
@@ -1219,9 +1228,15 @@ class NotesApp {
     
     saveCurrentNote(silent = false) {
         if (!this.currentNote) return;
-        
+
+        clearTimeout(this.autoSaveTimeout);
+
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('editor').innerHTML;
+
+        if (silent && title === this.currentNote.title && content === this.currentNote.content) {
+            return;
+        }
         
         this.currentNote.title = title || 'Untitled Note';
         this.currentNote.content = content;
@@ -1244,27 +1259,40 @@ class NotesApp {
     
     async saveNoteToServer(silent = false) {
         if (!this.currentNote) return;
-        
+
+        const payload = {
+            id: this.currentNote.id,
+            title: this.currentNote.title,
+            content: this.currentNote.content,
+            tags: this.currentNote.tags || []
+        };
+
+        const hash = JSON.stringify(payload);
+        if (this.lastSaveHash === hash && silent) {
+            return;
+        }
+        this.lastSaveHash = hash;
+
+        if (this.saveInProgress) {
+            this.pendingSave = true;
+            return;
+        }
+
+        this.saveInProgress = true;
+
         try {
             const response = await authFetch('/api/save-note', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    id: this.currentNote.id,
-                    title: this.currentNote.title,
-                    content: this.currentNote.content,
-                    tags: this.currentNote.tags || []
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             const result = await response.json();
-            
+
             if (!silent && result.success) {
                 console.log(`Note saved to server: ${result.filename}`);
             }
@@ -1272,6 +1300,12 @@ class NotesApp {
             console.error('Error saving note to server:', error);
             if (!silent) {
                 this.showNotification('Error saving note to server', 'error');
+            }
+        } finally {
+            this.saveInProgress = false;
+            if (this.pendingSave) {
+                this.pendingSave = false;
+                this.saveNoteToServer(true);
             }
         }
     }
