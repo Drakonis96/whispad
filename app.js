@@ -4169,6 +4169,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.style.display = 'none';
             }
         });
+        // Clear any loaded notes, tags and editor contents when logging out
+        if (window.notesApp) {
+            window.notesApp.notes = [];
+            window.notesApp.currentNote = null;
+            if (window.notesApp.selectedTags) window.notesApp.selectedTags.clear();
+            window.notesApp.searchTerm = '';
+        }
+        const notesList = document.getElementById('notes-list');
+        if (notesList) notesList.innerHTML = '';
+        const tagFilter = document.getElementById('tag-filter-bar');
+        if (tagFilter) tagFilter.innerHTML = '';
+        const editor = document.getElementById('editor');
+        if (editor) editor.innerHTML = '';
+        const noteTitle = document.getElementById('note-title');
+        if (noteTitle) noteTitle.value = '';
+        document.querySelector('.editor-container')?.classList.add('hidden');
         loginScreen.classList.remove('hidden');
         appContent.classList.add('hidden');
     });
