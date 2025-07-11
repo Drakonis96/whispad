@@ -83,7 +83,7 @@
             <button class="btn btn--outline btn--sm" id="restore-btn" title="Restore notes from files">
                 <i class="fas fa-upload"></i>&nbsp;Restore
             </button>
-            <button class="btn btn--outline btn--sm" id="upload-models-btn" title="Manage whisper.cpp models">
+            <button class="btn btn--outline btn--sm admin-only" id="upload-models-btn" title="Manage whisper.cpp models">
                 <i class="fas fa-download"></i>&nbsp;Models
             </button>
             <button class="btn btn--outline btn--sm hidden" id="user-btn" title="User management">
@@ -272,7 +272,7 @@
                             <option value="gpt-4o-transcribe">GPT-4o - High Precision</option>
                         </select>
                     </div>
-                    <div class="model-config">
+                    <div class="model-config restricted-option">
                         <label class="form-label">Transcription Options</label>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
@@ -282,11 +282,11 @@
                             </label>
                         </div>
                     </div>
-                    <div class="model-config">
+                    <div class="model-config restricted-option">
                         <label class="form-label">Transcription Context (GPT-4o)</label>
                         <textarea class="form-control" id="transcription-prompt" placeholder="E.g.: Technical conversation about artificial intelligence..." rows="2"></textarea>
                     </div>
-                    <div class="model-config">
+                    <div class="model-config restricted-option">
                         <label class="form-label">Transcription Language</label>
                         <select class="form-control" id="transcription-language">
                             <option value="auto">Auto-detect</option>
@@ -351,7 +351,7 @@
                         </select>
                         <small>Select the language you will speak to improve accuracy</small>
                     </div>
-                    <div class="model-config" id="sensevoice-options" style="display: none;">
+                    <div class="model-config restricted-option" id="sensevoice-options" style="display: none;">
                         <label class="form-label">SenseVoice Features</label>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
@@ -396,7 +396,7 @@
                         <option value="gemini-2.0-flash">Gemini 2.0 Flash (Google)</option>
                     </select>
                 </div>
-                <div class="config-section" id="lmstudio-options" style="display: none;">
+                <div class="config-section restricted-option" id="lmstudio-options" style="display: none;">
                     <h5>LM Studio Server</h5>
                     <div class="api-key-group">
                         <label class="form-label">Host</label>
@@ -412,7 +412,7 @@
                         <button class="btn btn--primary btn--sm" id="update-lmstudio-models-btn">Update Models</button>
                 </div>
                 </div>
-                <div class="config-section" id="ollama-options" style="display: none;">
+                <div class="config-section restricted-option" id="ollama-options" style="display: none;">
                     <h5>Ollama Server</h5>
                     <div class="api-key-group">
                         <label class="form-label">Host</label>
@@ -428,7 +428,7 @@
                         <button class="btn btn--primary btn--sm" id="update-ollama-models-btn">Update Models</button>
                     </div>
                 </div>
-                <div class="config-section">
+                <div class="config-section restricted-option">
                     <h5>Advanced Post-processing Configuration</h5>
                     <div class="advanced-config">
                         <div class="config-row">
@@ -468,7 +468,7 @@
                     </div>
                 </div>
                 <h4 class="config-group-title">Interface Options</h4>
-                <div class="config-section">
+                <div class="config-section restricted-option">
                     <div class="checkbox-group">
                         <label class="checkbox-label">
                             <input type="checkbox" id="show-mobile-record" checked>

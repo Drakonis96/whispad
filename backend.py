@@ -1821,6 +1821,9 @@ def upload_note():
 def upload_model():
     """Upload a whisper.cpp model file to the whisper-cpp-models directory"""
     try:
+        username = get_current_username()
+        if username != 'admin':
+            return jsonify({"error": "Unauthorized"}), 403
         if 'model' not in request.files:
             return jsonify({"error": "No se recibió archivo"}), 400
 
@@ -1849,6 +1852,9 @@ def upload_model():
 @app.route('/api/download-model', methods=['POST'])
 def download_model():
     """Download a whisper.cpp model from the internet with progress via SSE"""
+    username = get_current_username()
+    if username != 'admin':
+        return jsonify({"error": "Unauthorized"}), 403
     data = request.get_json() or {}
     size = data.get('size')
 
@@ -1894,6 +1900,9 @@ def download_model():
 def download_sensevoice():
     """Download SenseVoice model from Hugging Face with progress via SSE"""
     try:
+        username = get_current_username()
+        if username != 'admin':
+            return jsonify({"error": "Unauthorized"}), 403
         def generate():
             try:
                 # Import huggingface_hub here to avoid startup dependency

@@ -1,6 +1,7 @@
 // Authentication token and current user
 let authToken = '';
 let currentUser = '';
+let isAdmin = false;
 
 const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
 const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
@@ -747,7 +748,8 @@ class NotesApp {
 
     // Configuración
     loadConfig() {
-        const saved = localStorage.getItem('notes-app-config');
+        const storageKey = `notes-app-config-${currentUser}`;
+        const saved = localStorage.getItem(storageKey);
         if (saved) {
             this.config = { ...this.config, ...JSON.parse(saved) };
         }
@@ -807,7 +809,8 @@ class NotesApp {
             ollamaModels
         };
 
-        localStorage.setItem('notes-app-config', JSON.stringify(this.config));
+        const storageKey = `notes-app-config-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.config));
         this.updateMobileFabVisibility();
         this.hideConfigModal();
         this.showNotification('Configuration saved');
@@ -895,6 +898,16 @@ class NotesApp {
         // Mostrar/ocultar opciones Ollama según el proveedor seleccionado
         this.toggleOllamaOptions();
 
+        if (!isAdmin) {
+            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
+                el.disabled = true;
+            });
+        } else {
+            document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
+                el.disabled = false;
+            });
+        }
+
         const modal = document.getElementById('config-modal');
         this.hideMobileFab();
         modal.classList.add('active');
@@ -974,7 +987,8 @@ class NotesApp {
 
     saveStylesConfig() {
         // Guardar configuración en localStorage
-        localStorage.setItem('notes-app-styles-config', JSON.stringify(this.stylesConfig));
+        const storageKey = `notes-app-styles-config-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.stylesConfig));
         
         // Actualizar botones de IA
         this.updateAIButtons();
@@ -986,7 +1000,8 @@ class NotesApp {
     }
 
     loadStylesConfig() {
-        const saved = localStorage.getItem('notes-app-styles-config');
+        const storageKey = `notes-app-styles-config-${currentUser}`;
+        const saved = localStorage.getItem(storageKey);
         if (saved) {
             const savedConfig = JSON.parse(saved);
             
@@ -4061,7 +4076,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentUser = data.username;
             allowedTranscriptionProviders = data.transcription_providers || [];
             allowedPostprocessProviders = data.postprocess_providers || [];
-            if (data.is_admin) {
+            isAdmin = data.is_admin;
+            if (isAdmin) {
                 document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
             } else {
                 document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
@@ -4097,7 +4113,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentUser = username;
                 allowedTranscriptionProviders = data.transcription_providers || [];
                 allowedPostprocessProviders = data.postprocess_providers || [];
-                if (data.is_admin) {
+                isAdmin = data.is_admin;
+                if (isAdmin) {
                     document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
                 } else {
                     document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
@@ -4134,6 +4151,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = '';
         allowedTranscriptionProviders = [];
         allowedPostprocessProviders = [];
+        isAdmin = false;
         localStorage.removeItem('notes-app-session');
         usernameInput.value = '';
         passwordInput.value = '';
