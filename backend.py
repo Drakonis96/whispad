@@ -389,14 +389,14 @@ def transcribe_audio():
         if provider == 'local':
             if not WHISPER_CPP_AVAILABLE:
                 return jsonify({"error": "Whisper.cpp local no está disponible"}), 500
-            
-            # Usar whisper.cpp local
+
+            if not model_name:
+                return jsonify({"error": "Model not specified"}), 400
+
             audio_bytes = audio_file.read()
 
-            model_path = None
-            if model_name:
-                models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
-                model_path = os.path.join(models_dir, os.path.basename(model_name))
+            models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+            model_path = os.path.join(models_dir, os.path.basename(model_name))
 
             result = whisper_wrapper.transcribe_audio_from_bytes(
                 audio_bytes,
@@ -409,7 +409,7 @@ def transcribe_audio():
                 return jsonify({
                     "transcription": result.get('transcription', ''),
                     "provider": "local",
-                    "model": result.get('model', 'whisper-tiny-local')
+                    "model": result.get('model')
                 })
             else:
                 return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
@@ -458,9 +458,12 @@ def transcribe_audio():
         else:  # OpenAI
             if not OPENAI_API_KEY:
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
-            
+
+            if not model_name:
+                return jsonify({"error": "Model not specified"}), 400
+
             # Preparar la petición a OpenAI
-            model_to_use = model_name if model_name else 'whisper-1'
+            model_to_use = model_name
             files = {
                 'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
                 'model': (None, model_to_use)
@@ -517,12 +520,16 @@ def improve_text():
         
         if stream:
             if provider == 'openai':
-                model = data.get('model', 'gpt-3.5-turbo')
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openai_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
                 return improve_text_google_stream(text, improvement_type, custom_prompt)
             elif provider == 'openrouter':
-                model = data.get('model', 'google/gemma-3-27b-it:free')
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openrouter_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'lmstudio':
                 model = data.get('model')
@@ -538,12 +545,16 @@ def improve_text():
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
             if provider == 'openai':
-                model = data.get('model', 'gpt-3.5-turbo')
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openai(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
                 return improve_text_google(text, improvement_type, custom_prompt)
             elif provider == 'openrouter':
-                model = data.get('model', 'google/gemma-3-27b-it:free')
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openrouter(text, improvement_type, model, custom_prompt)
             elif provider == 'lmstudio':
                 model = data.get('model')
@@ -561,10 +572,13 @@ def improve_text():
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-def improve_text_openai(text, improvement_type, model='gpt-3.5-turbo', custom_prompt=None):
+def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenAI"""
     if not OPENAI_API_KEY:
         return jsonify({"error": "API key de OpenAI no configurada"}), 500
+
+    if not model:
+        return jsonify({"error": "Model not specified"}), 400
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
@@ -659,10 +673,13 @@ def improve_text_google(text, improvement_type, custom_prompt=None):
     else:
         return jsonify({"error": "Error al mejorar el texto con Google AI"}), response.status_code
 
-def improve_text_openai_stream(text, improvement_type, custom_prompt=None):
+def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenAI con streaming"""
     if not OPENAI_API_KEY:
         return jsonify({"error": "API key de OpenAI no configurada"}), 500
+
+    if not model:
+        return jsonify({"error": "Model not specified"}), 400
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
@@ -818,10 +835,13 @@ def improve_text_google_stream(text, improvement_type, custom_prompt=None):
     
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
-def improve_text_openrouter(text, improvement_type, model='google/gemma-3-27b-it:free', custom_prompt=None):
+def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenRouter"""
     if not OPENROUTER_API_KEY:
         return jsonify({"error": "API key de OpenRouter no configurada"}), 500
+
+    if not model:
+        return jsonify({"error": "Model not specified"}), 400
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
@@ -886,11 +906,16 @@ def improve_text_openrouter(text, improvement_type, model='google/gemma-3-27b-it
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-def improve_text_openrouter_stream(text, improvement_type, model='google/gemma-3-27b-it:free', custom_prompt=None):
+def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenRouter con streaming"""
     if not OPENROUTER_API_KEY:
         def generate_error():
             yield f"data: {json.dumps({'error': 'API key de OpenRouter no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    if not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Model not specified'})}\n\n"
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
     
     # Si se proporciona un prompt personalizado, usarlo directamente
@@ -1226,7 +1251,7 @@ def transcribe_audio_gpt4o():
             return jsonify({"error": "Archivo de audio vacío"}), 400
         
         # Obtener parámetros del request
-        model = request.form.get('model', 'gpt-4o-mini-transcribe')  # Por defecto gpt-4o-mini-transcribe
+        model = request.form.get('model')
         language = request.form.get('language', None)  # None = detección automática
         prompt = request.form.get('prompt', None)  # Prompt para mejorar transcripción
         response_format = request.form.get('response_format', 'json')  # json o text
@@ -1245,6 +1270,10 @@ def transcribe_audio_gpt4o():
             print(f"[WARNING] Streaming solicitado pero no soportado por OpenAI para transcripciones. Usando modo normal.")
             stream = False
         
+        if not model:
+            print(f"[ERROR] Modelo no especificado")
+            return jsonify({"error": "Model not specified"}), 400
+
         # Validar modelo
         if model not in ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe']:
             print(f"[ERROR] Modelo no válido: {model}")
