@@ -982,8 +982,7 @@ class NotesApp {
     }
     
     saveToStorage() {
-        // Notes are always fetched from the backend. Avoid persisting them
-        // locally to prevent stale data when users switch accounts.
+        localStorage.setItem('notes-app-data', JSON.stringify(this.notes));
     }
     
     async createNewNote() {
@@ -4170,14 +4169,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.style.display = 'none';
             }
         });
-        // Clear any loaded notes and editor content to avoid showing previous
-        // user's data before new notes are fetched after login.
-        if (window.notesApp) {
-            document.getElementById('notes-list').innerHTML = '';
-            document.getElementById('note-title').value = '';
-            document.getElementById('editor').innerHTML = '';
-            window.notesApp = null;
-        }
         loginScreen.classList.remove('hidden');
         appContent.classList.add('hidden');
     });
