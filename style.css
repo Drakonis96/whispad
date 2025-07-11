@@ -1273,6 +1273,9 @@ select.form-control {
     justify-content: center;
     z-index: 1000;
 }
+.login-screen.hidden {
+    display: none;
+}
 
 .login-box {
     text-align: center;
