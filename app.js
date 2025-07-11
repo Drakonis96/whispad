@@ -4159,6 +4159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         allowedPostprocessProviders = [];
         isAdmin = false;
         localStorage.removeItem('notes-app-session');
+        localStorage.removeItem('notes-app-data');
         usernameInput.value = '';
         passwordInput.value = '';
         currentUserBtn.classList.add('hidden');
