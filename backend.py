@@ -460,9 +460,10 @@ def transcribe_audio():
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
             
             # Preparar la petición a OpenAI
+            model_to_use = model_name if model_name else 'whisper-1'
             files = {
                 'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
-                'model': (None, 'whisper-1')
+                'model': (None, model_to_use)
             }
             
             # Solo añadir language si se especifica (None = auto-detectar)
@@ -484,7 +485,7 @@ def transcribe_audio():
                 return jsonify({
                     "transcription": result.get('text', ''),
                     "provider": "openai",
-                    "model": "whisper-1"
+                    "model": model_to_use
                 })
             else:
                 return jsonify({"error": "Error en la transcripción"}), response.status_code
@@ -516,7 +517,8 @@ def improve_text():
         
         if stream:
             if provider == 'openai':
-                return improve_text_openai_stream(text, improvement_type, custom_prompt)
+                model = data.get('model', 'gpt-3.5-turbo')
+                return improve_text_openai_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
                 return improve_text_google_stream(text, improvement_type, custom_prompt)
             elif provider == 'openrouter':
@@ -536,7 +538,8 @@ def improve_text():
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
             if provider == 'openai':
-                return improve_text_openai(text, improvement_type, custom_prompt)
+                model = data.get('model', 'gpt-3.5-turbo')
+                return improve_text_openai(text, improvement_type, model, custom_prompt)
             elif provider == 'google':
                 return improve_text_google(text, improvement_type, custom_prompt)
             elif provider == 'openrouter':
@@ -558,7 +561,7 @@ def improve_text():
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
-def improve_text_openai(text, improvement_type, custom_prompt=None):
+def improve_text_openai(text, improvement_type, model='gpt-3.5-turbo', custom_prompt=None):
     """Mejorar texto usando OpenAI"""
     if not OPENAI_API_KEY:
         return jsonify({"error": "API key de OpenAI no configurada"}), 500
@@ -587,7 +590,7 @@ def improve_text_openai(text, improvement_type, custom_prompt=None):
     }
     
     payload = {
-        'model': 'gpt-3.5-turbo',
+        'model': model,
         'messages': [
             {
                 'role': 'user',
@@ -685,7 +688,7 @@ def improve_text_openai_stream(text, improvement_type, custom_prompt=None):
     }
     
     payload = {
-        'model': 'gpt-3.5-turbo',
+        'model': model,
         'messages': [
             {
                 'role': 'user',
