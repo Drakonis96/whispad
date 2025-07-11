@@ -387,14 +387,13 @@ class NotesApp {
             this.showStylesConfigModal();
         });
 
-        document.getElementById('user-btn').addEventListener('click', async () => {
-            document.getElementById('user-modal').classList.add('active');
+        async function refreshUserList() {
             const listResp = await authFetch('/api/list-users');
             if (listResp.ok) {
                 const data = await listResp.json();
                 const list = document.getElementById('users-list');
                 list.innerHTML = '';
-                data.users.forEach(u => {
+                data.users.filter(u => u.username !== 'admin').forEach(u => {
                     const li = document.createElement('li');
                     li.className = 'user-item';
                     const title = document.createElement('strong');
@@ -461,6 +460,11 @@ class NotesApp {
                     list.appendChild(li);
                 });
             }
+        }
+
+        document.getElementById('user-btn').addEventListener('click', async () => {
+            document.getElementById('user-modal').classList.add('active');
+            await refreshUserList();
         });
         document.getElementById('close-user-modal').addEventListener('click', () => {
             document.getElementById('user-modal').classList.remove('active');
@@ -510,6 +514,7 @@ class NotesApp {
                 document.getElementById('create-username').value = '';
                 document.getElementById('create-password').value = '';
                 document.querySelectorAll('#create-tab input[type="checkbox"]').forEach(cb => cb.checked = false);
+                await refreshUserList();
             } else {
                 alert('Error creating user');
             }
@@ -4000,7 +4005,8 @@ function initApp() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const loginModal = document.getElementById('login-modal');
+    const loginScreen = document.getElementById('login-screen');
+    const appContent = document.getElementById('app-content');
     const loginBtn = document.getElementById('login-submit');
     const currentUserBtn = document.getElementById('current-user-btn');
     const logoutBtn = document.getElementById('logout-btn');
@@ -4025,7 +4031,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 currentUserBtn.textContent = username;
                 currentUserBtn.classList.remove('hidden');
                 logoutBtn.classList.remove('hidden');
-                loginModal.classList.remove('active');
+                loginScreen.classList.add('hidden');
+                appContent.classList.remove('hidden');
                 initApp();
             } else {
                 alert('Login failed');
@@ -4044,7 +4051,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUserBtn.classList.add('hidden');
         logoutBtn.classList.add('hidden');
         document.getElementById('user-btn').classList.add('hidden');
-        loginModal.classList.add('active');
+        loginScreen.classList.remove('hidden');
+        appContent.classList.add('hidden');
     });
 });
 

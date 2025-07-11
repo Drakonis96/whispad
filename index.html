@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <!-- Login modal -->
-    <div class="modal active" id="login-modal">
-        <div class="modal-content">
+    <!-- Login screen -->
+    <div class="login-screen" id="login-screen">
+        <div class="login-box">
             <img src="logos/logo.png" alt="WhisPad Logo" class="login-logo">
             <h3>Login</h3>
             <div class="modal-body">
@@ -64,6 +64,7 @@
             </div>
         </div>
     </div>
+    <div id="app-content" class="hidden">
     <!-- App Header -->
     <header class="app-header">
         <div class="app-brand">
@@ -589,6 +590,7 @@
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
+    </div> <!-- end app-content -->
     <script src="backend-api.js"></script>
     <script src="app.js"></script>
 </body>

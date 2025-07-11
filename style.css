@@ -1259,8 +1259,30 @@ select.form-control {
     position: relative;
 }
 
-#login-modal .modal-content {
+
+/* Login screen */
+.login-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.login-box {
     text-align: center;
+    background-color: var(--color-surface);
+    padding: var(--space-24);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    width: 80%;
+    max-width: 400px;
 }
 
 .login-logo {
