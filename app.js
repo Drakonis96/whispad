@@ -3508,6 +3508,7 @@ class NotesApp {
         const overlay = document.getElementById('processing-overlay');
         const textElement = document.getElementById('processing-text');
         textElement.textContent = text;
+        textElement.scrollTop = textElement.scrollHeight;
         overlay.classList.add('active');
     }
 
@@ -3515,6 +3516,7 @@ class NotesApp {
         const textElement = document.getElementById('processing-text');
         if (textElement) {
             textElement.textContent = text;
+            textElement.scrollTop = textElement.scrollHeight;
         }
     }
     
