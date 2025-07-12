@@ -17,6 +17,7 @@ class SenseVoiceWrapper:
     def __init__(self):
         self.model = None
         self.model_loaded = False
+        self.diarization_enabled = False
         self.supported_languages = {
             'auto': 'Auto-detect',
             'zh': 'Chinese (Mandarin)',
@@ -212,10 +213,14 @@ class SenseVoiceWrapper:
             print(f"Error installing dependencies: {e}")
             return False
     
-    def _load_model(self):
-        """Load the SenseVoice model"""
+    def _load_model(self, with_diarization: bool = False):
+        """Load the SenseVoice model optionally with speaker diarization"""
         if self.model_loaded:
-            return True
+            if with_diarization and not self.diarization_enabled:
+                # Need to reload with diarization support
+                self.model_loaded = False
+            else:
+                return True
             
         try:
             print("Starting SenseVoice model loading process...")
@@ -267,10 +272,14 @@ class SenseVoiceWrapper:
             
             # Load model with VAD for better accuracy (less strict settings)
             print("Loading SenseVoice model with AutoModel...")
+            punc_model = "ct-punc" if with_diarization else None
+            spk_model = "cam++" if with_diarization else None
             self.model = AutoModel(
                 model=model_dir,
                 trust_remote_code=True,
                 vad_model="fsmn-vad",
+                punc_model=punc_model,
+                spk_model=spk_model,
                 vad_kwargs={
                     "max_single_segment_time": 30000,
                     "max_start_silence_time": 5000,
@@ -284,8 +293,9 @@ class SenseVoiceWrapper:
             
             # Store postprocess function
             self.rich_transcription_postprocess = rich_transcription_postprocess
-            
+
             self.model_loaded = True
+            self.diarization_enabled = with_diarization
             print("SenseVoice model loaded successfully!")
             return True
             
@@ -295,12 +305,12 @@ class SenseVoiceWrapper:
             traceback.print_exc()
             return False
     
-    def transcribe_audio_from_bytes(self, audio_bytes: bytes, filename: str, 
-                                  language: Optional[str] = None, 
+    def transcribe_audio_from_bytes(self, audio_bytes: bytes, filename: str,
+                                  language: Optional[str] = None,
                                   detect_emotion: bool = True,
                                   detect_events: bool = True,
-                                  use_itn: bool = True) -> Dict:
-        """
+                                  use_itn: bool = True,
+                                  speaker_diarization: bool = False) -> Dict:
         Transcribe audio from bytes with SenseVoice
         
         Args:
@@ -316,7 +326,7 @@ class SenseVoiceWrapper:
         """
         try:
             # Load model if not already loaded
-            if not self._load_model():
+            if not self._load_model(with_diarization=speaker_diarization):
                 return {
                     'success': False,
                     'error': 'Failed to load SenseVoice model'
@@ -344,6 +354,8 @@ class SenseVoiceWrapper:
                     batch_size_s=60,
                     merge_vad=False,  # Don't merge VAD segments for better detection
                     merge_length_s=0,  # Don't merge short segments
+                    sentence_timestamp=speaker_diarization,
+                    return_spk_res=speaker_diarization,
                 )
                 
                 if not res or len(res) == 0:
@@ -369,7 +381,18 @@ class SenseVoiceWrapper:
                 
                 # Clean text for final output (remove special tokens)
                 clean_text = self._clean_transcription_text(processed_text)
-                
+
+                speaker_segments = []
+                if speaker_diarization:
+                    for seg in result.get("sentence_info", []):
+                        spk = seg.get("spk") if seg.get("spk") is not None else seg.get("speaker", 0)
+                        speaker_segments.append({
+                            'speaker': f"Speaker {int(spk) + 1}",
+                            'text': seg.get('sentence'),
+                            'start': seg.get('start'),
+                            'end': seg.get('end')
+                        })
+
                 return {
                     'success': True,
                     'transcription': clean_text,
@@ -378,6 +401,7 @@ class SenseVoiceWrapper:
                     'language_detected': result.get("language", language),
                     'emotion': emotion if detect_emotion else None,
                     'events': events if detect_events else [],
+                    'speaker_segments': speaker_segments if speaker_diarization else [],
                     'model': 'SenseVoiceSmall',
                     'provider': 'sensevoice'
                 }
