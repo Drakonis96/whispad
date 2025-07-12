@@ -38,6 +38,8 @@ LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
 LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
+# Enable or disable multi-user support (default True)
+MULTI_USER = os.getenv('MULTI_USER', 'true').lower() != 'false'
 # File to persist LM Studio/Ollama configuration set by the admin
 SERVER_CONFIG_FILE = os.path.join('data', 'server_config.json')
 
@@ -227,6 +229,8 @@ migrate_notes_to_admin_folder()
 create_missing_meta_files()
 
 def get_current_username():
+    if not MULTI_USER:
+        return 'admin'
     token = request.headers.get('Authorization')
     if not token:
         return None
@@ -297,10 +301,13 @@ def logout_user():
 @app.route('/api/session-info', methods=['GET'])
 def session_info():
     """Return information about the current session if the token is valid"""
-    token = request.headers.get('Authorization')
-    username = SESSIONS.get(token)
-    if not username:
-        return jsonify({"authenticated": False}), 401
+    if not MULTI_USER:
+        username = 'admin'
+    else:
+        token = request.headers.get('Authorization')
+        username = SESSIONS.get(token)
+        if not username:
+            return jsonify({"authenticated": False}), 401
     user = USERS.get(username, {})
     if username == 'admin':
         tp = ALL_TRANSCRIPTION_PROVIDERS
@@ -1667,6 +1674,14 @@ def check_apis():
         'openrouter': bool(OPENROUTER_API_KEY)
     }
     return jsonify(apis_status)
+
+
+@app.route('/api/app-config', methods=['GET'])
+def app_config():
+    """Return basic frontend configuration"""
+    return jsonify({
+        "multi_user": MULTI_USER
+    })
 
 
 @app.route('/api/default-provider-config', methods=['GET'])
