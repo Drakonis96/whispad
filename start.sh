@@ -28,7 +28,7 @@ if [ ! -f /app/users.json ]; then
     echo "Creating default users.json file..."
     cp /app/users.json.template /app/users.json 2>/dev/null || echo '{"admin":{"password":"whispad","is_admin":true,"transcription_providers":["openai","local","sensevoice"],"postprocess_providers":["openai","google","openrouter","lmstudio","ollama"]}}' > /app/users.json
 fi
-chmod 644 /app/users.json
+chmod 666 /app/users.json
 
 # Asegurar que los archivos estáticos tengan los permisos correctos
 echo "Configurando permisos de archivos estáticos..."
