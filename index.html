@@ -168,6 +168,14 @@
                         </button>
                     </div>
                 </div>
+                <div class="toolbar-section">
+                    <h3>Audio</h3>
+                    <div class="audio-controls">
+                        <button class="btn btn--outline btn--sm" id="voice-notes-btn">
+                            <i class="fas fa-headphones"></i>&nbsp;Voice notes
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <!-- Editing area -->
@@ -479,6 +487,16 @@
                         </label>
                     </div>
                 </div>
+                <h4 class="config-group-title">Audio files</h4>
+                <div class="config-section">
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="save-voice-notes">
+                            <span class="checkmark"></span>
+                            Enable saving voice-notes
+                        </label>
+                    </div>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-config">Cancel</button>
@@ -590,6 +608,17 @@
             
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-upload-models">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice notes modal -->
+    <div class="modal" id="voice-notes-modal">
+        <div class="modal-content">
+            <h3>Voice Notes</h3>
+            <div id="voice-notes-list" class="voice-notes-list"></div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-voice-notes">Close</button>
             </div>
         </div>
     </div>

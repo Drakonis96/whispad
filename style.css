@@ -2481,3 +2481,18 @@ select.form-control {
 .user-item:last-child {
     border-bottom: none;
 }
+
+.audio-controls {
+    display: flex;
+    gap: var(--space-8);
+    margin-bottom: var(--space-12);
+}
+
+.voice-notes-list .audio-item {
+    margin-bottom: var(--space-12);
+}
+
+.voice-notes-list audio {
+    width: 100%;
+    margin-bottom: var(--space-4);
+}

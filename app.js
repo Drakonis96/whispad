@@ -2,6 +2,7 @@
 let authToken = '';
 let currentUser = '';
 let isAdmin = false;
+let canDeleteAudio = false;
 
 const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
 const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
@@ -140,7 +141,8 @@ class NotesApp {
             lmstudioModels: '',
             ollamaHost: '127.0.0.1',
             ollamaPort: '11434',
-            ollamaModels: ''
+            ollamaModels: '',
+            saveVoiceNotes: false
         };
         
         // Visible styles configuration
@@ -173,6 +175,7 @@ class NotesApp {
         this.setupSidebarResponsive();
         this.setupMobileHeaderActions();
         this.updateMobileFabVisibility();
+        this.updateVoiceNotesVisibility();
 
         // Migrate existing notes without ID
         await this.migrateExistingNotes();
@@ -297,6 +300,17 @@ class NotesApp {
                 this.toggleRecording();
             };
             mobileFab.addEventListener('click', handleMobileFab);
+        }
+
+        const voiceBtn = document.getElementById('voice-notes-btn');
+        const closeVoiceModal = document.getElementById('close-voice-notes');
+        if (voiceBtn) {
+            voiceBtn.addEventListener('click', () => {
+                this.showVoiceNotesModal();
+            });
+        }
+        if (closeVoiceModal) {
+            closeVoiceModal.addEventListener('click', () => this.hideVoiceNotesModal());
         }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
@@ -633,6 +647,7 @@ class NotesApp {
         const topP = parseFloat(document.getElementById('top-p-range').value);
         const responseStyle = document.getElementById('response-style').value;
         const showMobileRecordButton = document.getElementById('show-mobile-record').checked;
+        const saveVoiceNotes = document.getElementById('save-voice-notes')?.checked ?? false;
         const lmstudioHost = document.getElementById('lmstudio-host').value.trim();
         const lmstudioPort = document.getElementById('lmstudio-port').value.trim();
         const lmstudioModels = document.getElementById('lmstudio-models').value.trim();
@@ -657,6 +672,7 @@ class NotesApp {
             topP,
             responseStyle,
             showMobileRecordButton,
+            saveVoiceNotes,
             lmstudioHost,
             lmstudioPort,
             lmstudioModels,
@@ -681,6 +697,7 @@ class NotesApp {
             }).catch(() => {});
         }
         this.updateMobileFabVisibility();
+        this.updateVoiceNotesVisibility();
         this.hideConfigModal();
         this.showNotification('Configuration saved');
     }
@@ -745,6 +762,8 @@ class NotesApp {
         document.getElementById('top-p-range').value = this.config.topP || 0.95;
         document.getElementById('response-style').value = this.config.responseStyle || 'balanced';
         document.getElementById('show-mobile-record').checked = this.config.showMobileRecordButton !== false;
+        const svn = document.getElementById('save-voice-notes');
+        if (svn) svn.checked = this.config.saveVoiceNotes === true;
         document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
         document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
         document.getElementById('lmstudio-models').value = this.config.lmstudioModels || '';
@@ -768,6 +787,8 @@ class NotesApp {
         this.toggleLmStudioOptions();
         // Mostrar/ocultar opciones Ollama según el proveedor seleccionado
         this.toggleOllamaOptions();
+
+        this.updateVoiceNotesVisibility();
 
         if (!isAdmin) {
             document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
@@ -2326,6 +2347,7 @@ class NotesApp {
             if (transcription) {
                 this.insertTranscription(transcription);
                 this.showNotification('Transcription completed');
+                await this.saveAudioNote(audioBlob, transcription);
             }
             
         } catch (error) {
@@ -4002,6 +4024,102 @@ class NotesApp {
         mobileFab.classList.toggle('hidden', !shouldShow);
     }
 
+    updateVoiceNotesVisibility() {
+        const btn = document.getElementById('voice-notes-btn');
+        if (!btn) return;
+        btn.style.display = this.config.saveVoiceNotes ? '' : 'none';
+    }
+
+    async showVoiceNotesModal() {
+        if (!this.config.saveVoiceNotes || !this.currentNote) return;
+        await this.loadVoiceNotes();
+        const modal = document.getElementById('voice-notes-modal');
+        if (modal) modal.classList.add('active');
+    }
+
+    hideVoiceNotesModal() {
+        const modal = document.getElementById('voice-notes-modal');
+        if (modal) modal.classList.remove('active');
+    }
+
+    async loadVoiceNotes() {
+        try {
+            const resp = await authFetch(`/api/list-audio?note_id=${this.currentNote.id}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                this.currentAudioNotes = data.audio || [];
+            } else {
+                this.currentAudioNotes = [];
+            }
+        } catch (err) {
+            console.error('Error loading audio notes:', err);
+            this.currentAudioNotes = [];
+        }
+        this.renderVoiceNotesList();
+    }
+
+    renderVoiceNotesList() {
+        const container = document.getElementById('voice-notes-list');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!this.currentAudioNotes || !this.currentAudioNotes.length) {
+            container.textContent = 'No audio files';
+            return;
+        }
+        this.currentAudioNotes.forEach(item => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'audio-item';
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = `/recordings/${currentUser}/${item.file}`;
+            audio.preload = 'none';
+            wrapper.appendChild(audio);
+            if (item.transcript) {
+                const p = document.createElement('p');
+                p.textContent = item.transcript;
+                wrapper.appendChild(p);
+            }
+            if (isAdmin || (canDeleteAudio && item.owner === currentUser)) {
+                const del = document.createElement('button');
+                del.className = 'btn btn--outline btn--sm';
+                del.textContent = 'Delete';
+                del.addEventListener('click', () => this.deleteAudioNote(item.file));
+                wrapper.appendChild(del);
+            }
+            container.appendChild(wrapper);
+        });
+    }
+
+    async deleteAudioNote(filename) {
+        if (!this.currentNote) return;
+        if (!confirm('Delete this audio file?')) return;
+        try {
+            const resp = await authFetch('/api/delete-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note_id: this.currentNote.id, filename })
+            });
+            if (resp.ok) {
+                await this.loadVoiceNotes();
+            }
+        } catch (err) {
+            console.error('Error deleting audio note:', err);
+        }
+    }
+
+    async saveAudioNote(audioBlob, transcript) {
+        if (!this.config.saveVoiceNotes || !this.currentNote) return;
+        const fd = new FormData();
+        fd.append('audio', audioBlob, 'note.webm');
+        fd.append('note_id', this.currentNote.id);
+        fd.append('transcript', transcript);
+        try {
+            await authFetch('/api/save-audio', { method: 'POST', body: fd });
+        } catch (err) {
+            console.error('Error saving audio note:', err);
+        }
+    }
+
     hideMobileFab() {
         const mobileFab = document.getElementById('mobile-record-fab');
         if (mobileFab) mobileFab.classList.add('hidden');
@@ -4072,6 +4190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             allowedTranscriptionProviders = data.transcription_providers || [];
             allowedPostprocessProviders = data.postprocess_providers || [];
             isAdmin = data.is_admin;
+            canDeleteAudio = data.can_delete_audio || false;
 
             // Clear any old localStorage data from previous sessions
             localStorage.removeItem('notes-app-data'); // Remove old global key
@@ -4160,6 +4279,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 allowedTranscriptionProviders = data.transcription_providers || [];
                 allowedPostprocessProviders = data.postprocess_providers || [];
                 isAdmin = data.is_admin;
+                canDeleteAudio = data.can_delete_audio || false;
                 
                 // Clear any old localStorage data from previous sessions
                 localStorage.removeItem('notes-app-data'); // Remove old global key

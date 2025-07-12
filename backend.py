@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, Response, send_file
+from flask import Flask, request, jsonify, Response, send_file, send_from_directory
 from flask_cors import CORS
 import os
 import io
@@ -285,7 +285,8 @@ def login_user():
             "token": token,
             "is_admin": user.get('is_admin', False),
             "transcription_providers": tp,
-            "postprocess_providers": pp
+            "postprocess_providers": pp,
+            "can_delete_audio": user.get('can_delete_audio', False)
         })
     return jsonify({"success": False}), 401
 
@@ -321,6 +322,7 @@ def session_info():
         "is_admin": user.get('is_admin', False),
         "transcription_providers": tp,
         "postprocess_providers": pp,
+        "can_delete_audio": user.get('can_delete_audio', False),
     })
 
 
@@ -357,7 +359,8 @@ def create_user():
         "password": password,
         "is_admin": False,
         "transcription_providers": data.get('transcription_providers', []),
-        "postprocess_providers": data.get('postprocess_providers', [])
+        "postprocess_providers": data.get('postprocess_providers', []),
+        "can_delete_audio": data.get('can_delete_audio', False)
     }
     save_users(USERS)
     return jsonify({"success": True})
@@ -392,6 +395,8 @@ def update_user_providers():
         return jsonify({"error": "Cannot modify admin"}), 400
     USERS[username]['transcription_providers'] = data.get('transcription_providers', USERS[username].get('transcription_providers', []))
     USERS[username]['postprocess_providers'] = data.get('postprocess_providers', USERS[username].get('postprocess_providers', []))
+    if 'can_delete_audio' in data:
+        USERS[username]['can_delete_audio'] = data.get('can_delete_audio', False)
     save_users(USERS)
     return jsonify({"success": True})
 
@@ -1984,6 +1989,126 @@ def upload_note():
         return jsonify({"success": True, "filename": note_file.filename, "overwritten": overwritten})
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
+
+
+@app.route('/api/save-audio', methods=['POST'])
+def save_audio():
+    """Save an audio recording for a note"""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    note_id = request.form.get('note_id')
+    transcript = request.form.get('transcript', '')
+    audio_file = request.files.get('audio')
+    if not note_id or not audio_file:
+        return jsonify({"error": "Missing parameters"}), 400
+
+    user_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+    audio_dir = os.path.join(user_dir, 'audio')
+    os.makedirs(audio_dir, exist_ok=True)
+
+    ext = os.path.splitext(audio_file.filename)[1] or '.webm'
+    ts = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f"{note_id}-{ts}{ext}"
+    path = os.path.join(audio_dir, filename)
+    audio_file.save(path)
+
+    md_path = find_existing_note_file(user_dir, note_id)
+    if not md_path:
+        return jsonify({"error": "Note not found"}), 404
+    meta_path = f"{md_path}.meta"
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+    except Exception:
+        meta = {}
+    entry = {
+        "file": filename,
+        "transcript": transcript,
+        "owner": username,
+        "timestamp": ts
+    }
+    audio_list = meta.get('audio', [])
+    audio_list.append(entry)
+    meta['audio'] = audio_list
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+
+    return jsonify({"success": True, "file": filename})
+
+
+@app.route('/api/list-audio', methods=['GET'])
+def list_audio():
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    note_id = request.args.get('note_id')
+    if not note_id:
+        return jsonify({"error": "note_id required"}), 400
+    user_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+    md_path = find_existing_note_file(user_dir, note_id)
+    if not md_path:
+        return jsonify({"audio": []})
+    meta_path = f"{md_path}.meta"
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        audio_list = meta.get('audio', [])
+    except Exception:
+        audio_list = []
+    return jsonify({"audio": audio_list})
+
+
+@app.route('/api/delete-audio', methods=['POST'])
+def delete_audio():
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    note_id = data.get('note_id')
+    filename = data.get('filename')
+    if not note_id or not filename:
+        return jsonify({"error": "Missing parameters"}), 400
+    user_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+    md_path = find_existing_note_file(user_dir, note_id)
+    if not md_path:
+        return jsonify({"error": "Note not found"}), 404
+    meta_path = f"{md_path}.meta"
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+    except Exception:
+        return jsonify({"error": "Metadata missing"}), 404
+    entry = next((a for a in meta.get('audio', []) if a.get('file') == filename), None)
+    if not entry:
+        return jsonify({"error": "File not found"}), 404
+    is_admin = USERS.get(username, {}).get('is_admin', False)
+    if username != entry.get('owner'):
+        if not is_admin:
+            return jsonify({"error": "Forbidden"}), 403
+    elif not is_admin and not USERS.get(username, {}).get('can_delete_audio', False):
+        return jsonify({"error": "Forbidden"}), 403
+
+    audio_path = os.path.join(user_dir, 'audio', filename)
+    try:
+        os.remove(audio_path)
+    except FileNotFoundError:
+        pass
+    meta['audio'] = [a for a in meta.get('audio', []) if a.get('file') != filename]
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2)
+    return jsonify({"success": True})
+
+
+@app.route('/recordings/<username>/<path:fname>')
+def get_recording(username, fname):
+    current = get_current_username()
+    if not current:
+        return jsonify({"error": "Unauthorized"}), 401
+    if current != username and not USERS.get(current, {}).get('is_admin'):
+        return jsonify({"error": "Forbidden"}), 403
+    directory = os.path.join(os.getcwd(), 'saved_notes', username, 'audio')
+    return send_from_directory(directory, fname)
 
 @app.route('/api/upload-model', methods=['POST'])
 def upload_model():
