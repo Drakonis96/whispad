@@ -36,7 +36,8 @@ def test_sensevoice_direct():
             filename="test.wav",
             language="auto",
             detect_emotion=True,
-            detect_events=True
+            detect_events=True,
+            speaker_diarization=True
         )
         
         print("Transcription result:")
@@ -49,6 +50,10 @@ def test_sensevoice_direct():
                 print(f"Emotion: {result['emotion']}")
             if result.get('events'):
                 print(f"Events: {result['events']}")
+            if result.get("speaker_segments"):
+                print("Speaker segments:")
+                for seg in result["speaker_segments"]:
+                    print(seg)
         else:
             print(f"Error: {result.get('error', 'Unknown error')}")
             

@@ -504,6 +504,7 @@ def transcribe_audio():
             detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
             detect_events = request.form.get('detect_events', 'true').lower() == 'true'
             use_itn = request.form.get('use_itn', 'true').lower() == 'true'
+            speaker_diarization = request.form.get('speaker_diarization', 'false').lower() == 'true'
             
             result = sensevoice_wrapper.transcribe_audio_from_bytes(
                 audio_bytes,
@@ -511,7 +512,8 @@ def transcribe_audio():
                 language,
                 detect_emotion=detect_emotion,
                 detect_events=detect_events,
-                use_itn=use_itn
+                use_itn=use_itn,
+                speaker_diarization=speaker_diarization
             )
             
             if result.get('success'):
@@ -527,6 +529,8 @@ def transcribe_audio():
                     response_data["emotion"] = result.get('emotion')
                 if result.get('events'):
                     response_data["events"] = result.get('events')
+                if result.get('speaker_segments'):
+                    response_data["speaker_segments"] = result.get('speaker_segments')
                 
                 return jsonify(response_data)
             else:
