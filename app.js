@@ -666,6 +666,19 @@ class NotesApp {
 
         const storageKey = `notes-app-config-${currentUser}`;
         localStorage.setItem(storageKey, JSON.stringify(this.config));
+
+        if (isAdmin) {
+            authFetch('/api/update-provider-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    lmstudio_host: lmstudioHost,
+                    lmstudio_port: lmstudioPort,
+                    ollama_host: ollamaHost,
+                    ollama_port: ollamaPort
+                })
+            }).catch(() => {});
+        }
         this.updateMobileFabVisibility();
         this.hideConfigModal();
         this.showNotification('Configuration saved');

@@ -119,7 +119,8 @@ WhisPad is designed to persist your data between container restarts, updates, an
 
 ### Persistent Data
 - **Notes**: Stored in `./saved_notes/` (mounted to `/app/saved_notes` in container)
-- **Users**: Stored in `./users.json` (mounted to `/app/users.json` in container) 
+- **Users**: Stored in `./users.json` (mounted to `/app/users.json` in container)
+- **Provider Config**: Stored in `./server_config.json` (mounted to `/app/server_config.json` in container)
 - **Models**: Stored in `./whisper-cpp-models/` (mounted to `/app/whisper-cpp-models` in container)
 - **Logs**: Stored in `./logs/` (mounted to `/var/log/nginx` in container)
 
