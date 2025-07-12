@@ -38,6 +38,47 @@ LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
 LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
+# File to persist LM Studio/Ollama configuration set by the admin
+SERVER_CONFIG_FILE = 'server_config.json'
+
+def load_server_config():
+    """Load host/port settings from disk if available."""
+    global LMSTUDIO_HOST, LMSTUDIO_PORT, OLLAMA_HOST, OLLAMA_PORT
+    if os.path.exists(SERVER_CONFIG_FILE):
+        try:
+            with open(SERVER_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            LMSTUDIO_HOST = data.get('lmstudio_host', LMSTUDIO_HOST)
+            LMSTUDIO_PORT = data.get('lmstudio_port', LMSTUDIO_PORT)
+            OLLAMA_HOST = data.get('ollama_host', OLLAMA_HOST)
+            OLLAMA_PORT = data.get('ollama_port', OLLAMA_PORT)
+        except Exception:
+            pass
+
+def save_server_config():
+    """Persist current host/port settings to disk."""
+    data = {
+        'lmstudio_host': LMSTUDIO_HOST,
+        'lmstudio_port': LMSTUDIO_PORT,
+        'ollama_host': OLLAMA_HOST,
+        'ollama_port': OLLAMA_PORT,
+    }
+    temp_dir = os.path.dirname(SERVER_CONFIG_FILE) or '.'
+    fd, temp_path = tempfile.mkstemp(dir=temp_dir, prefix='srvcfg.', suffix='.tmp')
+    os.close(fd)
+    try:
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+        os.replace(temp_path, SERVER_CONFIG_FILE)
+    except Exception:
+        try:
+            shutil.move(temp_path, SERVER_CONFIG_FILE)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+# Load persisted config if present
+load_server_config()
 # Opcional: enviar las notas guardadas a un flujo de trabajo externo
 WORKFLOW_WEBHOOK_URL = os.getenv('WORKFLOW_WEBHOOK_URL')
 WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
@@ -1637,6 +1678,21 @@ def default_provider_config():
         "ollama_host": OLLAMA_HOST,
         "ollama_port": OLLAMA_PORT,
     })
+
+@app.route('/api/update-provider-config', methods=['POST'])
+def update_provider_config():
+    """Allow admin users to update LM Studio/Ollama host and port."""
+    admin = get_current_username()
+    if not admin or not USERS.get(admin, {}).get('is_admin'):
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    global LMSTUDIO_HOST, LMSTUDIO_PORT, OLLAMA_HOST, OLLAMA_PORT
+    LMSTUDIO_HOST = data.get('lmstudio_host', LMSTUDIO_HOST)
+    LMSTUDIO_PORT = data.get('lmstudio_port', LMSTUDIO_PORT)
+    OLLAMA_HOST = data.get('ollama_host', OLLAMA_HOST)
+    OLLAMA_PORT = data.get('ollama_port', OLLAMA_PORT)
+    save_server_config()
+    return jsonify({"success": True})
 
 @app.route('/api/list-saved-notes', methods=['GET'])
 def list_saved_notes():
