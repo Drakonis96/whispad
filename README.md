@@ -119,8 +119,8 @@ WhisPad is designed to persist your data between container restarts, updates, an
 
 ### Persistent Data
 - **Notes**: Stored in `./saved_notes/` (mounted to `/app/saved_notes` in container)
-- **Users**: Stored in `./users.json` (mounted to `/app/users.json` in container)
-- **Provider Config**: Stored in `./server_config.json` (mounted to `/app/server_config.json` in container)
+- **Users**: Stored in `./data/users.json` (mounted to `/app/data/users.json` in container)
+- **Provider Config**: Stored in `./data/server_config.json` (mounted to `/app/data/server_config.json` in container)
 - **Models**: Stored in `./whisper-cpp-models/` (mounted to `/app/whisper-cpp-models` in container)
 - **Logs**: Stored in `./logs/` (mounted to `/var/log/nginx` in container)
 
@@ -130,7 +130,7 @@ WhisPad is designed to persist your data between container restarts, updates, an
 - **Per-User Folders**: Each user's notes are isolated in their own folder under `saved_notes/`
 
 ### Initial Setup
-If you don't have a `users.json` file, the application will automatically create one with the default admin account. You can also copy `users.json.template` to `users.json` and customize it as needed.
+If you don't have a `data/users.json` file, the application will automatically create one with the default admin account. You can also copy `users.json.template` to `data/users.json` and customize it as needed.
 
 **Important**: Change the default admin password immediately after first login for security!
 

@@ -39,7 +39,7 @@ LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 # File to persist LM Studio/Ollama configuration set by the admin
-SERVER_CONFIG_FILE = 'server_config.json'
+SERVER_CONFIG_FILE = os.path.join('data', 'server_config.json')
 
 def load_server_config():
     """Load host/port settings from disk if available."""
@@ -85,7 +85,7 @@ WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
 WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 
 # ---------- Simple user management ---------
-USERS_FILE = 'users.json'
+USERS_FILE = os.path.join('data', 'users.json')
 SESSIONS = {}
 # Locks to avoid concurrent writes that could corrupt files
 SAVE_LOCK = threading.Lock()
