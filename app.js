@@ -4071,9 +4071,19 @@ class NotesApp {
             wrapper.className = 'audio-item';
             const audio = document.createElement('audio');
             audio.controls = true;
-            audio.src = `/recordings/${currentUser}/${item.file}`;
+            const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
+            audio.src = `/recordings/${currentUser}/${item.file}${tokenParam}`;
             audio.preload = 'none';
             wrapper.appendChild(audio);
+            if (item.timestamp) {
+                const tsStr = formatTimestamp(item.timestamp);
+                if (tsStr) {
+                    const tsEl = document.createElement('div');
+                    tsEl.className = 'timestamp';
+                    tsEl.textContent = tsStr;
+                    wrapper.appendChild(tsEl);
+                }
+            }
             if (item.transcript) {
                 const p = document.createElement('p');
                 p.textContent = item.transcript;
@@ -4135,6 +4145,19 @@ class NotesApp {
             this.autoSaveInterval = null;
         }
     }
+}
+
+function formatTimestamp(ts) {
+    if (!ts || ts.length < 14) return '';
+    const year = ts.slice(0, 4);
+    const month = ts.slice(4, 6);
+    const day = ts.slice(6, 8);
+    const hour = ts.slice(8, 10);
+    const minute = ts.slice(10, 12);
+    const second = ts.slice(12, 14);
+    const d = new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}`);
+    if (isNaN(d)) return '';
+    return d.toLocaleString();
 }
 
 // Inicializar la aplicación cuando se carga la página

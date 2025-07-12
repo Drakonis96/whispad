@@ -2496,3 +2496,9 @@ select.form-control {
     width: 100%;
     margin-bottom: var(--space-4);
 }
+
+.voice-notes-list .timestamp {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-4);
+}

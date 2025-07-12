@@ -2102,7 +2102,9 @@ def delete_audio():
 
 @app.route('/recordings/<username>/<path:fname>')
 def get_recording(username, fname):
-    current = get_current_username()
+    """Serve a recorded audio file, allowing token via query string"""
+    token = request.headers.get('Authorization') or request.args.get('token')
+    current = SESSIONS.get(token) if token else None
     if not current:
         return jsonify({"error": "Unauthorized"}), 401
     if current != username and not USERS.get(current, {}).get('is_admin'):
