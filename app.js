@@ -8,6 +8,7 @@ const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ol
 let allowedTranscriptionProviders = [];
 let allowedPostprocessProviders = [];
 let defaultProviderConfig = {};
+let multiUser = true;
 
 const PROVIDER_LABELS = {
     openai: 'OpenAI',
@@ -4023,7 +4024,7 @@ function initApp() {
     window.notesApp = new NotesApp();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const loginScreen = document.getElementById('login-screen');
     const appContent = document.getElementById('app-content');
     const loginBtn = document.getElementById('login-submit');
@@ -4032,6 +4033,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const togglePasswordBtn = document.getElementById('toggle-password');
     const currentUserBtn = document.getElementById('current-user-btn');
     const logoutBtn = document.getElementById('logout-btn');
+
+    try {
+        const resp = await fetch('/api/app-config');
+        if (resp.ok) {
+            const cfg = await resp.json();
+            multiUser = cfg.multi_user;
+        }
+    } catch (err) {
+        console.error('Error fetching app config:', err);
+    }
 
     async function loadDefaultProviderConfig() {
         try {
@@ -4109,7 +4120,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    restoreSession();
+    if (multiUser) {
+        restoreSession();
+    } else {
+        currentUser = 'admin';
+        isAdmin = true;
+        try {
+            const resp = await fetch('/api/session-info');
+            if (resp.ok) {
+                const data = await resp.json();
+                allowedTranscriptionProviders = data.transcription_providers || [];
+                allowedPostprocessProviders = data.postprocess_providers || [];
+            }
+        } catch (err) {
+            console.error('Error fetching session info:', err);
+        }
+        await loadDefaultProviderConfig();
+        currentUserBtn.classList.add('hidden');
+        logoutBtn.classList.add('hidden');
+        document.getElementById('user-btn').classList.add('hidden');
+        loginScreen.classList.add('hidden');
+        appContent.classList.remove('hidden');
+        initApp();
+    }
 
     async function attemptLogin() {
         const username = usernameInput.value.trim();
