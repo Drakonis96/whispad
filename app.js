@@ -4125,6 +4125,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
         currentUser = 'admin';
         isAdmin = true;
+        try {
+            const resp = await fetch('/api/session-info');
+            if (resp.ok) {
+                const data = await resp.json();
+                allowedTranscriptionProviders = data.transcription_providers || [];
+                allowedPostprocessProviders = data.postprocess_providers || [];
+            }
+        } catch (err) {
+            console.error('Error fetching session info:', err);
+        }
         await loadDefaultProviderConfig();
         currentUserBtn.classList.add('hidden');
         logoutBtn.classList.add('hidden');
