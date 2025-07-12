@@ -20,6 +20,5 @@ services:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
-      - ./users.json:/app/users.json
-      - ./server_config.json:/app/server_config.json
+      - ./data:/app/data
     restart: unless-stopped

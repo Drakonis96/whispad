@@ -87,7 +87,7 @@ tmp/
 config.json
 settings.json
 user_config.json
-server_config.json
+/server_config.json
 
 # Archivos de API keys y tokens
 api_keys.txt
