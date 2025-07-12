@@ -740,9 +740,10 @@ class NotesApp {
         
         // Actualizar valores mostrados
         this.updateRangeValues();
-        
+
         // Filtrar modelos según el proveedor seleccionado
         this.updateModelOptions();
+        this.updateTranscriptionModelOptions();
         
         // Mostrar/ocultar opciones GPT-4o según el modelo seleccionado
         this.updateTranscriptionOptions();
