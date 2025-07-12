@@ -6,6 +6,9 @@
 
 WhisPad is a transcription and note management tool designed so anyone can turn their voice into text and easily organize their ideas. The application lets you use cloud models (OpenAI) or local whisper.cpp models to work offline.
 
+> **WARNING**
+> Always back up your notes before upgrading to a new version. Never expose the app to the internet without additional security measures.
+
 ## Table of Contents
 1. [Main Features](#main-features)
 2. [Disclaimer](#disclaimer)
