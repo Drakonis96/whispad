@@ -78,12 +78,24 @@ def load_users():
     return users
 
 def save_users(users):
-    """Persist users.json atomically to avoid corruption."""
-    temp_path = USERS_FILE + '.tmp'
+    """Persist users.json atomically and handle busy file errors."""
+    temp_dir = os.path.dirname(USERS_FILE) or "."
+    fd, temp_path = tempfile.mkstemp(dir=temp_dir, prefix="users.", suffix=".tmp")
+    os.close(fd)
     with USERS_LOCK:
-        with open(temp_path, 'w', encoding='utf-8') as f:
+        with open(temp_path, "w", encoding="utf-8") as f:
             json.dump(users, f, indent=2)
-        os.replace(temp_path, USERS_FILE)
+        try:
+            os.replace(temp_path, USERS_FILE)
+        except OSError as e:
+            app.logger.warning("Atomic replace failed: %s; falling back to shutil.move", e)
+            shutil.move(temp_path, USERS_FILE)
+        finally:
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
 
 def migrate_notes_to_admin_folder():
