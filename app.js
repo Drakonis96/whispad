@@ -4172,6 +4172,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     logoutBtn.addEventListener('click', async () => {
+        // Stop auto-save immediately to avoid saving with the wrong user
+        if (window.notesApp && typeof window.notesApp.destroy === 'function') {
+            window.notesApp.destroy();
+        }
+
         await authFetch('/api/logout', { method: 'POST' });
         
         // Clear user-specific localStorage data
@@ -4219,6 +4224,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.editor-container')?.classList.add('hidden');
         loginScreen.classList.remove('hidden');
         appContent.classList.add('hidden');
+
+        // Force a full page reload to ensure all state is cleared
+        window.location.reload(true);
     });
 
     async function refreshUserList() {
