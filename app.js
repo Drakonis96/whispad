@@ -2,6 +2,8 @@
 let authToken = '';
 let currentUser = '';
 let isAdmin = false;
+let canDeleteNotes = false;
+let canDeleteAudio = false;
 
 const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
 const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
@@ -360,6 +362,10 @@ class NotesApp {
             this.showDeleteModal();
         });
 
+        document.getElementById('audio-btn').addEventListener('click', () => {
+            this.showAudioModal();
+        });
+
         document.getElementById('download-all-btn').addEventListener('click', () => {
             this.downloadAllNotes();
         });
@@ -391,6 +397,10 @@ class NotesApp {
         
         document.getElementById('confirm-delete').addEventListener('click', async () => {
             await this.deleteCurrentNote();
+        });
+
+        document.getElementById('close-audio-modal').addEventListener('click', () => {
+            this.hideAudioModal();
         });
         
         // Configuración
@@ -1050,7 +1060,7 @@ class NotesApp {
         // Habilitar botones
         document.getElementById('save-btn').disabled = false;
         document.getElementById('download-btn').disabled = false;
-        document.getElementById('delete-btn').disabled = false;
+        document.getElementById('delete-btn').disabled = !(isAdmin || canDeleteNotes);
         
         // Restablecer selección
         this.selectedText = '';
@@ -2346,9 +2356,11 @@ class NotesApp {
             console.log('Language:', this.config.transcriptionLanguage);
             
             return await backendAPI.transcribeAudio(
-                audioBlob, 
-                this.config.transcriptionLanguage, 
-                model
+                audioBlob,
+                this.config.transcriptionLanguage,
+                model,
+                'openai',
+                this.currentNote ? this.currentNote.id : null
             );
         } catch (error) {
             throw new Error(`Transcription error: ${error.message}`);
@@ -2364,7 +2376,8 @@ class NotesApp {
                 audioBlob,
                 this.config.transcriptionLanguage,
                 this.config.transcriptionModel,
-                'local'
+                'local',
+                this.currentNote ? this.currentNote.id : null
             );
             
             console.log('Local transcription result:', result);
@@ -2398,7 +2411,8 @@ class NotesApp {
                 this.config.transcriptionLanguage,
                 detectEmotion,
                 detectEvents,
-                useItn
+                useItn,
+                this.currentNote ? this.currentNote.id : null
             );
             
             console.log('SenseVoice transcription result:', result);
@@ -3516,6 +3530,60 @@ class NotesApp {
         modal.classList.remove('active');
         this.showMobileFab();
     }
+
+    async showAudioModal() {
+        if (!this.currentNote) return;
+        const modal = document.getElementById('audio-modal');
+        const list = document.getElementById('audio-list');
+        list.innerHTML = 'Loading...';
+        modal.classList.add('active');
+        try {
+            const resp = await authFetch(`/api/list-audio?note_id=${this.currentNote.id}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                list.innerHTML = '';
+                if (data.audios.length === 0) {
+                    list.textContent = 'No audio files';
+                } else {
+                    data.audios.forEach(f => {
+                        const div = document.createElement('div');
+                        div.className = 'audio-item';
+                        const audio = document.createElement('audio');
+                        audio.controls = true;
+                        audio.src = `/api/audio/${this.currentNote.id}/${encodeURIComponent(f)}`;
+                        div.appendChild(audio);
+                        if (isAdmin || canDeleteAudio) {
+                            const del = document.createElement('button');
+                            del.className = 'btn btn--sm btn--error';
+                            del.textContent = 'Delete';
+                            del.addEventListener('click', async () => {
+                                if (!confirm('Delete audio?')) return;
+                                const r = await authFetch('/api/delete-audio', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ note_id: this.currentNote.id, filename: f })
+                                });
+                                if (r.ok) {
+                                    div.remove();
+                                }
+                            });
+                            div.appendChild(del);
+                        }
+                        list.appendChild(div);
+                    });
+                }
+            } else {
+                list.textContent = 'Error loading audio';
+            }
+        } catch (e) {
+            list.textContent = 'Error loading audio';
+        }
+    }
+
+    hideAudioModal() {
+        const modal = document.getElementById('audio-modal');
+        modal.classList.remove('active');
+    }
     
     showProcessingOverlay(text) {
         const overlay = document.getElementById('processing-overlay');
@@ -4061,6 +4129,8 @@ document.addEventListener('DOMContentLoaded', () => {
             allowedTranscriptionProviders = data.transcription_providers || [];
             allowedPostprocessProviders = data.postprocess_providers || [];
             isAdmin = data.is_admin;
+            canDeleteNotes = data.can_delete_notes || false;
+            canDeleteAudio = data.can_delete_audio || false;
 
             // Clear any old localStorage data from previous sessions
             localStorage.removeItem('notes-app-data'); // Remove old global key
@@ -4127,6 +4197,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 allowedTranscriptionProviders = data.transcription_providers || [];
                 allowedPostprocessProviders = data.postprocess_providers || [];
                 isAdmin = data.is_admin;
+                canDeleteNotes = data.can_delete_notes || false;
+                canDeleteAudio = data.can_delete_audio || false;
                 
                 // Clear any old localStorage data from previous sessions
                 localStorage.removeItem('notes-app-data'); // Remove old global key
@@ -4292,19 +4364,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 li.appendChild(ppGroup);
 
+                const permGroup = document.createElement('div');
+                permGroup.className = 'provider-group';
+                const delNotesCb = document.createElement('input');
+                delNotesCb.type = 'checkbox';
+                delNotesCb.className = 'edit-delete-notes';
+                if (u.can_delete_notes) delNotesCb.checked = true;
+                const lbl1 = document.createElement('label');
+                lbl1.style.marginRight = '6px';
+                lbl1.appendChild(delNotesCb);
+                lbl1.append(' Delete notes');
+                const delAudioCb = document.createElement('input');
+                delAudioCb.type = 'checkbox';
+                delAudioCb.className = 'edit-delete-audio';
+                if (u.can_delete_audio) delAudioCb.checked = true;
+                const lbl2 = document.createElement('label');
+                lbl2.appendChild(delAudioCb);
+                lbl2.append(' Delete audio');
+                permGroup.appendChild(lbl1);
+                permGroup.appendChild(lbl2);
+                li.appendChild(permGroup);
+
                 const saveBtn = document.createElement('button');
                 saveBtn.className = 'btn btn--primary btn--sm';
                 saveBtn.textContent = 'Save';
                 saveBtn.addEventListener('click', async () => {
                     const tProviders = Array.from(li.querySelectorAll('.edit-transcription:checked')).map(c => c.value);
                     const ppProviders = Array.from(li.querySelectorAll('.edit-postprocess:checked')).map(c => c.value);
+                    const delNotes = li.querySelector('.edit-delete-notes')?.checked || false;
+                    const delAudio = li.querySelector('.edit-delete-audio')?.checked || false;
                     const resp2 = await authFetch('/api/update-user-providers', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             username: u.username,
                             transcription_providers: tProviders,
-                            postprocess_providers: ppProviders
+                            postprocess_providers: ppProviders,
+                            can_delete_notes: delNotes,
+                            can_delete_audio: delAudio
                         })
                     });
                     if (resp2.ok) {
@@ -4393,6 +4490,8 @@ document.addEventListener('DOMContentLoaded', () => {
         createUserBtn.disabled = true;
         const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
         const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
+        const delNotes = document.getElementById('create-can-delete-notes').checked;
+        const delAudio = document.getElementById('create-can-delete-audio').checked;
         const resp = await authFetch('/api/create-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -4400,7 +4499,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 username: u,
                 password: p,
                 transcription_providers: tProviders,
-                postprocess_providers: ppProviders
+                postprocess_providers: ppProviders,
+                can_delete_notes: delNotes,
+                can_delete_audio: delAudio
             })
         });
         createUserBtn.disabled = false;

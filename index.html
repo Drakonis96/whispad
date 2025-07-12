@@ -59,6 +59,9 @@
                         <label><input type="checkbox" class="create-postprocess-provider" value="openrouter"> OpenRouter</label>
                         <label><input type="checkbox" class="create-postprocess-provider" value="lmstudio"> LM Studio</label>
                         <label><input type="checkbox" class="create-postprocess-provider" value="ollama"> Ollama</label>
+                        <p style="margin-top:10px;">Permissions</p>
+                        <label><input type="checkbox" id="create-can-delete-notes"> Delete notes</label>
+                        <label><input type="checkbox" id="create-can-delete-audio"> Delete audio</label>
                     </div>
                     <button type="button" class="btn btn--primary btn--sm" id="create-user-btn" style="margin-top:10px;">Create</button>
                 </div>
@@ -184,6 +187,9 @@
                         <button class="btn btn--outline btn--sm" id="delete-btn">
                             <i class="fas fa-trash"></i>&nbsp;Delete
                         </button>
+                        <button class="btn btn--outline btn--sm" id="audio-btn">
+                            <i class="fas fa-headphones"></i>&nbsp;Audio
+                        </button>
                     </div>
                 </div>
 
@@ -233,6 +239,16 @@
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-delete">Cancel</button>
                 <button class="btn btn--primary" id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="audio-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>Voice Notes</h3>
+            <div class="modal-body" id="audio-list"></div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-audio-modal">Close</button>
             </div>
         </div>
     </div>

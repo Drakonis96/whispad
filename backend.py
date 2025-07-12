@@ -112,6 +112,8 @@ def load_users():
             'is_admin': True,
             'transcription_providers': ALL_TRANSCRIPTION_PROVIDERS,
             'postprocess_providers': ALL_POSTPROCESS_PROVIDERS,
+            'can_delete_notes': True,
+            'can_delete_audio': True,
         }
         # Save immediately so the file is created or repaired
         save_users(users)
@@ -223,6 +225,8 @@ USERS = load_users()
 if "admin" in USERS:
     USERS["admin"]["transcription_providers"] = ALL_TRANSCRIPTION_PROVIDERS
     USERS["admin"]["postprocess_providers"] = ALL_POSTPROCESS_PROVIDERS
+    USERS["admin"].setdefault("can_delete_notes", True)
+    USERS["admin"].setdefault("can_delete_audio", True)
 migrate_notes_to_admin_folder()
 create_missing_meta_files()
 
@@ -281,7 +285,9 @@ def login_user():
             "token": token,
             "is_admin": user.get('is_admin', False),
             "transcription_providers": tp,
-            "postprocess_providers": pp
+            "postprocess_providers": pp,
+            "can_delete_notes": user.get('can_delete_notes', False),
+            "can_delete_audio": user.get('can_delete_audio', False)
         })
     return jsonify({"success": False}), 401
 
@@ -314,6 +320,8 @@ def session_info():
         "is_admin": user.get('is_admin', False),
         "transcription_providers": tp,
         "postprocess_providers": pp,
+        "can_delete_notes": user.get('can_delete_notes', False),
+        "can_delete_audio": user.get('can_delete_audio', False),
     })
 
 
@@ -350,7 +358,9 @@ def create_user():
         "password": password,
         "is_admin": False,
         "transcription_providers": data.get('transcription_providers', []),
-        "postprocess_providers": data.get('postprocess_providers', [])
+        "postprocess_providers": data.get('postprocess_providers', []),
+        "can_delete_notes": data.get('can_delete_notes', False),
+        "can_delete_audio": data.get('can_delete_audio', False)
     }
     save_users(USERS)
     return jsonify({"success": True})
@@ -367,7 +377,9 @@ def list_users():
             "username": name,
             "is_admin": info.get('is_admin', False),
             "transcription_providers": info.get('transcription_providers', []),
-            "postprocess_providers": info.get('postprocess_providers', [])
+            "postprocess_providers": info.get('postprocess_providers', []),
+            "can_delete_notes": info.get('can_delete_notes', False),
+            "can_delete_audio": info.get('can_delete_audio', False)
         })
     return jsonify({"users": users})
 
@@ -385,6 +397,10 @@ def update_user_providers():
         return jsonify({"error": "Cannot modify admin"}), 400
     USERS[username]['transcription_providers'] = data.get('transcription_providers', USERS[username].get('transcription_providers', []))
     USERS[username]['postprocess_providers'] = data.get('postprocess_providers', USERS[username].get('postprocess_providers', []))
+    if 'can_delete_notes' in data:
+        USERS[username]['can_delete_notes'] = data.get('can_delete_notes', False)
+    if 'can_delete_audio' in data:
+        USERS[username]['can_delete_audio'] = data.get('can_delete_audio', False)
     save_users(USERS)
     return jsonify({"success": True})
 
@@ -424,10 +440,21 @@ def transcribe_audio():
         # Obtener el archivo de audio del request
         if 'audio' not in request.files:
             return jsonify({"error": "No se encontró archivo de audio"}), 400
-        
+
         audio_file = request.files['audio']
         if audio_file.filename == '':
             return jsonify({"error": "Archivo de audio vacío"}), 400
+
+        note_id = request.form.get('note_id')
+
+        # Leer bytes una sola vez para poder guardar y reutilizar
+        audio_bytes = audio_file.read()
+        if note_id:
+            try:
+                save_audio_file(username, note_id, audio_bytes, audio_file.filename)
+            except Exception as e:
+                print(f"Error saving audio: {e}")
+        audio_buffer = io.BytesIO(audio_bytes)
         
         # Obtener parámetros del request
         language = request.form.get('language', None)  # None = detección automática
@@ -445,8 +472,6 @@ def transcribe_audio():
 
             if not model_name:
                 return jsonify({"error": "Model not specified"}), 400
-
-            audio_bytes = audio_file.read()
 
             models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
             model_path = os.path.join(models_dir, os.path.basename(model_name))
@@ -472,9 +497,8 @@ def transcribe_audio():
             sensevoice_available = sensevoice_wrapper and sensevoice_wrapper.is_available()
             if not sensevoice_available:
                 return jsonify({"error": "SenseVoice no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
-            
+
             # Usar SenseVoice
-            audio_bytes = audio_file.read()
             
             # Obtener opciones adicionales
             detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
@@ -518,7 +542,7 @@ def transcribe_audio():
             # Preparar la petición a OpenAI
             model_to_use = model_name
             files = {
-                'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
+                'file': (audio_file.filename, audio_buffer, audio_file.content_type),
                 'model': (None, model_to_use)
             }
             
@@ -1316,6 +1340,15 @@ def transcribe_audio_gpt4o():
         if audio_file.filename == '':
             print(f"[ERROR] Archivo de audio vacío")
             return jsonify({"error": "Archivo de audio vacío"}), 400
+
+        note_id = request.form.get('note_id')
+        audio_bytes = audio_file.read()
+        if note_id:
+            try:
+                save_audio_file(username, note_id, audio_bytes, audio_file.filename)
+            except Exception as e:
+                print(f"Error saving audio: {e}")
+        audio_buffer = io.BytesIO(audio_bytes)
         
         # Obtener parámetros del request
         model = request.form.get('model')
@@ -1353,7 +1386,7 @@ def transcribe_audio_gpt4o():
         
         # Preparar la petición a OpenAI
         files = {
-            'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
+            'file': (audio_file.filename, audio_buffer, audio_file.content_type),
             'model': (None, model),
             'response_format': (None, response_format)
         }
@@ -1442,6 +1475,9 @@ def save_note():
         username = get_current_username()
         if not username:
             return jsonify({"error": "Unauthorized"}), 401
+        user = USERS.get(username, {})
+        if not (user.get('is_admin') or user.get('can_delete_notes')):
+            return jsonify({"error": "Forbidden"}), 403
         data = request.get_json()
 
         if not data:
@@ -1654,8 +1690,20 @@ def html_to_markdown(html_content):
     # Limpiar espacios en blanco excesivos
     markdown = re.sub(r'\n\s*\n\s*\n', '\n\n', markdown)
     markdown = markdown.strip()
-    
+
     return markdown
+
+def save_audio_file(username: str, note_id: str, audio_bytes: bytes, original_name: str) -> str:
+    """Save uploaded audio under saved_notes/<user>/audio/<note_id>/timestamp.ext"""
+    audio_dir = os.path.join(os.getcwd(), 'saved_notes', username, 'audio', str(note_id))
+    os.makedirs(audio_dir, exist_ok=True)
+    ext = os.path.splitext(original_name)[1] or '.wav'
+    timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+    filename = f"{timestamp}{ext}"
+    path = os.path.join(audio_dir, filename)
+    with open(path, 'wb') as f:
+        f.write(audio_bytes)
+    return filename
 
 @app.route('/api/check-apis', methods=['GET'])
 def check_apis():
@@ -1920,6 +1968,50 @@ def list_notes():
         
     except Exception as e:
         return jsonify({"error": f"Error al listar notas: {str(e)}"}), 500
+
+@app.route('/api/list-audio', methods=['GET'])
+def list_audio():
+    """List saved audio files for a note"""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    note_id = request.args.get('note_id')
+    audio_dir = os.path.join(os.getcwd(), 'saved_notes', username, 'audio', str(note_id))
+    files = []
+    if note_id and os.path.exists(audio_dir):
+        files = sorted(os.listdir(audio_dir))
+    return jsonify({"audios": files})
+
+@app.route('/api/delete-audio', methods=['POST'])
+def delete_audio():
+    """Delete an audio file if allowed"""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    user = USERS.get(username, {})
+    if not (user.get('is_admin') or user.get('can_delete_audio')):
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json() or {}
+    note_id = str(data.get('note_id', ''))
+    filename = data.get('filename')
+    if not note_id or not filename:
+        return jsonify({"error": "Missing parameters"}), 400
+    audio_path = os.path.join(os.getcwd(), 'saved_notes', username, 'audio', note_id, filename)
+    if os.path.exists(audio_path):
+        os.remove(audio_path)
+        return jsonify({"success": True})
+    return jsonify({"error": "File not found"}), 404
+
+@app.route('/api/audio/<note_id>/<filename>', methods=['GET'])
+def serve_audio(note_id, filename):
+    """Serve an audio file for the current user"""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    audio_path = os.path.join(os.getcwd(), 'saved_notes', username, 'audio', note_id, filename)
+    if not os.path.exists(audio_path):
+        return jsonify({"error": "File not found"}), 404
+    return send_file(audio_path)
 
 @app.route('/api/download-all-notes', methods=['GET'])
 def download_all_notes():

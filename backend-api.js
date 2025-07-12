@@ -30,7 +30,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai') {
+    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai', noteId = null) {
         try {
             const formData = new FormData();
             
@@ -51,6 +51,10 @@ class BackendAPI {
             formData.append('audio', audioBlob, filename);
             formData.append('model', model);
             formData.append('provider', provider);
+
+            if (noteId) {
+                formData.append('note_id', noteId);
+            }
             
             if (language && language !== 'auto') {
                 formData.append('language', language);
@@ -89,7 +93,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true) {
+    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true, noteId = null) {
         try {
             const formData = new FormData();
             
@@ -112,9 +116,13 @@ class BackendAPI {
             formData.append('detect_emotion', detectEmotion.toString());
             formData.append('detect_events', detectEvents.toString());
             formData.append('use_itn', useItn.toString());
-            
+
             if (language && language !== 'auto') {
                 formData.append('language', language);
+            }
+
+            if (noteId) {
+                formData.append('note_id', noteId);
             }
 
             console.log('Sending SenseVoice transcription request:', { 
