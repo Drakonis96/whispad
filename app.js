@@ -2256,19 +2256,30 @@ class NotesApp {
             this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             this.audioChunks = [];
 
-            this.mediaRecorder.ondataavailable = (event) => {
+            this.mediaRecorder.ondataavailable = async (event) => {
                 this.audioChunks.push(event.data);
+
+                if (this.config.transcriptionProvider === 'sensevoice' && this.config.streamingEnabled) {
+                    await this.transcribeSenseVoiceChunk(event.data);
+                }
             };
 
             this.mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-                await this.transcribeAudio(audioBlob);
-                
+
+                if (!(this.config.transcriptionProvider === 'sensevoice' && this.config.streamingEnabled)) {
+                    await this.transcribeAudio(audioBlob);
+                }
+
                 // Stop stream
                 stream.getTracks().forEach(track => track.stop());
             };
 
-            this.mediaRecorder.start();
+            if (this.config.transcriptionProvider === 'sensevoice' && this.config.streamingEnabled) {
+                this.mediaRecorder.start(5000); // emit chunks every 5s for streaming
+            } else {
+                this.mediaRecorder.start();
+            }
             this.isRecording = true;
             
             const recordBtn = document.getElementById('record-btn');
@@ -2440,6 +2451,29 @@ class NotesApp {
         } catch (error) {
             console.error('Error in SenseVoice transcription:', error);
             throw new Error(`Error in SenseVoice transcription: ${error.message}`);
+        }
+    }
+
+    async transcribeSenseVoiceChunk(chunkBlob) {
+        try {
+            const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
+            const detectEvents = document.getElementById('detect-events')?.checked ?? true;
+            const useItn = document.getElementById('use-itn')?.checked ?? true;
+
+            const result = await backendAPI.transcribeAudioSenseVoice(
+                chunkBlob,
+                this.config.transcriptionLanguage,
+                detectEmotion,
+                detectEvents,
+                useItn,
+                this.currentNote ? this.currentNote.id : null
+            );
+
+            if (result && result.transcription) {
+                this.insertTranscription(result.transcription);
+            }
+        } catch (error) {
+            console.error('Error in SenseVoice streaming chunk:', error);
         }
     }
 

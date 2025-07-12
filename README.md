@@ -174,6 +174,7 @@ WhisPad now includes **SenseVoice**, a state-of-the-art multilingual speech reco
 2. **Configure**: In "Config" → Select "SenseVoice" as your transcription provider
 3. **Customize**: Enable/disable emotion detection and audio event detection as needed
 4. **Transcribe**: Record audio and get enhanced transcriptions with emotional context
+5. **Real-Time Streaming**: When streaming is enabled in the configuration, SenseVoice transcribes audio chunks every few seconds so you see text while still recording
 
 ### Supported Languages
 - **Chinese**: Mandarin (zh), Cantonese (yue)
