@@ -93,6 +93,9 @@
             </button>
             <button class="btn btn--outline btn--sm hidden" id="current-user-btn"></button>
             <button class="btn btn--error btn--sm hidden" id="logout-btn">Logout</button>
+            <button class="btn btn--outline btn--sm" id="prompt-sidebar-toggle" title="Custom prompt">
+                <i class="fas fa-terminal"></i>&nbsp;Prompt
+            </button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -223,8 +226,12 @@
                 </div>
             </div>
         </div>
+        <div class="prompt-sidebar" id="prompt-sidebar">
+            <textarea id="custom-prompt-text" rows="6" placeholder="Enter custom prompt..."></textarea>
+            <button class="btn btn--primary btn--sm" id="apply-custom-prompt" style="margin-top: 10px;">Apply</button>
+        </div>
     </div>
-    
+
     <!-- Confirmation modal -->
     <div class="modal" id="delete-modal">
         <div class="modal-content">

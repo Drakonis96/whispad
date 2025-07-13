@@ -207,7 +207,11 @@ class NotesApp {
         }
         // Toggle con hamburguesa
         hamburger.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+            if (window.innerWidth <= 900) {
+                sidebar.classList.toggle('active');
+            } else {
+                sidebar.classList.toggle('desktop-hidden');
+            }
         });
         // Cerrar sidebar al hacer click fuera (opcional)
         document.addEventListener('click', (e) => {
@@ -219,8 +223,6 @@ class NotesApp {
         // Opcional: cerrar al cambiar tamaño de pantalla
         window.addEventListener('resize', () => {
             if (window.innerWidth > 900) {
-                sidebar.classList.add('active');
-            } else {
                 sidebar.classList.remove('active');
             }
         });
@@ -441,6 +443,40 @@ class NotesApp {
         if (updateOllamaBtn) {
             updateOllamaBtn.addEventListener('click', () => {
                 this.updateOllamaModelsList();
+            });
+        }
+
+        // Custom prompt sidebar
+        const promptSidebar = document.getElementById('prompt-sidebar');
+        const promptToggle = document.getElementById('prompt-sidebar-toggle');
+        const applyPromptBtn = document.getElementById('apply-custom-prompt');
+        const customPromptInput = document.getElementById('custom-prompt-text');
+
+        if (promptToggle && promptSidebar) {
+            promptToggle.addEventListener('click', () => {
+                promptSidebar.classList.toggle('active');
+            });
+        }
+
+        if (applyPromptBtn && customPromptInput) {
+            applyPromptBtn.addEventListener('click', () => {
+                const prompt = customPromptInput.value.trim();
+                if (!prompt) {
+                    this.showNotification('Please enter a prompt', 'warning');
+                    return;
+                }
+                const finalPrompt = `${prompt}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language.`;
+                const tempKey = 'temp_custom_prompt';
+                this.stylesConfig[tempKey] = {
+                    nombre: 'Custom',
+                    descripcion: 'Temporary prompt',
+                    icono: '💬',
+                    prompt: finalPrompt,
+                    visible: true,
+                    custom: true
+                };
+                this.improveText(tempKey);
+                delete this.stylesConfig[tempKey];
             });
         }
         
