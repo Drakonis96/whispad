@@ -9,7 +9,7 @@ const ejemplosTranscripcion = [
 ];
 
 const configuracionMejoras = {
-    claridad: {
+    clarity: {
         nombre: "Mejorar Claridad",
         descripcion: "Hace el texto más claro y directo",
         icono: "✨",
@@ -27,31 +27,31 @@ const configuracionMejoras = {
         icono: "😊",
         visible: false
     },
-    academico: {
+    academic: {
         nombre: "Académico",
         descripcion: "Convierte el texto a estilo académico",
         icono: "🎓",
         visible: false
     },
-    narrativo: {
+    narrative: {
         nombre: "Narrativo",
-        descripcion: "Mejora textos narrativos y diálogos de novela",
+        descripcion: "Mejora textos narratives y diálogos de novela",
         icono: "📖",
         visible: false
     },
-    academico_v2: {
+    academic_v2: {
         nombre: "Académico v2",
         descripcion: "Mejora académica con cambios mínimos, preservando palabras del autor",
         icono: "🎓",
         visible: true
     },
-    resumir: {
+    summarize: {
         nombre: "Resumir",
         descripcion: "Crea un resumen conciso del texto",
         icono: "📝",
         visible: false
     },
-    expandir: {
+    expand: {
         nombre: "Expandir",
         descripcion: "Añade más detalles y contexto",
         icono: "✚",
@@ -815,14 +815,14 @@ class NotesApp {
 
     async improveWithOpenAI(text, action) {
         const prompts = {
-            claridad: `Mejora la claridad del siguiente texto, hazlo más directo y fácil de entender. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            formal: `Convierte el siguiente texto a un tono más formal y profesional. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            casual: `Convierte el siguiente texto a un tono más casual y amigable. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            academico: `Convierte el siguiente texto a estilo académico con vocabulario técnico, estructura formal y referencias implícitas. Utiliza un lenguaje preciso, objetivo y bien fundamentado. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            narrativo: `Mejora el siguiente texto narrativo o diálogo de novela, preservando el estilo literario y la voz narrativa. Mejora la fluidez, la descripción y la calidad literaria manteniendo la esencia del texto:\n\n${text}`,
-            academico_v2: `Mejora el siguiente texto académico realizando cambios mínimos para preservar las palabras del autor. Usa palabras más precisas cuando sea necesario, mejora la estructura y elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Mantén el estilo y vocabulario original tanto como sea posible:\n\n${text}`,
-            resumir: `Crea un resumen conciso del siguiente texto. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            expandir: `Expande el siguiente texto añadiendo más detalles y contexto relevante. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`
+            clarity: `Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n${text}`,
+            formal: `Rewrite the following text in a formal tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n${text}`,
+            casual: `Rewrite the following text in a casual and friendly tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n${text}`,
+            academic: `Rewrite the following text in an academic style. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n${text}`,
+            narrative: `Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n${text}`,
+            academic_v2: `Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n${text}`,
+            summarize: `Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n${text}`,
+            expand: `Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n${text}`
         };
 
         const model = this.config.postprocessModel || 'gpt-4o-mini';
@@ -854,7 +854,7 @@ class NotesApp {
                     },
                     {
                         role: 'user',
-                        content: prompts[action] || prompts.claridad
+                        content: prompts[action] || prompts.clarity
                     }
                 ],
                 max_tokens: this.config.maxTokens || 1000,
@@ -874,14 +874,14 @@ class NotesApp {
 
     async improveWithGemini(text, action) {
         const prompts = {
-            claridad: `Mejora la claridad del siguiente texto, hazlo más directo y fácil de entender. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            formal: `Convierte el siguiente texto a un tono más formal y profesional. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            casual: `Convierte el siguiente texto a un tono más casual y amigable. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            academico: `Convierte el siguiente texto a estilo académico con vocabulario técnico, estructura formal y referencias implícitas. Utiliza un lenguaje preciso, objetivo y bien fundamentado. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            narrativo: `Mejora el siguiente texto narrativo o diálogo de novela, preservando el estilo literario y la voz narrativa. Mejora la fluidez, la descripción y la calidad literaria manteniendo la esencia del texto:\n\n${text}`,
-            academico_v2: `Mejora el siguiente texto académico realizando cambios mínimos para preservar las palabras del autor. Usa palabras más precisas cuando sea necesario, mejora la estructura y elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta. Mantén el estilo y vocabulario original tanto como sea posible:\n\n${text}`,
-            resumir: `Crea un resumen conciso del siguiente texto. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`,
-            expandir: `Expande el siguiente texto añadiendo más detalles y contexto relevante. Elimina cualquier tipo de interjección o expresión propia del lenguaje oral (mmm, ahhh, eh, um, etc.) y expresiones de duda cuando se habla o piensa en voz alta:\n\n${text}`
+            clarity: `Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n${text}`,
+            formal: `Rewrite the following text in a formal tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n${text}`,
+            casual: `Rewrite the following text in a casual and friendly tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n${text}`,
+            academic: `Rewrite the following text in an academic style. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n${text}`,
+            narrative: `Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n${text}`,
+            academic_v2: `Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n${text}`,
+            summarize: `Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n${text}`,
+            expand: `Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n${text}`
         };
 
         const model = this.config.postprocessModel || 'gemini-2.0-flash';
@@ -908,7 +908,7 @@ class NotesApp {
                     {
                         parts: [
                             {
-                                text: `Eres un asistente que ayuda a mejorar textos. Responde únicamente con el texto mejorado, sin explicaciones adicionales.\n\n${prompts[action] || prompts.claridad}`
+                                text: `Eres un asistente que ayuda a mejorar textos. Responde únicamente con el texto mejorado, sin explicaciones adicionales.\n\n${prompts[action] || prompts.clarity}`
                             }
                         ]
                     }
@@ -932,7 +932,7 @@ class NotesApp {
     
     applyAIImprovement(text, action) {
         const mejoras = {
-            claridad: (texto) => {
+            clarity: (texto) => {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/\s+/g, ' ')
@@ -953,7 +953,7 @@ class NotesApp {
                     .replace(/excelente/g, 'genial')
                     .replace(/considero que/g, 'creo que') + ' [Versión casual]';
             },
-            academico: (texto) => {
+            academic: (texto) => {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/muy/g, 'significativamente')
@@ -961,24 +961,24 @@ class NotesApp {
                     .replace(/creo que/g, 'se puede argumentar que')
                     .replace(/porque/g, 'debido a que') + ' [Versión académica]';
             },
-            narrativo: (texto) => {
+            narrative: (texto) => {
                 return texto
                     .replace(/\b(y entonces|y luego)\b/g, 'después')
                     .replace(/\b(muy)\b/g, 'sumamente')
                     .replace(/\bdijo\b/g, 'murmuró') + ' [Versión narrativa mejorada]';
             },
-            academico_v2: (texto) => {
+            academic_v2: (texto) => {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/\s+/g, ' ')
                     .trim() + ' [Mejora académica con cambios mínimos]';
             },
-            resumir: (texto) => {
+            summarize: (texto) => {
                 const words = texto.split(' ');
                 const summary = words.slice(0, Math.min(20, words.length)).join(' ');
                 return `Resumen: ${summary}${words.length > 20 ? '...' : ''}`;
             },
-            expandir: (texto) => {
+            expand: (texto) => {
                 return texto + ' [Se han añadido detalles adicionales y contexto relevante para enriquecer el contenido y proporcionar una comprensión más completa del tema tratado.]';
             }
         };
