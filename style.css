@@ -875,6 +875,35 @@ select.form-control {
     margin-bottom: var(--space-16);
 }
 
+.prompt-tabs {
+    display: flex;
+    gap: var(--space-8);
+    margin-bottom: var(--space-16);
+}
+
+.prompt-tab {
+    flex: 1;
+    padding: var(--space-8);
+    text-align: center;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+}
+
+.prompt-tab.active {
+    background-color: var(--color-primary);
+    color: var(--color-btn-primary-text);
+}
+
+.prompt-section {
+    display: none;
+}
+
+.prompt-section.active {
+    display: block;
+}
+
 #quick-prompt-input {
     margin-bottom: var(--space-16);
     resize: vertical;

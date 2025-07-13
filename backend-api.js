@@ -630,6 +630,23 @@ class BackendAPI {
             throw error;
         }
     }
+
+    async chatCompletion(messages, provider = 'openai', model = 'gpt-3.5-turbo') {
+        try {
+            const response = await authFetch(`${this.baseUrl}/api/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages, provider, model })
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response;
+        } catch (error) {
+            console.error('Error sending chat message:', error);
+            throw error;
+        }
+    }
     async refreshProviders() {
         try {
             const response = await authFetch(`${this.baseUrl}/api/refresh-providers`, {

@@ -638,6 +638,55 @@ def improve_text():
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
+@app.route('/api/chat', methods=['POST'])
+def chat_completion():
+    """Simple chat endpoint using OpenAI"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json()
+        if not data or 'messages' not in data:
+            return jsonify({"error": "Missing messages"}), 400
+
+        provider = data.get('provider', 'openai')
+        model = data.get('model')
+        messages = data['messages']
+
+        if provider != 'openai':
+            return jsonify({"error": "Provider not supported"}), 400
+
+        if not OPENAI_API_KEY:
+            return jsonify({"error": "API key de OpenAI no configurada"}), 500
+        if not model:
+            return jsonify({"error": "Model not specified"}), 400
+
+        headers = {
+            'Authorization': f'Bearer {OPENAI_API_KEY}',
+            'Content-Type': 'application/json'
+        }
+        payload = {
+            'model': model,
+            'messages': messages
+        }
+
+        response = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers=headers,
+            json=payload
+        )
+
+        if response.status_code == 200:
+            result = response.json()
+            message = result['choices'][0]['message']['content']
+            return jsonify({'message': message})
+        else:
+            return jsonify({'error': 'Error calling OpenAI API'}), response.status_code
+
+    except Exception as e:
+        return jsonify({'error': f'Error interno: {str(e)}'}), 500
+
 def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenAI"""
     if not OPENAI_API_KEY:

@@ -118,6 +118,8 @@ class NotesApp {
         // History to undo AI changes
         this.aiHistory = [];
         this.maxHistorySize = 10;
+
+        this.chatHistory = [];
         
         // Provider configuration
         this.config = {
@@ -172,6 +174,7 @@ class NotesApp {
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
         this.setupPromptSidebar();
+        this.setupPromptTabs();
         this.setupMobileHeaderActions();
         this.updateMobileFabVisibility();
 
@@ -252,6 +255,33 @@ class NotesApp {
                 sidebar.classList.remove('active');
             }
         });
+    }
+
+    setupPromptTabs() {
+        const editTab = document.getElementById('prompt-tab-edit');
+        const chatTab = document.getElementById('prompt-tab-chat');
+        const editSection = document.getElementById('prompt-edit');
+        const chatSection = document.getElementById('prompt-chat');
+        if (!editTab || !chatTab) return;
+
+        const activate = (tab) => {
+            if (tab === 'edit') {
+                editTab.classList.add('active');
+                chatTab.classList.remove('active');
+                editSection.classList.add('active');
+                chatSection.classList.remove('active');
+            } else {
+                chatTab.classList.add('active');
+                editTab.classList.remove('active');
+                chatSection.classList.add('active');
+                editSection.classList.remove('active');
+            }
+        };
+
+        editTab.addEventListener('click', () => activate('edit'));
+        chatTab.addEventListener('click', () => activate('chat'));
+
+        activate('edit');
     }
 
     setupMobileHeaderActions() {
@@ -1039,7 +1069,7 @@ class NotesApp {
         }
     }
 
-    sendChatMessage() {
+    async sendChatMessage() {
         this.updateSelectedText();
         const input = document.getElementById('chat-message-input');
         const text = input.value.trim();
@@ -1051,10 +1081,35 @@ class NotesApp {
         userBubble.textContent = text;
         messagesContainer.appendChild(userBubble);
 
-        const aiBubble = document.createElement('div');
-        aiBubble.className = 'chat-message ai';
-        aiBubble.textContent = 'AI response placeholder';
-        messagesContainer.appendChild(aiBubble);
+        const finalPrompt = `${text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language`;
+        this.chatHistory.push({ role: 'user', content: finalPrompt });
+
+        const messages = [];
+        if (document.getElementById('chat-add-full-note').checked && this.currentNote) {
+            messages.push({ role: 'system', content: this.currentNote.content });
+        }
+        if (document.getElementById('chat-add-selection').checked && this.selectedText) {
+            messages.push({ role: 'system', content: this.selectedText });
+        }
+        messages.push(...this.chatHistory);
+
+        try {
+            const response = await backendAPI.chatCompletion(messages, this.config.postprocessProvider || 'openai', this.config.postprocessModel || 'gpt-3.5-turbo');
+            const data = await response.json();
+            const aiText = data.message || data.error || 'Error';
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'chat-message ai';
+            aiBubble.textContent = aiText;
+            messagesContainer.appendChild(aiBubble);
+            if (!data.error) {
+                this.chatHistory.push({ role: 'assistant', content: aiText });
+            }
+        } catch (err) {
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'chat-message ai';
+            aiBubble.textContent = `Error: ${err.message}`;
+            messagesContainer.appendChild(aiBubble);
+        }
 
         input.value = '';
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -1063,6 +1118,7 @@ class NotesApp {
     startNewChat() {
         const messagesContainer = document.getElementById('chat-messages');
         messagesContainer.innerHTML = '';
+        this.chatHistory = [];
     }
 
     updateAIButtons() {

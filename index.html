@@ -231,13 +231,15 @@
                 <h2>Custom Prompt</h2>
                 <button class="btn btn--outline btn--sm" id="close-prompt-sidebar" aria-label="Close prompt sidebar">&times;</button>
             </div>
-            <div class="prompt-section" id="prompt-edit">
-                <h3>Edit</h3>
+            <div class="prompt-tabs">
+                <button class="prompt-tab active" id="prompt-tab-edit">Edit</button>
+                <button class="prompt-tab" id="prompt-tab-chat">Chat</button>
+            </div>
+            <div class="prompt-section active" id="prompt-edit">
                 <textarea class="form-control" id="quick-prompt-input" rows="5" placeholder="Enter custom prompt..."></textarea>
                 <button class="btn btn--primary btn--sm" id="apply-quick-prompt">Apply</button>
             </div>
             <div class="prompt-section" id="prompt-chat">
-                <h3>Chat</h3>
                 <div class="chat-messages" id="chat-messages"></div>
                 <div class="checkbox-group">
                     <label class="checkbox-label">
