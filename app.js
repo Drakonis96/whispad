@@ -114,7 +114,6 @@ class NotesApp {
         this.insertionRange = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
-        this.realtimeIntervalId = null;
         
         // History to undo AI changes
         this.aiHistory = [];
@@ -2278,18 +2277,9 @@ class NotesApp {
                     }
                 };
                 this.mediaRecorder.onstop = () => {
-                    if (this.realtimeIntervalId) {
-                        clearInterval(this.realtimeIntervalId);
-                        this.realtimeIntervalId = null;
-                    }
                     stream.getTracks().forEach(track => track.stop());
                 };
-                this.mediaRecorder.start();
-                this.realtimeIntervalId = setInterval(() => {
-                    if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-                        try { this.mediaRecorder.requestData(); } catch (e) { console.error('requestData error', e); }
-                    }
-                }, this.config.localInterval * 1000);
+                this.mediaRecorder.start(this.config.localInterval * 1000);
             } else {
                 this.mediaRecorder.ondataavailable = (event) => {
                     this.audioChunks.push(event.data);
@@ -2330,10 +2320,6 @@ class NotesApp {
 
     stopRecording() {
         if (this.mediaRecorder && this.isRecording) {
-            if (this.realtimeIntervalId) {
-                clearInterval(this.realtimeIntervalId);
-                this.realtimeIntervalId = null;
-            }
             this.mediaRecorder.stop();
             this.isRecording = false;
             
