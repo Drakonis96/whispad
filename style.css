@@ -875,6 +875,11 @@ select.form-control {
     margin-bottom: var(--space-16);
 }
 
+#quick-prompt-input {
+    margin-bottom: var(--space-16);
+    resize: vertical;
+}
+
 @media (max-width: 900px) {
     .prompt-sidebar {
         width: 80vw;
