@@ -94,6 +94,14 @@ const configuracionMejoras = {
         icono: "✚",
         prompt: "Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:",
         visible: true
+    },
+    translation: {
+        nombre: "Translation",
+        descripcion: "Translate text into another language",
+        icono: "🗣️",
+        prompt: "",
+        visible: false,
+        custom: true
     }
 };
 
@@ -146,7 +154,9 @@ class NotesApp {
             lmstudioModels: '',
             ollamaHost: '127.0.0.1',
             ollamaPort: '11434',
-            ollamaModels: ''
+            ollamaModels: '',
+            translationEnabled: false,
+            translationLanguage: 'en'
         };
         
         // Visible styles configuration
@@ -165,6 +175,7 @@ class NotesApp {
     async init() {
         this.loadConfig();
         this.loadStylesConfig();
+        this.updateTranslationStyle();
         this.storeDefaultLanguageOptions();
         await this.loadNotes();
         this.setupEventListeners();
@@ -417,6 +428,24 @@ class NotesApp {
         // Styles configuration
         document.getElementById('styles-config-btn').addEventListener('click', () => {
             this.showStylesConfigModal();
+        });
+
+        // Translation settings
+        document.getElementById('translation-settings-btn').addEventListener('click', () => {
+            this.showTranslationModal();
+        });
+
+        document.getElementById('cancel-translation').addEventListener('click', () => {
+            this.hideTranslationModal();
+        });
+
+        document.getElementById('save-translation').addEventListener('click', () => {
+            this.saveTranslationConfig();
+        });
+
+        document.getElementById('translation-enabled').addEventListener('change', (e) => {
+            const container = document.getElementById('translation-language-container');
+            container.style.display = e.target.checked ? 'block' : 'none';
         });
         
         document.getElementById('cancel-config').addEventListener('click', () => {
@@ -906,6 +935,37 @@ class NotesApp {
         document.getElementById('new-style-icon').value = '';
         document.getElementById('new-style-description').value = '';
         document.getElementById('new-style-prompt').value = '';
+    }
+
+    showTranslationModal() {
+        const modal = document.getElementById('translation-modal');
+        const enabled = document.getElementById('translation-enabled');
+        const language = document.getElementById('translation-language');
+        enabled.checked = this.config.translationEnabled === true;
+        language.value = this.config.translationLanguage || 'en';
+        document.getElementById('translation-language-container').style.display = enabled.checked ? 'block' : 'none';
+        this.hideMobileFab();
+        modal.classList.add('active');
+    }
+
+    hideTranslationModal() {
+        const modal = document.getElementById('translation-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    saveTranslationConfig() {
+        const enabled = document.getElementById('translation-enabled').checked;
+        const languageSelect = document.getElementById('translation-language');
+        const language = languageSelect.value;
+        this.config.translationEnabled = enabled;
+        this.config.translationLanguage = language;
+        const storageKey = `notes-app-config-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.config));
+        this.updateTranslationStyle();
+        this.updateAIButtons();
+        this.hideTranslationModal();
+        this.showNotification('Translation settings saved');
     }
 
     renderStylesConfig() {
@@ -2658,6 +2718,9 @@ class NotesApp {
     
     // Mejora con IA
     async improveText(action) {
+        if (action === 'translation') {
+            this.updateTranslationStyle();
+        }
         console.log('improveText called with action:', action);
         console.log('selectedText:', this.selectedText);
         console.log('selectedRange:', this.selectedRange);
@@ -4101,6 +4164,26 @@ class NotesApp {
             languageSelect.value = currentValue;
         } else {
             languageSelect.value = 'auto';
+        }
+    }
+
+    updateTranslationStyle() {
+        const style = this.stylesConfig.translation;
+        if (!style) return;
+        if (this.config.translationEnabled) {
+            const code = this.config.translationLanguage || 'en';
+            let langName = code;
+            const select = document.getElementById('translation-language');
+            if (select) {
+                const opt = select.querySelector(`option[value="${code}"]`);
+                if (opt) {
+                    langName = opt.textContent;
+                }
+            }
+            style.prompt = `You are a professional translator. Translate the following text into ${langName}, preserving original line breaks, formatting, and punctuation. Respond ONLY with the translated text, without additional explanations.`;
+            style.visible = true;
+        } else {
+            style.visible = false;
         }
     }
 
