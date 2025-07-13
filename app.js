@@ -322,6 +322,13 @@ class NotesApp {
         editor.addEventListener('input', () => {
             this.handleEditorChange();
         });
+
+        // Handle paste events to ensure plain text insertion
+        editor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+            document.execCommand('insertText', false, text);
+        });
         
         // Selección de texto en el editor
         editor.addEventListener('mouseup', () => {
