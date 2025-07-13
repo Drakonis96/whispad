@@ -39,60 +39,60 @@ const ejemplosTranscripcion = [
 ];
 
 const configuracionMejoras = {
-    claridad: {
+    clarity: {
         nombre: "Improve Clarity",
         descripcion: "Makes text clearer and more direct",
         icono: "✨",
-        prompt: "Rewrite the following text to be clearer, more direct and easier to understand. Keep the same meaning but improve clarity. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:",
         visible: true
     },
     formal: {
         nombre: "Make Formal",
         descripcion: "Converts text to a more formal tone",
         icono: "🎩",
-        prompt: "Rewrite the following text using a formal and professional tone, appropriate for an academic or business context. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text in a formal tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:",
         visible: false
     },
     casual: {
         nombre: "Make Casual",
         descripcion: "Converts text to a more casual tone",
         icono: "😊",
-        prompt: "Rewrite the following text using a casual and friendly tone, as if you were talking to a friend. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text in a casual and friendly tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:",
         visible: false
     },
-    academico: {
+    academic: {
         nombre: "Academic",
         descripcion: "Converts text to academic style",
         icono: "🎓",
-        prompt: "Rewrite the following text using an academic style with precise terminology, formal structure and appropriate references. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Rewrite the following text in an academic style. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the rewritten text, without additional explanations:",
         visible: false
     },
-    narrativo: {
+    narrative: {
         nombre: "Narrative",
         descripcion: "Improves narrative texts and novel dialogues",
         icono: "📖",
-        prompt: "Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Improve fluency, description and literary quality while maintaining the essence of the text:",
+        prompt: "Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:",
         visible: false
     },
-    academico_v2: {
+    academic_v2: {
         nombre: "Academic v2",
         descripcion: "Academic improvement with minimal changes, preserving author's words",
         icono: "🎓",
-        prompt: "Improve the following academic text making minimal changes to preserve the author's words. Use more precise words when necessary, improve structure and remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud. Keep the original style and vocabulary as much as possible:",
+        prompt: "Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:",
         visible: true
     },
-    resumir: {
+    summarize: {
         nombre: "Summarize",
         descripcion: "Creates a concise summary of the text",
         icono: "📝",
-        prompt: "Create a concise and clear summary of the following text, maintaining the most important points. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:",
         visible: false
     },
-    expandir: {
+    expand: {
         nombre: "Expand",
         descripcion: "Adds more details and context",
         icono: "✚",
-        prompt: "Expand the following text by adding more details, examples and relevant context to enrich the content. Remove any type of interjection or expression typical of oral language (mmm, ahhh, eh, um, etc.) and expressions of doubt when speaking or thinking out loud:",
+        prompt: "Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:",
         visible: true
     }
 };
@@ -3318,11 +3318,11 @@ class NotesApp {
     // Función auxiliar para mejoras locales (fallback)
     applyAIImprovement(text, action) {
         const mejoras = {
-            claridad: (texto) => {
+            clarity: (texto) => {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/\s+/g, ' ')
-                    .trim() + ' [Texto mejorado para mayor claridad]';
+                    .trim() + ' [Texto mejorado para mayor clarity]';
             },
             formal: (texto) => {
                 return texto
@@ -3339,7 +3339,7 @@ class NotesApp {
                     .replace(/excelente/g, 'genial')
                     .replace(/considero que/g, 'creo que') + ' [Versión casual]';
             },
-            academico: (texto) => {
+            academic: (texto) => {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/muy/g, 'significativamente')
@@ -3347,24 +3347,24 @@ class NotesApp {
                     .replace(/creo que/g, 'se puede argumentar que')
                     .replace(/porque/g, 'debido a que') + ' [Versión académica]';
             },
-            narrativo: (texto) => {
+            narrative: (texto) => {
                 return texto
                     .replace(/\b(y entonces|y luego)\b/g, 'después')
                     .replace(/\b(muy)\b/g, 'sumamente')
                     .replace(/\bdijo\b/g, 'murmuró') + ' [Versión narrativa mejorada]';
             },
-            academico_v2: (texto) => {
+            academic_v2: (texto) => {
                 return texto
                     .replace(/eh|um|ah|mmm|ahhh/g, '')
                     .replace(/\s+/g, ' ')
                     .trim() + ' [Mejora académica con cambios mínimos]';
             },
-            resumir: (texto) => {
+            summarize: (texto) => {
                 const words = texto.split(' ');
                 const summary = words.slice(0, Math.min(20, words.length)).join(' ');
                 return `Resumen: ${summary}${words.length > 20 ? '...' : ''}`;
             },
-            expandir: (texto) => {
+            expand: (texto) => {
                 return texto + ' [Se han añadido detalles adicionales y contexto relevante para enriquecer el contenido y proporcionar una comprensión más completa del tema tratado.]';
             }
         };
