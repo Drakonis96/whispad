@@ -465,6 +465,19 @@ class NotesApp {
             });
         }
 
+        const chatSendBtn = document.getElementById('chat-send-btn');
+        if (chatSendBtn) {
+            chatSendBtn.addEventListener('click', () => {
+                this.sendChatMessage();
+            });
+        }
+        const chatNewBtn = document.getElementById('chat-new-btn');
+        if (chatNewBtn) {
+            chatNewBtn.addEventListener('click', () => {
+                this.startNewChat();
+            });
+        }
+
         const updateModelsBtn = document.getElementById('update-lmstudio-models-btn');
         if (updateModelsBtn) {
             updateModelsBtn.addEventListener('click', () => {
@@ -1024,6 +1037,32 @@ class NotesApp {
             const sidebar = document.getElementById('prompt-sidebar');
             if (sidebar) sidebar.classList.remove('active');
         }
+    }
+
+    sendChatMessage() {
+        this.updateSelectedText();
+        const input = document.getElementById('chat-message-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        const messagesContainer = document.getElementById('chat-messages');
+        const userBubble = document.createElement('div');
+        userBubble.className = 'chat-message user';
+        userBubble.textContent = text;
+        messagesContainer.appendChild(userBubble);
+
+        const aiBubble = document.createElement('div');
+        aiBubble.className = 'chat-message ai';
+        aiBubble.textContent = 'AI response placeholder';
+        messagesContainer.appendChild(aiBubble);
+
+        input.value = '';
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    startNewChat() {
+        const messagesContainer = document.getElementById('chat-messages');
+        messagesContainer.innerHTML = '';
     }
 
     updateAIButtons() {

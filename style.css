@@ -905,6 +905,60 @@ select.form-control {
     }
 }
 
+#prompt-edit {
+    margin-bottom: var(--space-24);
+}
+
+.prompt-section h3 {
+    margin: 0 0 var(--space-12) 0;
+    font-size: var(--font-size-md);
+    color: var(--color-text);
+}
+
+.chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    height: 200px;
+    overflow-y: auto;
+    margin-bottom: var(--space-12);
+    padding-right: var(--space-4);
+}
+
+.chat-message {
+    padding: var(--space-8) var(--space-12);
+    border-radius: var(--radius-md);
+    max-width: 85%;
+    word-wrap: break-word;
+}
+
+.chat-message.user {
+    align-self: flex-end;
+    background-color: var(--color-primary);
+    color: var(--color-btn-primary-text);
+}
+
+.chat-message.ai {
+    align-self: flex-start;
+    background-color: var(--color-secondary);
+    color: var(--color-text);
+}
+
+.chat-input-container {
+    display: flex;
+    gap: var(--space-8);
+    align-items: center;
+}
+
+.icon-btn {
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
 .sidebar-header {
     padding: var(--space-20) var(--space-16);
     border-bottom: 1px solid var(--color-border);

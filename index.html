@@ -228,11 +228,35 @@
         </div>
         <div class="prompt-sidebar" id="prompt-sidebar">
             <div class="prompt-sidebar-header">
-                <h2>Quick Prompt</h2>
+                <h2>Custom Prompt</h2>
                 <button class="btn btn--outline btn--sm" id="close-prompt-sidebar" aria-label="Close prompt sidebar">&times;</button>
             </div>
-            <textarea class="form-control" id="quick-prompt-input" rows="5" placeholder="Enter custom prompt..."></textarea>
-            <button class="btn btn--primary btn--sm" id="apply-quick-prompt">Apply</button>
+            <div class="prompt-section" id="prompt-edit">
+                <h3>Edit</h3>
+                <textarea class="form-control" id="quick-prompt-input" rows="5" placeholder="Enter custom prompt..."></textarea>
+                <button class="btn btn--primary btn--sm" id="apply-quick-prompt">Apply</button>
+            </div>
+            <div class="prompt-section" id="prompt-chat">
+                <h3>Chat</h3>
+                <div class="chat-messages" id="chat-messages"></div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chat-add-full-note">
+                        <span class="checkmark"></span>
+                        Add full note
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="chat-add-selection">
+                        <span class="checkmark"></span>
+                        Add selected text
+                    </label>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" class="form-control" id="chat-message-input" placeholder="Type a message...">
+                    <button class="btn btn--outline btn--sm icon-btn" id="chat-send-btn" title="Send"><i class="fas fa-paper-plane"></i></button>
+                    <button class="btn btn--outline btn--sm icon-btn" id="chat-new-btn" title="New chat"><i class="fas fa-comments"></i></button>
+                </div>
+            </div>
         </div>
     </div>
 
