@@ -171,6 +171,7 @@ class NotesApp {
         await this.checkBackendStatus();
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
+        this.setupPromptSidebar();
         this.setupMobileHeaderActions();
         this.updateMobileFabVisibility();
 
@@ -201,26 +202,53 @@ class NotesApp {
     setupSidebarResponsive() {
         const sidebar = document.querySelector('.sidebar');
         const hamburger = document.getElementById('hamburger-menu');
-        // Cerrar sidebar por defecto en móvil
         if (window.innerWidth <= 900) {
             sidebar.classList.remove('active');
         }
-        // Toggle con hamburguesa
         hamburger.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+            if (window.innerWidth <= 900) {
+                sidebar.classList.toggle('active');
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
         });
-        // Cerrar sidebar al hacer click fuera (opcional)
         document.addEventListener('click', (e) => {
             if (window.innerWidth > 900) return;
             if (!sidebar.contains(e.target) && !hamburger.contains(e.target)) {
                 sidebar.classList.remove('active');
             }
         });
-        // Opcional: cerrar al cambiar tamaño de pantalla
         window.addEventListener('resize', () => {
             if (window.innerWidth > 900) {
-                sidebar.classList.add('active');
+                sidebar.classList.remove('active');
             } else {
+                sidebar.classList.remove('collapsed');
+            }
+        });
+    }
+
+    setupPromptSidebar() {
+        const sidebar = document.getElementById('prompt-sidebar');
+        const toggle = document.getElementById('prompt-sidebar-toggle');
+        const closeBtn = document.getElementById('close-prompt-sidebar');
+        if (!sidebar || !toggle) return;
+        toggle.addEventListener('click', () => {
+            this.updateSelectedText();
+            sidebar.classList.toggle('active');
+        });
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                sidebar.classList.remove('active');
+            });
+        }
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth > 900) return;
+            if (!sidebar.contains(e.target) && !toggle.contains(e.target)) {
+                sidebar.classList.remove('active');
+            }
+        });
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 900) {
                 sidebar.classList.remove('active');
             }
         });
@@ -429,6 +457,13 @@ class NotesApp {
         document.getElementById('add-style-btn').addEventListener('click', () => {
             this.addNewStyle();
         });
+
+        const applyQuickPromptBtn = document.getElementById('apply-quick-prompt');
+        if (applyQuickPromptBtn) {
+            applyQuickPromptBtn.addEventListener('click', () => {
+                this.applyQuickPrompt();
+            });
+        }
 
         const updateModelsBtn = document.getElementById('update-lmstudio-models-btn');
         if (updateModelsBtn) {
@@ -959,6 +994,35 @@ class NotesApp {
             delete this.stylesConfig[styleKey];
             this.renderStylesConfig();
             this.showNotification('Style deleted successfully');
+        }
+    }
+
+    async applyQuickPrompt() {
+        this.updateSelectedText();
+        const promptInput = document.getElementById('quick-prompt-input');
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+            this.showNotification('Please enter a prompt', 'warning');
+            return;
+        }
+
+        const tempKey = 'quick_prompt_temp';
+        this.stylesConfig[tempKey] = {
+            nombre: 'Quick Prompt',
+            descripcion: '',
+            icono: '✨',
+            prompt: `${prompt}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language`,
+            visible: true,
+            custom: true
+        };
+
+        try {
+            await this.improveText(tempKey);
+        } finally {
+            delete this.stylesConfig[tempKey];
+            promptInput.value = '';
+            const sidebar = document.getElementById('prompt-sidebar');
+            if (sidebar) sidebar.classList.remove('active');
         }
     }
 
