@@ -2717,6 +2717,9 @@ class NotesApp {
     
     // Mejora con IA
     async improveText(action) {
+        if (action === 'translation') {
+            this.updateTranslationStyle();
+        }
         console.log('improveText called with action:', action);
         console.log('selectedText:', this.selectedText);
         console.log('selectedRange:', this.selectedRange);
