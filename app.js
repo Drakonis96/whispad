@@ -118,6 +118,8 @@ class NotesApp {
         // History to undo AI changes
         this.aiHistory = [];
         this.maxHistorySize = 10;
+        this.aiInProgress = false;
+        this.aiBackupKey = null;
         
         // Provider configuration
         this.config = {
@@ -207,7 +209,11 @@ class NotesApp {
         }
         // Toggle con hamburguesa
         hamburger.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+            if (window.innerWidth <= 900) {
+                sidebar.classList.toggle('active');
+            } else {
+                sidebar.classList.toggle('desktop-hidden');
+            }
         });
         // Cerrar sidebar al hacer click fuera (opcional)
         document.addEventListener('click', (e) => {
@@ -219,8 +225,6 @@ class NotesApp {
         // Opcional: cerrar al cambiar tamaño de pantalla
         window.addEventListener('resize', () => {
             if (window.innerWidth > 900) {
-                sidebar.classList.add('active');
-            } else {
                 sidebar.classList.remove('active');
             }
         });
@@ -441,6 +445,40 @@ class NotesApp {
         if (updateOllamaBtn) {
             updateOllamaBtn.addEventListener('click', () => {
                 this.updateOllamaModelsList();
+            });
+        }
+
+        // Custom prompt sidebar
+        const promptSidebar = document.getElementById('prompt-sidebar');
+        const promptToggle = document.getElementById('prompt-sidebar-toggle');
+        const applyPromptBtn = document.getElementById('apply-custom-prompt');
+        const customPromptInput = document.getElementById('custom-prompt-text');
+
+        if (promptToggle && promptSidebar) {
+            promptToggle.addEventListener('click', () => {
+                promptSidebar.classList.toggle('active');
+            });
+        }
+
+        if (applyPromptBtn && customPromptInput) {
+            applyPromptBtn.addEventListener('click', () => {
+                const prompt = customPromptInput.value.trim();
+                if (!prompt) {
+                    this.showNotification('Please enter a prompt', 'warning');
+                    return;
+                }
+                const finalPrompt = `${prompt}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language.`;
+                const tempKey = 'temp_custom_prompt';
+                this.stylesConfig[tempKey] = {
+                    nombre: 'Custom',
+                    descripcion: 'Temporary prompt',
+                    icono: '💬',
+                    prompt: finalPrompt,
+                    visible: true,
+                    custom: true
+                };
+                this.improveText(tempKey);
+                delete this.stylesConfig[tempKey];
             });
         }
         
@@ -1042,7 +1080,15 @@ class NotesApp {
     
     loadNoteToEditor() {
         if (!this.currentNote) return;
-        
+
+        const backupKey = `ai-backup-${this.currentNote.id}`;
+        const backup = localStorage.getItem(backupKey);
+        if (backup) {
+            this.currentNote.content = backup;
+            localStorage.removeItem(backupKey);
+            this.showNotification('Restored unsaved content after interrupted AI operation', 'warning');
+        }
+
         document.getElementById('note-title').value = this.currentNote.title;
         document.getElementById('editor').innerHTML = this.currentNote.content;
 
@@ -1079,6 +1125,7 @@ class NotesApp {
     
     handleEditorChange() {
         if (!this.currentNote) return;
+        if (this.aiInProgress) return;
 
         const content = document.getElementById('editor').innerHTML;
         if (content === this.currentNote.content) return;
@@ -1091,6 +1138,7 @@ class NotesApp {
 
     handleTitleChange() {
         if (!this.currentNote) return;
+        if (this.aiInProgress) return;
 
         const title = document.getElementById('note-title').value.trim();
         if (title === this.currentNote.title) return;
@@ -1103,6 +1151,7 @@ class NotesApp {
     
     saveCurrentNote(silent = false) {
         if (!this.currentNote) return;
+        if (this.aiInProgress) return;
 
         clearTimeout(this.autoSaveTimeout);
 
@@ -2632,6 +2681,12 @@ class NotesApp {
             return;
         }
 
+        // Start AI improvement and create backup
+        this.aiInProgress = true;
+        this.aiBackupKey = `ai-backup-${this.currentNote?.id}`;
+        localStorage.setItem(this.aiBackupKey, document.getElementById('editor').innerHTML);
+        clearTimeout(this.autoSaveTimeout);
+
         // Guardar estado actual para poder deshacer
         this.saveAIHistory();
 
@@ -2709,6 +2764,9 @@ class NotesApp {
             this.hideProcessingOverlay();
             this.showNotification(`Text improved: ${configuracionMejoras[action].nombre}`);
             this.handleEditorChange();
+            localStorage.removeItem(this.aiBackupKey);
+            this.aiInProgress = false;
+            this.aiBackupKey = null;
             
         } catch (error) {
             this.hideProcessingOverlay();
@@ -2725,8 +2783,11 @@ class NotesApp {
             // Limpiar variables de selección
             this.selectedText = '';
             this.selectedRange = null;
-            
+
             this.showNotification('Error improving text: ' + error.message, 'error');
+            localStorage.removeItem(this.aiBackupKey);
+            this.aiInProgress = false;
+            this.aiBackupKey = null;
         }
     }
 

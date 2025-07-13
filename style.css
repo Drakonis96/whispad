@@ -1,6 +1,6 @@
 /* Hamburger menu styles */
 .hamburger-menu {
-  display: none;
+  display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -60,7 +60,7 @@
 
 @media (min-width: 901px) {
   .hamburger-menu {
-    display: none !important;
+    display: flex !important;
   }
   .sidebar {
     position: relative;
@@ -2480,4 +2480,32 @@ select.form-control {
 
 .user-item:last-child {
     border-bottom: none;
+}
+
+/* Desktop sidebar toggle */
+.sidebar.desktop-hidden {
+    display: none;
+}
+
+/* Custom prompt sidebar */
+.prompt-sidebar {
+    width: 320px;
+    background-color: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    display: none;
+    flex-direction: column;
+    padding: var(--space-16);
+}
+
+.prompt-sidebar.active {
+    display: flex;
+}
+
+.prompt-sidebar textarea {
+    width: 100%;
+    resize: vertical;
+}
+
+.prompt-sidebar button {
+    margin-top: var(--space-16);
 }
