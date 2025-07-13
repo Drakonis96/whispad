@@ -26,8 +26,7 @@
             <div class="modal-actions">
                 <button type="button" class="btn btn--primary" id="login-submit">Login</button>
             </div>
-        </div>
-    </div>
+
 
     <!-- User management modal -->
     <div class="modal" id="user-modal">
@@ -93,6 +92,9 @@
             </button>
             <button class="btn btn--outline btn--sm hidden" id="current-user-btn"></button>
             <button class="btn btn--error btn--sm hidden" id="logout-btn">Logout</button>
+            <button class="btn btn--outline btn--sm" id="prompt-sidebar-toggle" title="Custom prompt">
+                <i class="fas fa-keyboard"></i>&nbsp;Prompt
+            </button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -222,6 +224,10 @@
                     <div class="editor" id="editor" contenteditable="true" placeholder="Start writing your note here..."></div>
                 </div>
             </div>
+        </div>
+        <div class="custom-prompt-sidebar hidden">
+            <textarea id="custom-prompt-text" class="form-control" rows="6" placeholder="Enter custom prompt..."></textarea>
+            <button class="btn btn--primary btn--sm" id="apply-custom-prompt" style="margin-top:8px;">Apply</button>
         </div>
     </div>
     

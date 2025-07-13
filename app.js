@@ -171,6 +171,7 @@ class NotesApp {
         await this.checkBackendStatus();
         // Sidebar responsive: cerrar en móvil por defecto
         this.setupSidebarResponsive();
+        this.setupPromptSidebar();
         this.setupMobileHeaderActions();
         this.updateMobileFabVisibility();
 
@@ -201,13 +202,17 @@ class NotesApp {
     setupSidebarResponsive() {
         const sidebar = document.querySelector('.sidebar');
         const hamburger = document.getElementById('hamburger-menu');
-        // Cerrar sidebar por defecto en móvil
+        // Close sidebar by default on mobile
         if (window.innerWidth <= 900) {
             sidebar.classList.remove('active');
         }
-        // Toggle con hamburguesa
+        // Toggle with hamburger
         hamburger.addEventListener('click', () => {
-            sidebar.classList.toggle('active');
+            if (window.innerWidth > 900) {
+                sidebar.classList.toggle('hidden');
+            } else {
+                sidebar.classList.toggle('active');
+            }
         });
         // Cerrar sidebar al hacer click fuera (opcional)
         document.addEventListener('click', (e) => {
@@ -219,10 +224,48 @@ class NotesApp {
         // Opcional: cerrar al cambiar tamaño de pantalla
         window.addEventListener('resize', () => {
             if (window.innerWidth > 900) {
-                sidebar.classList.add('active');
-            } else {
                 sidebar.classList.remove('active');
+            } else {
+                sidebar.classList.remove('hidden');
             }
+        });
+    }
+
+    setupPromptSidebar() {
+        const promptSidebar = document.querySelector('.custom-prompt-sidebar');
+        const toggleBtn = document.getElementById('prompt-sidebar-toggle');
+        const applyBtn = document.getElementById('apply-custom-prompt');
+        const promptInput = document.getElementById('custom-prompt-text');
+
+        if (!promptSidebar || !toggleBtn || !applyBtn || !promptInput) return;
+
+        if (window.innerWidth <= 900) {
+            promptSidebar.classList.remove('active');
+        }
+
+        toggleBtn.addEventListener('click', () => {
+            if (window.innerWidth > 900) {
+                promptSidebar.classList.toggle('hidden');
+            } else {
+                promptSidebar.classList.toggle('active');
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 900) {
+                promptSidebar.classList.remove('active');
+            } else {
+                promptSidebar.classList.remove('hidden');
+            }
+        });
+
+        applyBtn.addEventListener('click', () => {
+            const prompt = promptInput.value.trim();
+            if (!prompt) {
+                this.showNotification('Please enter a custom prompt', 'warning');
+                return;
+            }
+            this.improveText('custom', prompt);
         });
     }
 
@@ -230,9 +273,10 @@ class NotesApp {
         const headerActions = document.querySelector('.header-actions');
         const mobileContainer = document.querySelector('.mobile-header-actions');
         const hamburger = document.getElementById('hamburger-menu');
-        if (!headerActions || !mobileContainer || !hamburger) return;
+        const toggleBtn = document.getElementById('prompt-sidebar-toggle');
+        if (!headerActions || !mobileContainer || !hamburger || !toggleBtn) return;
 
-        const buttons = Array.from(headerActions.querySelectorAll('button')).filter(btn => btn !== hamburger);
+        const buttons = Array.from(headerActions.querySelectorAll('button')).filter(btn => btn !== hamburger && btn !== toggleBtn);
 
         const moveButtons = () => {
             if (window.innerWidth <= 900) {
@@ -2559,7 +2603,7 @@ class NotesApp {
     }
     
     // Mejora con IA
-    async improveText(action) {
+    async improveText(action, customPrompt = null) {
         console.log('improveText called with action:', action);
         console.log('selectedText:', this.selectedText);
         console.log('selectedRange:', this.selectedRange);
@@ -2663,15 +2707,15 @@ class NotesApp {
             this.updateAIButtonsState(true);
             
             if (isOpenAI) {
-                improvedText = await this.improveWithOpenAIStream(textToImprove, action, tempSpan);
+                improvedText = await this.improveWithOpenAIStream(textToImprove, action, tempSpan, customPrompt);
             } else if (isGemini) {
-                improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
+                improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan, customPrompt);
             } else if (isOpenRouter) {
-                improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
+                improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan, customPrompt);
             } else if (isLmStudio) {
-                improvedText = await this.improveWithLmStudioStream(textToImprove, action, tempSpan);
+                improvedText = await this.improveWithLmStudioStream(textToImprove, action, tempSpan, customPrompt);
             } else if (isOllama) {
-                improvedText = await this.improveWithOllamaStream(textToImprove, action, tempSpan);
+                improvedText = await this.improveWithOllamaStream(textToImprove, action, tempSpan, customPrompt);
             } else {
                 // Fallback a mejora local
                 improvedText = this.applyAIImprovement(textToImprove, action);
@@ -2707,7 +2751,8 @@ class NotesApp {
             this.updateUndoButton();
             
             this.hideProcessingOverlay();
-            this.showNotification(`Text improved: ${configuracionMejoras[action].nombre}`);
+            const styleName = configuracionMejoras[action]?.nombre || 'Custom prompt';
+            this.showNotification(`Text improved: ${styleName}`);
             this.handleEditorChange();
             
         } catch (error) {
@@ -2730,28 +2775,34 @@ class NotesApp {
         }
     }
 
-    async improveWithOpenAI(text, action) {
+    async improveWithOpenAI(text, action, customPrompt = null) {
         try {
             // Verificar si es un estilo personalizado y enviar su prompt
+        let prompt = customPrompt;
+        if (!prompt) {
             const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            prompt = (style && style.custom) ? style.prompt : null;
+        }
             
             // Usar el backend en lugar de la API directamente
-            return await backendAPI.improveText(text, action, 'openai', false, this.config.postprocessModel, customPrompt);
+            return await backendAPI.improveText(text, action, 'openai', false, this.config.postprocessModel, prompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenAI: ${error.message}`);
         }
     }
 
-    async improveWithOpenAIStream(text, action, tempElement) {
+    async improveWithOpenAIStream(text, action, tempElement, customPrompt = null) {
         try {
             console.log('Starting OpenAI stream for action:', action);
-            
+
             // Verificar si es un estilo personalizado y enviar su prompt
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
-            
-            const response = await backendAPI.improveText(text, action, 'openai', true, this.config.postprocessModel, customPrompt);
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
+
+            const response = await backendAPI.improveText(text, action, 'openai', true, this.config.postprocessModel, prompt);
             
             if (!response.body) {
                 throw new Error('No response body received');
@@ -2826,28 +2877,34 @@ class NotesApp {
         }
     }
 
-    async improveWithGemini(text, action) {
+    async improveWithGemini(text, action, customPrompt = null) {
         try {
             // Verificar si es un estilo personalizado y enviar su prompt
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
             
             // Usar el backend en lugar de la API directamente
-            return await backendAPI.improveText(text, action, 'google', false, this.config.postprocessModel, customPrompt);
+            return await backendAPI.improveText(text, action, 'google', false, this.config.postprocessModel, prompt);
         } catch (error) {
             throw new Error(`Error improving text with Gemini: ${error.message}`);
         }
     }
 
-    async improveWithGeminiStream(text, action, tempElement) {
+    async improveWithGeminiStream(text, action, tempElement, customPrompt = null) {
         try {
             console.log('Starting Gemini stream for action:', action);
-            
+
             // Verificar si es un estilo personalizado y enviar su prompt
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
-            
-            const response = await backendAPI.improveText(text, action, 'google', true, this.config.postprocessModel, customPrompt);
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
+
+            const response = await backendAPI.improveText(text, action, 'google', true, this.config.postprocessModel, prompt);
             
             if (!response.body) {
                 throw new Error('No response body received');
@@ -2921,55 +2978,66 @@ class NotesApp {
         }
     }
     
-    async improveWithOpenRouter(text, action) {
+    async improveWithOpenRouter(text, action, customPrompt = null) {
         try {
-            // Verificar si es un estilo personalizado y enviar su prompt
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
             
             const model = this.config.postprocessModel;
-            return await backendAPI.improveText(text, action, 'openrouter', false, model, customPrompt);
+            return await backendAPI.improveText(text, action, 'openrouter', false, model, prompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
         }
     }
 
-    async improveWithLmStudio(text, action) {
+    async improveWithLmStudio(text, action, customPrompt = null) {
         try {
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
             const model = this.config.postprocessModel;
             const host = this.config.lmstudioHost;
             const port = this.config.lmstudioPort;
-            return await backendAPI.improveText(text, action, 'lmstudio', false, model, customPrompt, host, port);
+            return await backendAPI.improveText(text, action, 'lmstudio', false, model, prompt, host, port);
         } catch (error) {
             throw new Error(`Error improving text with LM Studio: ${error.message}`);
         }
     }
 
-    async improveWithOllama(text, action) {
+    async improveWithOllama(text, action, customPrompt = null) {
         try {
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
             const model = this.config.postprocessModel;
             const host = this.config.ollamaHost;
             const port = this.config.ollamaPort;
-            return await backendAPI.improveText(text, action, 'ollama', false, model, customPrompt, host, port);
+            return await backendAPI.improveText(text, action, 'ollama', false, model, prompt, host, port);
         } catch (error) {
             throw new Error(`Error improving text with Ollama: ${error.message}`);
         }
     }
 
-    async improveWithOpenRouterStream(text, action, tempElement) {
+    async improveWithOpenRouterStream(text, action, tempElement, customPrompt = null) {
         try {
             console.log('Starting OpenRouter stream for action:', action);
-            
+
             // Verificar si es un estilo personalizado y enviar su prompt
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
             
             const model = this.config.postprocessModel;
-            const response = await backendAPI.improveText(text, action, 'openrouter', true, model, customPrompt);
+            const response = await backendAPI.improveText(text, action, 'openrouter', true, model, prompt);
             
             if (!response.body) {
                 throw new Error('No response body received');
@@ -3048,17 +3116,20 @@ class NotesApp {
         }
     }
 
-    async improveWithLmStudioStream(text, action, tempElement) {
+    async improveWithLmStudioStream(text, action, tempElement, customPrompt = null) {
         try {
             console.log('Starting LM Studio stream for action:', action);
 
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
 
             const model = this.config.postprocessModel;
             const host = this.config.lmstudioHost;
             const port = this.config.lmstudioPort;
-            const response = await backendAPI.improveText(text, action, 'lmstudio', true, model, customPrompt, host, port);
+            const response = await backendAPI.improveText(text, action, 'lmstudio', true, model, prompt, host, port);
 
             if (!response.body) {
                 throw new Error('No response body received');
@@ -3110,17 +3181,20 @@ class NotesApp {
         }
     }
 
-    async improveWithOllamaStream(text, action, tempElement) {
+    async improveWithOllamaStream(text, action, tempElement, customPrompt = null) {
         try {
             console.log('Starting Ollama stream for action:', action);
 
-            const style = this.stylesConfig[action];
-            const customPrompt = (style && style.custom) ? style.prompt : null;
+            let prompt = customPrompt;
+            if (!prompt) {
+                const style = this.stylesConfig[action];
+                prompt = (style && style.custom) ? style.prompt : null;
+            }
 
             const model = this.config.postprocessModel;
             const host = this.config.ollamaHost;
             const port = this.config.ollamaPort;
-            const response = await backendAPI.improveText(text, action, 'ollama', true, model, customPrompt, host, port);
+            const response = await backendAPI.improveText(text, action, 'ollama', true, model, prompt, host, port);
 
             if (!response.body) {
                 throw new Error('No response body received');

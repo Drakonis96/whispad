@@ -648,7 +648,7 @@ def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -704,7 +704,7 @@ def improve_text_google(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -752,7 +752,7 @@ def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -838,7 +838,7 @@ def improve_text_google_stream(text, improvement_type, model, custom_prompt=None
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -919,7 +919,7 @@ def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -994,7 +994,7 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -1081,7 +1081,7 @@ def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prom
         return jsonify({"error": "LM Studio host, port and model required"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         prompts = {
             'claridad': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1144,7 +1144,7 @@ def improve_text_lmstudio_stream(text, improvement_type, model, host, port, cust
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         prompts = {
             'claridad': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1205,7 +1205,7 @@ def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt
         return jsonify({"error": "Ollama host, port and model required"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         prompts = {
             'claridad': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1248,7 +1248,7 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language."
     else:
         prompts = {
             'claridad': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
