@@ -123,6 +123,7 @@ class NotesApp {
 
         // Chat conversation history
         this.chatMessages = [];
+        this.chatNote = '';
         
         // Provider configuration
         this.config = {
@@ -525,6 +526,7 @@ class NotesApp {
         if (chatNew) {
             chatNew.addEventListener('click', () => {
                 this.chatMessages = [];
+                this.chatNote = '';
                 this.renderChatMessages();
             });
         }
@@ -4123,6 +4125,12 @@ class NotesApp {
         const container = document.getElementById('chat-messages');
         if (!container) return;
         container.innerHTML = '';
+        if (this.chatNote) {
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'chat-message system';
+            noteDiv.textContent = this.chatNote;
+            container.appendChild(noteDiv);
+        }
         this.chatMessages.forEach(msg => {
             const div = document.createElement('div');
             div.className = `chat-message ${msg.role}`;
@@ -4145,6 +4153,8 @@ class NotesApp {
         } else if (addSelected) {
             noteText = this.selectedText || '';
         }
+
+        this.chatNote = noteText;
 
         this.chatMessages.push({ role: 'user', content: text });
         this.renderChatMessages();

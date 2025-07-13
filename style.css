@@ -2558,6 +2558,12 @@ select.form-control {
     align-self: flex-start;
 }
 
+.chat-message.system {
+    background-color: #f5f5f5;
+    align-self: center;
+    font-style: italic;
+}
+
 .chat-input {
     display: flex;
     padding: var(--space-16);
