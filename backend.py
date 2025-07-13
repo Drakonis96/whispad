@@ -565,7 +565,47 @@ def improve_text():
             return jsonify({"error": "Unauthorized"}), 401
 
         data = request.get_json()
-        if not data or 'text' not in data or 'improvement_type' not in data:
+        if not data:
+            return jsonify({"error": "Faltan parámetros requeridos"}), 400
+
+        # Chat assistant support
+        if 'messages' in data:
+            provider = data.get('provider', 'openai')
+            allowed = USERS.get(username, {}).get('postprocess_providers', [])
+            if allowed and provider not in allowed:
+                return jsonify({"error": "Post-process provider not allowed"}), 403
+            stream = data.get('stream', False)
+            model = data.get('model')
+            note = data.get('note', '')
+            messages = data['messages']
+            if note:
+                messages = [{'role': 'system', 'content': note}] + messages
+
+            if not model:
+                return jsonify({"error": "Model not specified"}), 400
+
+            if stream:
+                if provider == 'openai':
+                    return chat_openai_stream(messages, model)
+                elif provider == 'google':
+                    return chat_google_stream(messages, model)
+                elif provider == 'openrouter':
+                    return chat_openrouter_stream(messages, model)
+                elif provider == 'lmstudio':
+                    host = data.get('host', LMSTUDIO_HOST)
+                    port = data.get('port', LMSTUDIO_PORT)
+                    return chat_lmstudio_stream(messages, model, host, port)
+                elif provider == 'ollama':
+                    host = data.get('host', OLLAMA_HOST)
+                    port = data.get('port', OLLAMA_PORT)
+                    return chat_ollama_stream(messages, model, host, port)
+                else:
+                    return jsonify({"error": "Proveedor no soportado para streaming"}), 400
+
+            else:
+                return jsonify({"error": "Non-streaming chat not supported"}), 400
+
+        if 'text' not in data or 'improvement_type' not in data:
             return jsonify({"error": "Faltan parámetros requeridos"}), 400
         
         text = data['text']
@@ -1293,6 +1333,177 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
             yield f"data: {json.dumps({'error': f'Error de conexión con Ollama: {str(e)}'})}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def chat_openai_stream(messages, model):
+    if not OPENAI_API_KEY:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'API key de OpenAI no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    url = 'https://api.openai.com/v1/chat/completions'
+    headers = { 'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json' }
+    payload = { 'model': model, 'messages': messages, 'stream': True }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': 'OpenAI error'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def chat_google_stream(messages, model):
+    if not GOOGLE_API_KEY:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'API key de Google no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
+    headers = { 'Content-Type': 'application/json' }
+    payload = { 'contents': [ { 'role': m['role'], 'parts': [ { 'text': m['content'] } ] } for m in messages ] }
+
+    def generate():
+        try:
+            resp = requests.post(url, headers=headers, json=payload)
+            if resp.status_code != 200:
+                yield f"data: {json.dumps({'error': f'Google error {resp.status_code}'})}\n\n"
+                return
+            result = resp.json()
+            text = result['candidates'][0]['content']['parts'][0]['text']
+            for word in text.split(' '):
+                yield f"data: {json.dumps({'content': word if word.startswith(' ') else ' ' + word})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def chat_openrouter_stream(messages, model):
+    if not OPENROUTER_API_KEY:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'API key de OpenRouter no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    url = 'https://openrouter.ai/api/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://note-transcribe-ai.local',
+        'X-Title': 'Note Transcribe AI'
+    }
+    payload = { 'model': model, 'messages': messages, 'stream': True }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'OpenRouter error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def chat_lmstudio_stream(messages, model, host, port):
+    if not host or not port or not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'LM Studio host, port and model required'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = { 'Content-Type': 'application/json' }
+    payload = { 'model': model, 'messages': messages, 'stream': True }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'LM Studio error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def chat_ollama_stream(messages, model, host, port):
+    if not host or not port or not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Ollama host, port and model required'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    url = f"http://{host}:{port}/api/chat"
+    headers = { 'Content-Type': 'application/json' }
+    payload = { 'model': model, 'messages': messages, 'stream': True }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'Ollama error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        data = json.loads(line.decode('utf-8'))
+                        if data.get('message') and data['message'].get('content'):
+                            yield f"data: {json.dumps({'content': data['message']['content']})}\n\n"
+                        if data.get('done'):
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
