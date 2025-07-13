@@ -998,6 +998,7 @@ class NotesApp {
     }
 
     async applyQuickPrompt() {
+        this.updateSelectedText();
         const promptInput = document.getElementById('quick-prompt-input');
         const prompt = promptInput.value.trim();
         if (!prompt) {
@@ -1010,7 +1011,7 @@ class NotesApp {
             nombre: 'Quick Prompt',
             descripcion: '',
             icono: '✨',
-            prompt: prompt,
+            prompt: `${prompt}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language`,
             visible: true,
             custom: true
         };
