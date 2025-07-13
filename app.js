@@ -120,6 +120,9 @@ class NotesApp {
         this.maxHistorySize = 10;
         this.aiInProgress = false;
         this.aiBackupKey = null;
+
+        // Chat conversation history
+        this.chatMessages = [];
         
         // Provider configuration
         this.config = {
@@ -486,6 +489,43 @@ class NotesApp {
                 };
                 this.improveText(tempKey);
                 delete this.stylesConfig[tempKey];
+            });
+        }
+
+        // Chat sidebar
+        const chatSidebar = document.getElementById('chat-sidebar');
+        const chatToggle = document.getElementById('chat-sidebar-toggle');
+        const chatSend = document.getElementById('chat-send');
+        const chatInput = document.getElementById('chat-message-input');
+        const chatNew = document.getElementById('chat-new');
+        const addFull = document.getElementById('chat-add-full');
+        const addSelected = document.getElementById('chat-add-selected');
+
+        if (chatToggle && chatSidebar) {
+            chatToggle.addEventListener('click', () => {
+                chatSidebar.classList.toggle('active');
+            });
+        }
+
+        if (addFull && addSelected) {
+            addFull.addEventListener('change', () => { if (addFull.checked) addSelected.checked = false; });
+            addSelected.addEventListener('change', () => { if (addSelected.checked) addFull.checked = false; });
+        }
+
+        if (chatSend && chatInput) {
+            chatSend.addEventListener('click', () => { this.sendChatMessage(); });
+            chatInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    this.sendChatMessage();
+                }
+            });
+        }
+
+        if (chatNew) {
+            chatNew.addEventListener('click', () => {
+                this.chatMessages = [];
+                this.renderChatMessages();
             });
         }
         
@@ -4077,6 +4117,99 @@ class NotesApp {
 
     showMobileFab() {
         this.updateMobileFabVisibility();
+    }
+
+    renderChatMessages() {
+        const container = document.getElementById('chat-messages');
+        if (!container) return;
+        container.innerHTML = '';
+        this.chatMessages.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `chat-message ${msg.role}`;
+            div.textContent = msg.content;
+            container.appendChild(div);
+        });
+        container.scrollTop = container.scrollHeight;
+    }
+
+    async sendChatMessage() {
+        const input = document.getElementById('chat-message-input');
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+        const addFull = document.getElementById('chat-add-full').checked;
+        const addSelected = document.getElementById('chat-add-selected').checked;
+        let noteText = '';
+        if (addFull) {
+            noteText = document.getElementById('editor').innerText || '';
+        } else if (addSelected) {
+            noteText = this.selectedText || '';
+        }
+
+        this.chatMessages.push({ role: 'user', content: text });
+        this.renderChatMessages();
+        input.value = '';
+
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+        const payload = { note: noteText, messages: this.chatMessages, stream: true, provider, model };
+        if (provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+
+        const response = await authFetch('/api/improve-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok || !response.body) {
+            this.showNotification('Chat request failed', 'error');
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        const assistantMsg = { role: 'assistant', content: '' };
+        this.chatMessages.push(assistantMsg);
+        const container = document.getElementById('chat-messages');
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-message assistant';
+        container.appendChild(bubble);
+        container.scrollTop = container.scrollHeight;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') break;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            assistantMsg.content += data.content;
+                            bubble.textContent += data.content;
+                            container.scrollTop = container.scrollHeight;
+                        }
+                        if (data.done) {
+                            bubble.textContent = assistantMsg.content;
+                            container.scrollTop = container.scrollHeight;
+                            return;
+                        }
+                    } catch (e) { continue; }
+                }
+            }
+        }
+        bubble.textContent = assistantMsg.content;
+        container.scrollTop = container.scrollHeight;
     }
 
     destroy() {

@@ -2509,3 +2509,60 @@ select.form-control {
 .prompt-sidebar button {
     margin-top: var(--space-16);
 }
+
+/* Chat sidebar */
+.chat-sidebar {
+    width: 320px;
+    background-color: var(--color-surface);
+    border-left: 1px solid var(--color-border);
+    display: none;
+    flex-direction: column;
+}
+
+.chat-sidebar.active {
+    display: flex;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--space-16);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-16);
+}
+
+.chat-message {
+    margin-bottom: var(--space-8);
+    padding: var(--space-8);
+    border-radius: 4px;
+    word-break: break-word;
+}
+
+.chat-message.user {
+    background-color: #e0e0e0;
+    align-self: flex-end;
+}
+
+.chat-message.assistant {
+    background-color: #d1eaff;
+    align-self: flex-start;
+}
+
+.chat-input {
+    display: flex;
+    padding: var(--space-16);
+    border-top: 1px solid var(--color-border);
+}
+
+.chat-input input {
+    flex: 1;
+}
+
+.chat-input button {
+    margin-left: var(--space-8);
+}
