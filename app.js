@@ -129,6 +129,8 @@ class NotesApp {
             // Nuevas opciones para GPT-4o transcription
             streamingEnabled: true,
             transcriptionPrompt: '',
+            localRealtime: false,
+            localInterval: 2,
             // Configuración avanzada de post-procesamiento
             temperature: 0.3,
             maxTokens: 1000,
@@ -621,6 +623,10 @@ class NotesApp {
         // Nuevas opciones para GPT-4o
         const streamingEnabled = document.getElementById('streaming-enabled').checked;
         const transcriptionPrompt = document.getElementById('transcription-prompt').value.trim();
+
+        // Local whisper options
+        const localRealtime = document.getElementById('local-realtime')?.checked ?? false;
+        const localInterval = parseFloat(document.getElementById('local-interval')?.value) || 2;
         
         // SenseVoice options
         const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
@@ -649,6 +655,8 @@ class NotesApp {
             transcriptionLanguage,
             streamingEnabled,
             transcriptionPrompt,
+            localRealtime,
+            localInterval,
             detectEmotion,
             detectEvents,
             useItn,
@@ -727,6 +735,13 @@ class NotesApp {
         // Nuevas opciones para GPT-4o
         document.getElementById('streaming-enabled').checked = this.config.streamingEnabled !== false; // true por defecto
         document.getElementById('transcription-prompt').value = this.config.transcriptionPrompt || '';
+
+        if (document.getElementById('local-realtime')) {
+            document.getElementById('local-realtime').checked = this.config.localRealtime === true;
+        }
+        if (document.getElementById('local-interval')) {
+            document.getElementById('local-interval').value = this.config.localInterval || 2;
+        }
         
         // SenseVoice options
         if (document.getElementById('detect-emotion')) {
@@ -768,6 +783,13 @@ class NotesApp {
         this.toggleLmStudioOptions();
         // Mostrar/ocultar opciones Ollama según el proveedor seleccionado
         this.toggleOllamaOptions();
+        // Mostrar/ocultar opciones Local Whisper
+        this.toggleLocalOptions();
+
+        const intervalContainer = document.getElementById('local-interval-container');
+        if (intervalContainer) {
+            intervalContainer.style.display = this.config.localRealtime ? 'block' : 'none';
+        }
 
         if (!isAdmin) {
             document.querySelectorAll('#config-modal .restricted-option input, #config-modal .restricted-option select, #config-modal .restricted-option textarea, #config-modal .restricted-option button').forEach(el => {
@@ -1585,9 +1607,10 @@ class NotesApp {
             
             // Update model options for current provider
             this.updateTranscriptionModelOptions();
-            
+
             // Update any other UI elements that depend on providers
             this.toggleSenseVoiceOptions();
+            this.toggleLocalOptions();
             
             console.log('Transcription configuration updated successfully');
         } catch (error) {
@@ -2247,19 +2270,29 @@ class NotesApp {
             this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
             this.audioChunks = [];
 
-            this.mediaRecorder.ondataavailable = (event) => {
-                this.audioChunks.push(event.data);
-            };
+            if (this.config.transcriptionProvider === 'local' && this.config.localRealtime) {
+                this.mediaRecorder.ondataavailable = async (event) => {
+                    if (event.data.size > 0) {
+                        await this.transcribeAudio(event.data, true);
+                    }
+                };
+                this.mediaRecorder.onstop = () => {
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                this.mediaRecorder.start(this.config.localInterval * 1000);
+            } else {
+                this.mediaRecorder.ondataavailable = (event) => {
+                    this.audioChunks.push(event.data);
+                };
 
-            this.mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-                await this.transcribeAudio(audioBlob);
-                
-                // Stop stream
-                stream.getTracks().forEach(track => track.stop());
-            };
+                this.mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+                    await this.transcribeAudio(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
 
-            this.mediaRecorder.start();
+                this.mediaRecorder.start();
+            }
             this.isRecording = true;
             
             const recordBtn = document.getElementById('record-btn');
@@ -2304,13 +2337,19 @@ class NotesApp {
                 mobileFab.classList.remove('btn--error');
                 mobileFab.innerHTML = '<i class="fas fa-microphone"></i>';
             }
-            recordingStatus.querySelector('.status-text').textContent = 'Processing...';
+            if (this.config.transcriptionProvider === 'local' && this.config.localRealtime) {
+                recordingStatus.querySelector('.status-text').textContent = 'Ready to record';
+            } else {
+                recordingStatus.querySelector('.status-text').textContent = 'Processing...';
+            }
             recordingIndicator.classList.remove('active');
         }
     }
 
-    async transcribeAudio(audioBlob) {
-        this.showProcessingOverlay('Transcribing audio...');
+    async transcribeAudio(audioBlob, skipOverlay = false) {
+        if (!skipOverlay) {
+            this.showProcessingOverlay('Transcribing audio...');
+        }
         
         try {
             let transcription = '';
@@ -2332,8 +2371,10 @@ class NotesApp {
             console.error('Error in transcription:', error);
             this.showNotification('Error transcribing audio: ' + error.message, 'error');
         } finally {
-            this.hideProcessingOverlay();
-            document.getElementById('recording-status').querySelector('.status-text').textContent = 'Ready to record';
+            if (!skipOverlay) {
+                this.hideProcessingOverlay();
+                document.getElementById('recording-status').querySelector('.status-text').textContent = 'Ready to record';
+            }
         }
     }
 
@@ -3642,6 +3683,15 @@ class NotesApp {
             transcriptionProvider.addEventListener('change', () => {
                 this.updateTranscriptionModelOptions();
                 this.toggleSenseVoiceOptions();
+                this.toggleLocalOptions();
+            });
+        }
+
+        const localRealtimeChk = document.getElementById('local-realtime');
+        const intervalContainer = document.getElementById('local-interval-container');
+        if (localRealtimeChk && intervalContainer) {
+            localRealtimeChk.addEventListener('change', () => {
+                intervalContainer.style.display = localRealtimeChk.checked ? 'block' : 'none';
             });
         }
     }
@@ -3862,6 +3912,19 @@ class NotesApp {
 
         if (ollamaOptions) {
             ollamaOptions.style.display = provider === 'ollama' ? 'block' : 'none';
+        }
+    }
+
+    toggleLocalOptions() {
+        const provider = document.getElementById('transcription-provider').value;
+        const localOptions = document.getElementById('local-options');
+        const intervalContainer = document.getElementById('local-interval-container');
+        if (localOptions) {
+            localOptions.style.display = provider === 'local' ? 'block' : 'none';
+        }
+        if (intervalContainer) {
+            const realtime = document.getElementById('local-realtime')?.checked;
+            intervalContainer.style.display = (provider === 'local' && realtime) ? 'block' : 'none';
         }
     }
 

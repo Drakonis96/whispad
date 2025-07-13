@@ -373,6 +373,20 @@
                             </label>
                         </div>
                     </div>
+                    <div class="model-config restricted-option" id="local-options" style="display: none;">
+                        <label class="form-label">Local Whisper</label>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="local-realtime">
+                                <span class="checkmark"></span>
+                                Real-time transcription
+                            </label>
+                            <div id="local-interval-container" style="display:none;margin-top:5px;">
+                                <label class="form-label">Interval (seconds)</label>
+                                <input type="number" class="form-control" id="local-interval" min="1" value="2">
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <h4 class="config-group-title">Post-processing Configuration</h4>
