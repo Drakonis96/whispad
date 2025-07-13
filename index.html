@@ -239,15 +239,15 @@
                     <label><input type="checkbox" id="chat-add-full"> Add full note</label>
                     <label><input type="checkbox" id="chat-add-selected"> Add selected text</label>
                 </div>
-                <button class="btn btn--outline btn--sm" id="chat-new" title="New chat">
-                    <i class="fas fa-plus"></i>
-                </button>
             </div>
             <div class="chat-messages" id="chat-messages"></div>
             <div class="chat-input">
-                <input type="text" id="chat-message-input" placeholder="Type a message...">
+                <textarea id="chat-message-input" rows="3" placeholder="Type a message..."></textarea>
                 <button class="btn btn--primary btn--sm" id="chat-send" title="Send">
                     <i class="fas fa-paper-plane"></i>
+                </button>
+                <button class="btn btn--outline btn--sm" id="chat-new" title="New chat">
+                    <i class="fas fa-plus"></i>
                 </button>
             </div>
         </div>
