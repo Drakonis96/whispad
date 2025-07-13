@@ -233,6 +233,7 @@ class NotesApp {
         const closeBtn = document.getElementById('close-prompt-sidebar');
         if (!sidebar || !toggle) return;
         toggle.addEventListener('click', () => {
+            this.updateSelectedText();
             sidebar.classList.toggle('active');
         });
         if (closeBtn) {
