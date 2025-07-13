@@ -15,6 +15,7 @@ from datetime import datetime
 import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
+from pydub import AudioSegment
 import threading
 
 # Cargar variables de entorno
@@ -2012,6 +2013,16 @@ def save_audio():
     filename = f"{note_id}-{ts}{ext}"
     path = os.path.join(audio_dir, filename)
     audio_file.save(path)
+
+    mp3_filename = f"{note_id}-{ts}.mp3"
+    mp3_path = os.path.join(audio_dir, mp3_filename)
+    try:
+        AudioSegment.from_file(path).export(mp3_path, format='mp3')
+        os.remove(path)
+        filename = mp3_filename
+        path = mp3_path
+    except Exception as e:
+        print(f"Error converting audio to MP3: {e}")
 
     md_path = find_existing_note_file(user_dir, note_id)
     if not md_path:
