@@ -2530,8 +2530,11 @@ select.form-control {
     border-bottom: 1px solid var(--color-border);
 }
 
+
 .chat-messages {
     flex: 1;
+    display: flex;
+    flex-direction: column;
     overflow-y: auto;
     padding: var(--space-16);
 }
@@ -2539,8 +2542,10 @@ select.form-control {
 .chat-message {
     margin-bottom: var(--space-8);
     padding: var(--space-8);
-    border-radius: 4px;
+    border-radius: 8px;
     word-break: break-word;
+    max-width: 80%;
+    color: #000;
 }
 
 .chat-message.user {
