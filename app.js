@@ -1094,7 +1094,18 @@ class NotesApp {
         messages.push(...this.chatHistory);
 
         try {
-            const response = await backendAPI.chatCompletion(messages, this.config.postprocessProvider || 'openai', this.config.postprocessModel || 'gpt-3.5-turbo');
+            const provider = this.config.postprocessProvider || 'openai';
+            const model = this.config.postprocessModel || 'gpt-3.5-turbo';
+            let host = null;
+            let port = null;
+            if (provider === 'lmstudio') {
+                host = this.config.lmstudioHost;
+                port = this.config.lmstudioPort;
+            } else if (provider === 'ollama') {
+                host = this.config.ollamaHost;
+                port = this.config.ollamaPort;
+            }
+            const response = await backendAPI.chatCompletion(messages, provider, model, host, port);
             const data = await response.json();
             const aiText = data.message || data.error || 'Error';
             const aiBubble = document.createElement('div');

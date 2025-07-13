@@ -640,7 +640,7 @@ def improve_text():
 
 @app.route('/api/chat', methods=['POST'])
 def chat_completion():
-    """Simple chat endpoint using OpenAI"""
+    """Generic chat endpoint supporting multiple providers"""
     try:
         username = get_current_username()
         if not username:
@@ -652,40 +652,148 @@ def chat_completion():
 
         provider = data.get('provider', 'openai')
         model = data.get('model')
+        host = data.get('host')
+        port = data.get('port')
         messages = data['messages']
 
-        if provider != 'openai':
+        allowed = USERS.get(username, {}).get('postprocess_providers', [])
+        if allowed and provider not in allowed:
+            return jsonify({"error": "Post-process provider not allowed"}), 403
+
+        if provider == 'openai':
+            return chat_openai(messages, model)
+        elif provider == 'google':
+            return chat_google(messages, model)
+        elif provider == 'openrouter':
+            return chat_openrouter(messages, model)
+        elif provider == 'lmstudio':
+            return chat_lmstudio(messages, model, host or LMSTUDIO_HOST, port or LMSTUDIO_PORT)
+        elif provider == 'ollama':
+            return chat_ollama(messages, model, host or OLLAMA_HOST, port or OLLAMA_PORT)
+        else:
             return jsonify({"error": "Provider not supported"}), 400
 
-        if not OPENAI_API_KEY:
-            return jsonify({"error": "API key de OpenAI no configurada"}), 500
-        if not model:
-            return jsonify({"error": "Model not specified"}), 400
+    except Exception as e:
+        return jsonify({'error': f'Error interno: {str(e)}'}), 500
 
-        headers = {
-            'Authorization': f'Bearer {OPENAI_API_KEY}',
-            'Content-Type': 'application/json'
-        }
-        payload = {
-            'model': model,
-            'messages': messages
-        }
+def chat_openai(messages, model):
+    if not OPENAI_API_KEY:
+        return jsonify({'error': 'API key de OpenAI no configurada'}), 500
+    if not model:
+        return jsonify({'error': 'Model not specified'}), 400
 
-        response = requests.post(
-            'https://api.openai.com/v1/chat/completions',
-            headers=headers,
-            json=payload
-        )
+    headers = {
+        'Authorization': f'Bearer {OPENAI_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'model': model,
+        'messages': messages
+    }
 
+    response = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=payload)
+    if response.status_code == 200:
+        result = response.json()
+        message = result['choices'][0]['message']['content']
+        return jsonify({'message': message})
+    else:
+        error_msg = f'OpenAI error {response.status_code}'
+        if response.content:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('error', {}).get('message', error_msg)
+            except Exception:
+                pass
+        return jsonify({'error': error_msg}), response.status_code
+
+def chat_google(messages, model):
+    if not GOOGLE_API_KEY:
+        return jsonify({'error': 'API key de Google no configurada'}), 500
+    if not model:
+        return jsonify({'error': 'Model not specified'}), 400
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
+    headers = { 'Content-Type': 'application/json' }
+    contents = []
+    for m in messages:
+        role = m.get('role', 'user')
+        contents.append({'role': role, 'parts': [{'text': m.get('content', '')}]})
+    payload = { 'contents': contents }
+
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code == 200:
+        result = response.json()
+        message = result.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+        return jsonify({'message': message})
+    else:
+        return jsonify({'error': f'Google error {response.status_code}'}), response.status_code
+
+def chat_openrouter(messages, model):
+    if not OPENROUTER_API_KEY:
+        return jsonify({'error': 'API key de OpenRouter no configurada'}), 500
+    if not model:
+        return jsonify({'error': 'Model not specified'}), 400
+
+    headers = {
+        'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://note-transcribe-ai.local',
+        'X-Title': 'Note Transcribe AI'
+    }
+    payload = {
+        'model': model,
+        'messages': messages
+    }
+    response = requests.post('https://openrouter.ai/api/v1/chat/completions', headers=headers, json=payload)
+    if response.status_code == 200:
+        result = response.json()
+        message = result['choices'][0]['message']['content']
+        return jsonify({'message': message})
+    else:
+        error_msg = f'OpenRouter error {response.status_code}'
+        if response.content:
+            try:
+                error_data = response.json()
+                error_msg = error_data.get('error', {}).get('message', error_msg)
+            except Exception:
+                pass
+        return jsonify({'error': error_msg}), response.status_code
+
+def chat_lmstudio(messages, model, host, port):
+    if not host or not port or not model:
+        return jsonify({'error': 'LM Studio host, port and model required'}), 400
+
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = { 'Content-Type': 'application/json' }
+    payload = { 'model': model, 'messages': messages }
+    try:
+        response = requests.post(url, headers=headers, json=payload)
         if response.status_code == 200:
             result = response.json()
             message = result['choices'][0]['message']['content']
             return jsonify({'message': message})
         else:
-            return jsonify({'error': 'Error calling OpenAI API'}), response.status_code
+            return jsonify({'error': f'LM Studio error {response.status_code}'}), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Error de conexión con LM Studio: {str(e)}'}), 500
 
-    except Exception as e:
-        return jsonify({'error': f'Error interno: {str(e)}'}), 500
+def chat_ollama(messages, model, host, port):
+    if not host or not port or not model:
+        return jsonify({'error': 'Ollama host, port and model required'}), 400
+
+    url = f"http://{host}:{port}/api/chat"
+    headers = { 'Content-Type': 'application/json' }
+    payload = { 'model': model, 'messages': messages }
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            result = response.json()
+            message = result.get('message', {}).get('content', '')
+            return jsonify({'message': message})
+        else:
+            return jsonify({'error': f'Ollama error {response.status_code}'}), response.status_code
+    except requests.RequestException as e:
+        return jsonify({'error': f'Error de conexión con Ollama: {str(e)}'}), 500
 
 def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando OpenAI"""

@@ -631,12 +631,15 @@ class BackendAPI {
         }
     }
 
-    async chatCompletion(messages, provider = 'openai', model = 'gpt-3.5-turbo') {
+    async chatCompletion(messages, provider = 'openai', model = 'gpt-3.5-turbo', host = null, port = null) {
         try {
+            const body = { messages, provider, model };
+            if (host) body.host = host;
+            if (port) body.port = port;
             const response = await authFetch(`${this.baseUrl}/api/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages, provider, model })
+                body: JSON.stringify(body)
             });
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
