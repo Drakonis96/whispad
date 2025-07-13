@@ -862,6 +862,7 @@ select.form-control {
     flex-direction: column;
     padding: var(--space-16);
     overflow-y: auto;
+    height: 100%;
 }
 
 .prompt-sidebar.active {
@@ -887,6 +888,7 @@ select.form-control {
     text-align: center;
     border: 1px solid var(--color-border);
     background-color: var(--color-surface);
+    color: var(--color-text);
     cursor: pointer;
     border-radius: var(--radius-sm);
 }
@@ -902,6 +904,12 @@ select.form-control {
 
 .prompt-section.active {
     display: block;
+}
+
+#prompt-chat {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
 }
 
 #quick-prompt-input {
@@ -948,7 +956,7 @@ select.form-control {
     display: flex;
     flex-direction: column;
     gap: var(--space-8);
-    height: 200px;
+    flex: 1;
     overflow-y: auto;
     margin-bottom: var(--space-12);
     padding-right: var(--space-4);
@@ -977,6 +985,7 @@ select.form-control {
     display: flex;
     gap: var(--space-8);
     align-items: center;
+    margin-bottom: var(--space-12);
 }
 
 .icon-btn {

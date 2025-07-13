@@ -1082,7 +1082,8 @@ class NotesApp {
         messagesContainer.appendChild(userBubble);
 
         const finalPrompt = `${text}\n\nIMPORTANT SYSTEM PROMPT: you must not add any additional comments. Simply follow the previous prompt as instructed and answer in the previous language`;
-        this.chatHistory.push({ role: 'user', content: finalPrompt });
+        const currentMsg = { role: 'user', content: finalPrompt };
+        this.chatHistory.push({ role: 'user', content: text });
 
         const messages = [];
         if (document.getElementById('chat-add-full-note').checked && this.currentNote) {
@@ -1092,6 +1093,7 @@ class NotesApp {
             messages.push({ role: 'system', content: this.selectedText });
         }
         messages.push(...this.chatHistory);
+        messages.push(currentMsg);
 
         try {
             const provider = this.config.postprocessProvider || 'openai';
