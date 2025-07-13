@@ -956,7 +956,8 @@ class NotesApp {
 
     saveTranslationConfig() {
         const enabled = document.getElementById('translation-enabled').checked;
-        const language = document.getElementById('translation-language').value;
+        const languageSelect = document.getElementById('translation-language');
+        const language = languageSelect.value;
         this.config.translationEnabled = enabled;
         this.config.translationLanguage = language;
         const storageKey = `notes-app-config-${currentUser}`;
@@ -4170,8 +4171,16 @@ class NotesApp {
         const style = this.stylesConfig.translation;
         if (!style) return;
         if (this.config.translationEnabled) {
-            const lang = this.config.translationLanguage || 'en';
-            style.prompt = `You are a professional translator. Translate the following text into ${lang}, preserving original line breaks, formatting, and punctuation. Respond ONLY with the translated text, without additional explanations.`;
+            const code = this.config.translationLanguage || 'en';
+            let langName = code;
+            const select = document.getElementById('translation-language');
+            if (select) {
+                const opt = select.querySelector(`option[value="${code}"]`);
+                if (opt) {
+                    langName = opt.textContent;
+                }
+            }
+            style.prompt = `You are a professional translator. Translate the following text into ${langName}, preserving original line breaks, formatting, and punctuation. Respond ONLY with the translated text, without additional explanations.`;
             style.visible = true;
         } else {
             style.visible = false;
