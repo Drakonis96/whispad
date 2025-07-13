@@ -4072,8 +4072,15 @@ class NotesApp {
             const audio = document.createElement('audio');
             audio.controls = true;
             const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
-            audio.src = `/recordings/${currentUser}/${item.file}${tokenParam}`;
+            const encodedUser = encodeURIComponent(currentUser);
+            const encodedFile = encodeURIComponent(item.file);
+            audio.src = `/recordings/${encodedUser}/${encodedFile}${tokenParam}`;
+            audio.type = 'audio/mpeg';
             audio.preload = 'none';
+            audio.addEventListener('error', () => {
+                audio.title = 'Failed to load audio';
+                audio.classList.add('error');
+            });
             wrapper.appendChild(audio);
             if (item.timestamp) {
                 const tsStr = formatTimestamp(item.timestamp);
