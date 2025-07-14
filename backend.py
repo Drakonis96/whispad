@@ -55,44 +55,31 @@ OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 # Enable or disable multi-user support (default True)
 MULTI_USER = os.getenv('MULTI_USER', 'true').lower() != 'false'
-# File to persist LM Studio/Ollama configuration set by the admin
-SERVER_CONFIG_FILE = os.path.join('data', 'server_config.json')
 
 def load_server_config():
-    """Load host/port settings from disk if available."""
+    """Load host/port settings from database if available."""
     global LMSTUDIO_HOST, LMSTUDIO_PORT, OLLAMA_HOST, OLLAMA_PORT
-    if os.path.exists(SERVER_CONFIG_FILE):
-        try:
-            with open(SERVER_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            LMSTUDIO_HOST = data.get('lmstudio_host', LMSTUDIO_HOST)
-            LMSTUDIO_PORT = data.get('lmstudio_port', LMSTUDIO_PORT)
-            OLLAMA_HOST = data.get('ollama_host', OLLAMA_HOST)
-            OLLAMA_PORT = data.get('ollama_port', OLLAMA_PORT)
-        except Exception:
-            pass
+    try:
+        from db import get_setting
+        LMSTUDIO_HOST = get_setting('lmstudio_host', LMSTUDIO_HOST)
+        LMSTUDIO_PORT = get_setting('lmstudio_port', LMSTUDIO_PORT)
+        OLLAMA_HOST = get_setting('ollama_host', OLLAMA_HOST)
+        OLLAMA_PORT = get_setting('ollama_port', OLLAMA_PORT)
+    except Exception:
+        # If database is not available or settings don't exist, use defaults
+        pass
 
 def save_server_config():
-    """Persist current host/port settings to disk."""
-    data = {
-        'lmstudio_host': LMSTUDIO_HOST,
-        'lmstudio_port': LMSTUDIO_PORT,
-        'ollama_host': OLLAMA_HOST,
-        'ollama_port': OLLAMA_PORT,
-    }
-    temp_dir = os.path.dirname(SERVER_CONFIG_FILE) or '.'
-    fd, temp_path = tempfile.mkstemp(dir=temp_dir, prefix='srvcfg.', suffix='.tmp')
-    os.close(fd)
+    """Persist current host/port settings to database."""
     try:
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
-        os.replace(temp_path, SERVER_CONFIG_FILE)
-    except Exception:
-        try:
-            shutil.move(temp_path, SERVER_CONFIG_FILE)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        from db import set_setting
+        set_setting('lmstudio_host', LMSTUDIO_HOST)
+        set_setting('lmstudio_port', LMSTUDIO_PORT)
+        set_setting('ollama_host', OLLAMA_HOST)
+        set_setting('ollama_port', OLLAMA_PORT)
+    except Exception as e:
+        print(f"Error saving server config to database: {e}")
+        raise
 
 # Load persisted config if present
 load_server_config()
@@ -112,6 +99,7 @@ from argon2.low_level import Type
 from db import (
     init_db,
     migrate_json,
+    migrate_server_config_to_db,
     get_user,
     list_users as db_list_users,
     create_user as db_create_user,
@@ -124,20 +112,37 @@ HASHER = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=2, hash_len=
 
 init_db()
 migrate_json(hasher=HASHER)
+migrate_server_config_to_db()  # Migrate server config from JSON to database
+
+# Load server configuration from database
+load_server_config()
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 if not ADMIN_PASSWORD:
     raise RuntimeError("ADMIN_PASSWORD environment variable not set")
 
 def ensure_admin_user():
-    if not get_user('admin'):
+    admin_user = get_user('admin')
+    expected_password_hash = HASHER.hash(ADMIN_PASSWORD)
+    
+    if not admin_user:
+        # Create admin user if it doesn't exist
         db_create_user(
             'admin',
-            HASHER.hash(ADMIN_PASSWORD),
+            expected_password_hash,
             True,
             ALL_TRANSCRIPTION_PROVIDERS,
             ALL_POSTPROCESS_PROVIDERS,
         )
+    else:
+        # Update admin password if it's different from the expected one
+        try:
+            HASHER.verify(admin_user['password'], ADMIN_PASSWORD)
+            # Password is correct, no need to update
+        except argon2_exceptions.VerifyMismatchError:
+            # Password is different, update it
+            print("Updating admin password to match ADMIN_PASSWORD environment variable")
+            db_update_password('admin', expected_password_hash)
 
 ensure_admin_user()
 
