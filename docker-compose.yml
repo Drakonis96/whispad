@@ -17,9 +17,26 @@ services:
       - BACKEND_PORT=8000
       - CORS_ORIGINS=https://localhost:5037,https://127.0.0.1:5037
       - DEBUG=False
+      - DATABASE_URL=postgresql://whispad:whispad@db:5432/whispad
+    depends_on:
+      - db
     volumes:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
       - ./data:/app/data
     restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: whispad
+      POSTGRES_PASSWORD: whispad
+      POSTGRES_DB: whispad
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:

@@ -86,59 +86,49 @@ WORKFLOW_WEBHOOK_URL = os.getenv('WORKFLOW_WEBHOOK_URL')
 WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
 WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 
-# ---------- Simple user management ---------
-USERS_FILE = os.path.join('data', 'users.json')
-SESSIONS = {}
-# Locks to avoid concurrent writes that could corrupt files
+# ---------- User management with PostgreSQL ---------
 SAVE_LOCK = threading.Lock()
-USERS_LOCK = threading.Lock()
-
-# Provider lists
+SESSIONS = {}
 ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
 ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama"]
 
-def load_users():
-    """Load users from disk ensuring the admin account always exists."""
-    if not os.path.exists(USERS_FILE):
-        users = {}
-    else:
-        try:
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                users = json.load(f)
-        except Exception:
-            users = {}
+from argon2 import PasswordHasher, exceptions as argon2_exceptions
+from argon2.low_level import Type
+from db import (
+    init_db,
+    migrate_json,
+    get_user,
+    list_users as db_list_users,
+    create_user as db_create_user,
+    update_password as db_update_password,
+    update_user_providers as db_update_user_providers,
+    delete_user as db_delete_user,
+)
 
-    if 'admin' not in users:
-        users['admin'] = {
-            'password': 'whispad',
-            'is_admin': True,
-            'transcription_providers': ALL_TRANSCRIPTION_PROVIDERS,
-            'postprocess_providers': ALL_POSTPROCESS_PROVIDERS,
-        }
-        # Save immediately so the file is created or repaired
-        save_users(users)
+HASHER = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=2, hash_len=32, type=Type.ID)
 
-    return users
+init_db()
+migrate_json(hasher=HASHER)
 
-def save_users(users):
-    """Persist users.json atomically and handle busy file errors."""
-    temp_dir = os.path.dirname(USERS_FILE) or "."
-    fd, temp_path = tempfile.mkstemp(dir=temp_dir, prefix="users.", suffix=".tmp")
-    os.close(fd)
-    with USERS_LOCK:
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(users, f, indent=2)
-        try:
-            os.replace(temp_path, USERS_FILE)
-        except OSError as e:
-            app.logger.warning("Atomic replace failed: %s; falling back to shutil.move", e)
-            shutil.move(temp_path, USERS_FILE)
-        finally:
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+def ensure_admin_user():
+    if not get_user('admin'):
+        db_create_user(
+            'admin',
+            HASHER.hash('whispad'),
+            True,
+            ALL_TRANSCRIPTION_PROVIDERS,
+            ALL_POSTPROCESS_PROVIDERS,
+        )
+
+ensure_admin_user()
+
+def get_user_providers(username):
+    user = get_user(username)
+    if not user:
+        return [], []
+    if username == 'admin':
+        return ALL_TRANSCRIPTION_PROVIDERS, ALL_POSTPROCESS_PROVIDERS
+    return user.get('transcription_providers', []), user.get('postprocess_providers', [])
 
 
 def migrate_notes_to_admin_folder():
@@ -221,10 +211,6 @@ def create_missing_meta_files():
     return created
 
 
-USERS = load_users()
-if "admin" in USERS:
-    USERS["admin"]["transcription_providers"] = ALL_TRANSCRIPTION_PROVIDERS
-    USERS["admin"]["postprocess_providers"] = ALL_POSTPROCESS_PROVIDERS
 migrate_notes_to_admin_folder()
 create_missing_meta_files()
 
@@ -270,24 +256,25 @@ def login_user():
     data = request.get_json() or {}
     username = data.get('username')
     password = data.get('password')
-    user = USERS.get(username)
-    if user and user.get('password') == password:
-        token = base64.urlsafe_b64encode(os.urandom(24)).decode('utf-8')
-        SESSIONS[token] = username
-        if username == 'admin':
-            tp = ALL_TRANSCRIPTION_PROVIDERS
-            pp = ALL_POSTPROCESS_PROVIDERS
-        else:
-            tp = user.get('transcription_providers', [])
-            pp = user.get('postprocess_providers', [])
-        return jsonify({
-            "success": True,
-            "token": token,
-            "is_admin": user.get('is_admin', False),
-            "transcription_providers": tp,
-            "postprocess_providers": pp
-        })
-    return jsonify({"success": False}), 401
+    user = get_user(username)
+    if not user:
+        return jsonify({"success": False}), 401
+    try:
+        HASHER.verify(user['password'], password)
+    except argon2_exceptions.VerifyMismatchError:
+        return jsonify({"success": False}), 401
+    if HASHER.check_needs_rehash(user['password']):
+        db_update_password(username, HASHER.hash(password))
+    token = base64.urlsafe_b64encode(os.urandom(24)).decode('utf-8')
+    SESSIONS[token] = username
+    tp, pp = get_user_providers(username)
+    return jsonify({
+        "success": True,
+        "token": token,
+        "is_admin": user.get('is_admin', False),
+        "transcription_providers": tp,
+        "postprocess_providers": pp,
+    })
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -308,13 +295,8 @@ def session_info():
         username = SESSIONS.get(token)
         if not username:
             return jsonify({"authenticated": False}), 401
-    user = USERS.get(username, {})
-    if username == 'admin':
-        tp = ALL_TRANSCRIPTION_PROVIDERS
-        pp = ALL_POSTPROCESS_PROVIDERS
-    else:
-        tp = user.get('transcription_providers', [])
-        pp = user.get('postprocess_providers', [])
+    user = get_user(username) or {}
+    tp, pp = get_user_providers(username)
     return jsonify({
         "authenticated": True,
         "username": username,
@@ -334,65 +316,68 @@ def change_password():
     new_password = data.get('new_password')
     if not current or not new_password:
         return jsonify({"error": "Password required"}), 400
-    if USERS.get(username, {}).get('password') != current:
+    user = get_user(username)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    try:
+        HASHER.verify(user['password'], current)
+    except argon2_exceptions.VerifyMismatchError:
         return jsonify({"error": "Current password incorrect"}), 400
-    USERS[username]['password'] = new_password
-    save_users(USERS)
+    new_hash = HASHER.hash(new_password)
+    db_update_password(username, new_hash)
     return jsonify({"success": True})
 
 
 @app.route('/api/create-user', methods=['POST'])
 def create_user():
     admin = get_current_username()
-    if not admin or not USERS.get(admin, {}).get('is_admin'):
+    admin_info = get_user(admin)
+    if not admin or not admin_info or not admin_info.get('is_admin'):
         return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json() or {}
     username = data.get('username')
     password = data.get('password')
     if not username or not password:
         return jsonify({"error": "Username and password required"}), 400
-    if username in USERS or username == 'admin':
+    if get_user(username) or username == 'admin':
         return jsonify({"error": "User exists"}), 400
-    USERS[username] = {
-        "password": password,
-        "is_admin": False,
-        "transcription_providers": data.get('transcription_providers', []),
-        "postprocess_providers": data.get('postprocess_providers', [])
-    }
-    save_users(USERS)
+    db_create_user(
+        username,
+        HASHER.hash(password),
+        False,
+        data.get('transcription_providers', []),
+        data.get('postprocess_providers', []),
+    )
     return jsonify({"success": True})
 
 
 @app.route('/api/list-users', methods=['GET'])
 def list_users():
     admin = get_current_username()
-    if not admin or not USERS.get(admin, {}).get('is_admin'):
+    admin_info = get_user(admin)
+    if not admin or not admin_info or not admin_info.get('is_admin'):
         return jsonify({"error": "Unauthorized"}), 401
-    users = []
-    for name, info in USERS.items():
-        users.append({
-            "username": name,
-            "is_admin": info.get('is_admin', False),
-            "transcription_providers": info.get('transcription_providers', []),
-            "postprocess_providers": info.get('postprocess_providers', [])
-        })
-    return jsonify({"users": users})
+    return jsonify({"users": db_list_users()})
 
 
 @app.route('/api/update-user-providers', methods=['POST'])
 def update_user_providers():
     admin = get_current_username()
-    if not admin or not USERS.get(admin, {}).get('is_admin'):
+    admin_info = get_user(admin)
+    if not admin or not admin_info or not admin_info.get('is_admin'):
         return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json() or {}
     username = data.get('username')
-    if username not in USERS:
+    user = get_user(username)
+    if not user:
         return jsonify({"error": "User not found"}), 404
     if username == 'admin':
         return jsonify({"error": "Cannot modify admin"}), 400
-    USERS[username]['transcription_providers'] = data.get('transcription_providers', USERS[username].get('transcription_providers', []))
-    USERS[username]['postprocess_providers'] = data.get('postprocess_providers', USERS[username].get('postprocess_providers', []))
-    save_users(USERS)
+    db_update_user_providers(
+        username,
+        data.get('transcription_providers', user.get('transcription_providers', [])),
+        data.get('postprocess_providers', user.get('postprocess_providers', [])),
+    )
     return jsonify({"success": True})
 
 
@@ -400,17 +385,16 @@ def update_user_providers():
 def delete_user():
     """Remove a non-admin user and delete their notes folder"""
     admin = get_current_username()
-    if not admin or not USERS.get(admin, {}).get('is_admin'):
+    admin_info = get_user(admin)
+    if not admin or not admin_info or not admin_info.get('is_admin'):
         return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json() or {}
     username = data.get('username')
-    if not username or username not in USERS:
+    if not username or not get_user(username):
         return jsonify({"error": "User not found"}), 404
     if username == 'admin':
         return jsonify({"error": "Cannot delete admin"}), 400
-
-    USERS.pop(username, None)
-    save_users(USERS)
+    db_delete_user(username)
 
     user_dir = os.path.join(os.getcwd(), 'saved_notes', username)
     try:
@@ -440,8 +424,8 @@ def transcribe_audio():
         language = request.form.get('language', None)  # None = detección automática
         provider = request.form.get('provider', 'openai')  # openai o local
 
-        allowed = USERS.get(username, {}).get('transcription_providers', [])
-        if allowed and provider not in allowed:
+        tp, _ = get_user_providers(username)
+        if tp and provider not in tp:
             return jsonify({"error": "Transcription provider not allowed"}), 403
         model_name = request.form.get('model')
         
@@ -571,8 +555,8 @@ def improve_text():
         # Chat assistant support
         if 'messages' in data:
             provider = data.get('provider', 'openai')
-            allowed = USERS.get(username, {}).get('postprocess_providers', [])
-            if allowed and provider not in allowed:
+            _, pp = get_user_providers(username)
+            if pp and provider not in pp:
                 return jsonify({"error": "Post-process provider not allowed"}), 403
             stream = data.get('stream', False)
             model = data.get('model')
@@ -612,8 +596,8 @@ def improve_text():
         improvement_type = data['improvement_type']
         provider = data.get('provider', 'openai')  # openai o google
 
-        allowed = USERS.get(username, {}).get('postprocess_providers', [])
-        if allowed and provider not in allowed:
+        _, pp = get_user_providers(username)
+        if pp and provider not in pp:
             return jsonify({"error": "Post-process provider not allowed"}), 403
         stream = data.get('stream', False)  # Nuevo parámetro para streaming
         custom_prompt = data.get('custom_prompt')  # Nuevo parámetro para prompts personalizados
@@ -1517,8 +1501,8 @@ def transcribe_audio_gpt4o():
         if not username:
             return jsonify({"error": "Unauthorized"}), 401
 
-        allowed = USERS.get(username, {}).get('transcription_providers', [])
-        if allowed and 'openai' not in allowed:
+        tp, _ = get_user_providers(username)
+        if tp and 'openai' not in tp:
             return jsonify({"error": "Transcription provider not allowed"}), 403
 
         if not OPENAI_API_KEY:
@@ -1909,7 +1893,8 @@ def default_provider_config():
 def update_provider_config():
     """Allow admin users to update LM Studio/Ollama host and port."""
     admin = get_current_username()
-    if not admin or not USERS.get(admin, {}).get('is_admin'):
+    admin_info = get_user(admin)
+    if not admin or not admin_info or not admin_info.get('is_admin'):
         return jsonify({"error": "Unauthorized"}), 401
     data = request.get_json() or {}
     global LMSTUDIO_HOST, LMSTUDIO_PORT, OLLAMA_HOST, OLLAMA_PORT

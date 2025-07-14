@@ -105,6 +105,7 @@ cp env.example .env
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
 If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
 Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook payload now includes the username so your workflow can fetch the note from the correct folder.
+Set `DATABASE_URL` if you want to override the default PostgreSQL connection string.
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.
@@ -118,11 +119,11 @@ With these instructions you should have WhisPad running in just a few minutes wi
 
 ## Data Persistence and User Management
 
-WhisPad is designed to persist your data between container restarts, updates, and recreations through Docker volumes:
+WhisPad is designed to persist your data between container restarts, updates, and recreations through Docker volumes and a PostgreSQL database:
 
 ### Persistent Data
 - **Notes**: Stored in `./saved_notes/` (mounted to `/app/saved_notes` in container)
-- **Users**: Stored in `./data/users.json` (mounted to `/app/data/users.json` in container)
+- **Users**: Stored in PostgreSQL (`whispad` database)
 - **Provider Config**: Stored in `./data/server_config.json` (mounted to `/app/data/server_config.json` in container)
 - **Models**: Stored in `./whisper-cpp-models/` (mounted to `/app/whisper-cpp-models` in container)
 - **Logs**: Stored in `./logs/` (mounted to `/var/log/nginx` in container)
@@ -134,7 +135,7 @@ WhisPad is designed to persist your data between container restarts, updates, an
 - **Single User Mode**: Set `MULTI_USER=false` in `.env` or the compose file to skip the login screen and always use the admin account
 
 ### Initial Setup
-If you don't have a `data/users.json` file, the application will automatically create one with the default admin account. You can also copy `users.json.template` to `data/users.json` and customize it as needed.
+On first start the backend migrates any existing `data/users.json` file to the PostgreSQL database automatically and creates the default admin if necessary.
 
 **Important**: Change the default admin password immediately after first login for security!
 
