@@ -108,6 +108,9 @@ Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook p
 Set the database credentials in your `.env` file using `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`.
 `DATABASE_URL` should point to `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}`.
 Set `ADMIN_PASSWORD` to define the initial admin user's password.
+To run the container as a non-root user, set `PUID` and `PGID` in your `.env`
+file (for example `PUID=1000` and `PGID=1000`). These values are passed to the
+compose file so the image is built and executed with that user and group.
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.

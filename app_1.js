@@ -53,6 +53,10 @@ const configuracionMejoras = {
     }
 };
 
+function safeSetInnerHTML(element, html) {
+    element.innerHTML = DOMPurify.sanitize(html);
+}
+
 // Clase principal de la aplicación
 class NotesApp {
     constructor() {
@@ -255,7 +259,7 @@ class NotesApp {
         if (!this.currentNote) return;
         
         document.getElementById('note-title').value = this.currentNote.title;
-        document.getElementById('editor').innerHTML = this.currentNote.content;
+        safeSetInnerHTML(document.getElementById('editor'), this.currentNote.content);
         
         // Habilitar botones
         document.getElementById('save-btn').disabled = false;
@@ -433,7 +437,7 @@ class NotesApp {
             return;
         }
         
-        container.innerHTML = filteredNotes.map(note => {
+        safeSetInnerHTML(container, filteredNotes.map(note => {
             const preview = this.getTextPreview(note.content);
             const date = new Date(note.createdAt).toLocaleDateString();
             
@@ -444,7 +448,7 @@ class NotesApp {
                     <div class="note-item-date">${date}</div>
                 </div>
             `;
-        }).join('');
+        }).join(''));
         
         // Agregar event listeners a los items
         container.querySelectorAll('.note-item').forEach(item => {
@@ -457,7 +461,7 @@ class NotesApp {
     
     getTextPreview(html) {
         const temp = document.createElement('div');
-        temp.innerHTML = html;
+        safeSetInnerHTML(temp, html);
         const text = temp.textContent || temp.innerText || '';
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
     }
@@ -710,12 +714,12 @@ class NotesApp {
         // Crear elemento de notificación
         const notification = document.createElement('div');
         notification.className = `notification notification--${type}`;
-        notification.innerHTML = `
+        safeSetInnerHTML(notification, `
             <div class="notification-content">
                 <span class="notification-icon">${type === 'success' ? '✓' : type === 'warning' ? '⚠' : 'ℹ'}</span>
                 <span class="notification-message">${message}</span>
             </div>
-        `;
+        `);
         
         // Estilos inline para la notificación
         Object.assign(notification.style, {

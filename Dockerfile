@@ -1,6 +1,12 @@
 # Dockerfile unificado para nginx + python backend
 FROM python:3.11-slim
 
+ARG PUID=1000
+ARG PGID=1000
+
+RUN groupadd -g ${PGID} appgroup \
+    && useradd -u ${PUID} -g appgroup -m appuser
+
 # Instalar nginx, build tools y dependencias del sistema
 RUN apt-get update && apt-get install -y \
     nginx \
@@ -73,21 +79,35 @@ RUN mkdir -p /usr/share/nginx/html && \
 
 # Dar permisos correctos a los archivos estáticos
 RUN chmod -R 755 /usr/share/nginx/html && \
-    chown -R www-data:www-data /usr/share/nginx/html
+    chown -R appuser:appgroup /usr/share/nginx/html
 
 # Crear directorios para logs de nginx y notas guardadas
 RUN mkdir -p /var/log/nginx && \
     touch /var/log/nginx/access.log && \
     touch /var/log/nginx/error.log && \
-    chmod 666 /var/log/nginx/access.log && \
-    chmod 666 /var/log/nginx/error.log
+    chmod 640 /var/log/nginx/access.log && \
+    chmod 640 /var/log/nginx/error.log && \
+    chmod 700 /var/log/nginx && \
+    chown -R appuser:appgroup /var/log/nginx
+RUN mkdir -p /var/lib/nginx && \
+    chmod 700 /var/lib/nginx && \
+    chown -R appuser:appgroup /var/lib/nginx
+
+# Crear directorio para datos y establecer permisos
+RUN mkdir -p /app/data && \
+    chown -R appuser:appgroup /app/data && \
+    chmod 700 /app/data
 
 # Crear directorio para notas guardadas con permisos apropiados
 RUN mkdir -p /app/saved_notes && \
-    chmod 777 /app/saved_notes
+    chmod 700 /app/saved_notes && \
+    chown -R appuser:appgroup /app/saved_notes
 
 # Hacer ejecutable el script de inicio
 RUN chmod +x start.sh
+
+# Cambiar a usuario no root
+USER appuser
 
 # Exponer puerto
 EXPOSE 5037

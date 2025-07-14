@@ -18,6 +18,7 @@
 </head>
 <body>
     <h1>📡 Monitor de Red - GPT-4o</h1>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     
     <div>
         <button onclick="startMonitoring()">🔍 Iniciar Monitoreo</button>
@@ -39,7 +40,7 @@
             const logsDiv = document.getElementById('logs');
             const logDiv = document.createElement('div');
             logDiv.className = `log ${type}`;
-            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`;
+            logDiv.innerHTML = DOMPurify.sanitize(`<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`);
             logsDiv.appendChild(logDiv);
             logsDiv.scrollTop = logsDiv.scrollHeight;
             console.log(`[${type.toUpperCase()}] ${message}`);

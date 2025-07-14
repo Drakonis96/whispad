@@ -21,7 +21,7 @@ fi
 
 # Crear y configurar directorios persistentes
 mkdir -p /app/saved_notes
-chmod 777 /app/saved_notes
+chmod 700 /app/saved_notes
 
 mkdir -p /app/data
 
@@ -30,18 +30,17 @@ if [ ! -f /app/data/users.json ]; then
     echo "Creating default users.json file..."
     cp /app/users.json.template /app/data/users.json 2>/dev/null || echo '{"admin":{"password":"whispad","is_admin":true,"transcription_providers":["openai","local","sensevoice"],"postprocess_providers":["openai","google","openrouter","lmstudio","ollama"]}}' > /app/data/users.json
 fi
-chmod 666 /app/data/users.json
+chmod 600 /app/data/users.json
 
 # Ensure server_config.json exists so Docker doesn't create a directory
 if [ ! -f /app/data/server_config.json ]; then
     echo '{}' > /app/data/server_config.json
 fi
-chmod 666 /app/data/server_config.json
+chmod 600 /app/data/server_config.json
 
 # Asegurar que los archivos estáticos tengan los permisos correctos
 echo "Configurando permisos de archivos estáticos..."
 chmod -R 755 /usr/share/nginx/html
-chown -R www-data:www-data /usr/share/nginx/html
 
 # Verificar que nginx esté configurado correctamente
 echo "Verificando configuración de nginx..."
