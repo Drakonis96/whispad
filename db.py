@@ -2,7 +2,9 @@ import os
 import json
 from psycopg_pool import ConnectionPool
 
-DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/whispad")
+DB_DSN = os.getenv("DATABASE_URL")
+if not DB_DSN:
+    raise RuntimeError("DATABASE_URL environment variable not set")
 
 pool = ConnectionPool(conninfo=DB_DSN, min_size=1, max_size=5)
 

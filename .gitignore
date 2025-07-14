@@ -117,8 +117,7 @@ whisper.cpp/
 whisper_models/
 
 # User data and configuration (persisted via Docker volumes)
-# users.json - uncomment the line below if you want to keep user data in git
-# users.json
+data/users.json
 
 # Archivos de desarrollo y testing
 .pytest_cache/

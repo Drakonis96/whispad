@@ -46,7 +46,7 @@ If you are not comfortable with the terminal, the easiest method is to use **Doc
    docker compose up
    ```
 4. Docker will download the dependencies and show *"Starting services..."*. When everything is ready, open your browser at `https://localhost:5037`.
-5. Sign in with **admin** / **whispad** the first time to access the app.
+5. Sign in with **admin** and the password from `ADMIN_PASSWORD` the first time to access the app.
 6. To stop the application, press `Ctrl+C` in the terminal or use the *Stop* button in Docker Desktop.
 
 ## Installing with Docker Desktop
@@ -64,7 +64,7 @@ This option is ideal if you don't want to worry about installing Python or depen
    docker compose up
    ```
 4. Go to `https://localhost:5037` and start using WhisPad.
-5. Log in with **admin** / **whispad** on first use.
+5. Log in with **admin** using the password from `ADMIN_PASSWORD` on first use.
 6. To stop it, press `Ctrl+C` in the terminal or run `docker compose down`.
 7. If you want to use LM Studio or Ollama for local AI text improvement, set the host to
    `host.docker.internal` in the configuration page so the container can reach
@@ -95,7 +95,7 @@ If you prefer not to use Docker, you can also run it directly with Python:
    python backend.py
    ```
 6. Open `index.html` in your browser or serve the folder with `python -m http.server 5037` and visit `https://localhost:5037`.
-7. Log in with **admin** / **whispad** the first time you access the app.
+7. Log in with **admin** using the password from `ADMIN_PASSWORD` the first time you access the app.
 
 ## API Key Configuration
 Copy `env.example` to `.env` and add your API keys:
@@ -105,7 +105,9 @@ cp env.example .env
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
 If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
 Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook payload now includes the username so your workflow can fetch the note from the correct folder.
-Set `DATABASE_URL` if you want to override the default PostgreSQL connection string.
+Set the database credentials in your `.env` file using `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`.
+`DATABASE_URL` should point to `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}`.
+Set `ADMIN_PASSWORD` to define the initial admin user's password.
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.
@@ -129,15 +131,15 @@ WhisPad is designed to persist your data between container restarts, updates, an
 - **Logs**: Stored in `./logs/` (mounted to `/var/log/nginx` in container)
 
 ### User Management
-- **Default Admin**: Username `admin`, password `whispad`
+- **Default Admin**: Username `admin`, password set via `ADMIN_PASSWORD`
 - **User Configuration**: Admins can create users and assign different transcription/postprocessing providers
 - **Per-User Folders**: Each user's notes are isolated in their own folder under `saved_notes/`
 - **Single User Mode**: Set `MULTI_USER=false` in `.env` or the compose file to skip the login screen and always use the admin account
 
 ### Initial Setup
-On first start the backend migrates any existing `data/users.json` file to the PostgreSQL database automatically and creates the default admin if necessary.
+On first start the backend creates the `admin` user using the password from `ADMIN_PASSWORD`.
 
-**Important**: Change the default admin password immediately after first login for security!
+**Important**: Change the admin password immediately after first login for security!
 
 ## Screenshots
 

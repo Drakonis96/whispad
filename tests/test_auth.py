@@ -1,4 +1,5 @@
 import os
+os.environ.setdefault("ADMIN_PASSWORD", "secret")
 import pytest
 from backend import app, HASHER
 from db import pool, init_db, create_user, get_user
