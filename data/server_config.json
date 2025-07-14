@@ -1,6 +1,0 @@
-{
-  "lmstudio_host": "127.0.0.1",
-  "lmstudio_port": 1234,
-  "ollama_host": "127.0.0.1",
-  "ollama_port": 11434
-}

@@ -20,6 +20,10 @@ const PROVIDER_LABELS = {
     ollama: 'Ollama'
 };
 
+function safeSetInnerHTML(element, html) {
+    element.innerHTML = DOMPurify.sanitize(html);
+}
+
 function authFetch(url, options = {}) {
     options.headers = options.headers || {};
     if (authToken) {
@@ -977,7 +981,7 @@ class NotesApp {
             const isCustomStyle = style.custom === true;
             styleItem.className = `style-config-item ${!style.visible ? 'disabled' : ''} ${isCustomStyle ? 'custom-style' : ''}`;
             
-            styleItem.innerHTML = `
+            safeSetInnerHTML(styleItem, `
                 <label class="style-toggle">
                     <input type="checkbox" ${style.visible ? 'checked' : ''} data-style="${key}">
                     <span class="style-toggle-slider"></span>
@@ -991,7 +995,7 @@ class NotesApp {
                     <div class="style-prompt">${style.prompt}</div>
                 </div>
                 ${isCustomStyle ? `<button class="delete-style-btn" data-style="${key}" title="Eliminar estilo personalizado"><i class="fas fa-times"></i></button>` : ''}
-            `;
+            `);
 
             // Add event listener for toggle
             const checkbox = styleItem.querySelector('input[type="checkbox"]');
@@ -1125,10 +1129,10 @@ class NotesApp {
                 button.className = 'btn btn--secondary btn--sm ai-btn';
                 button.setAttribute('data-action', key);
                 button.setAttribute('title', style.descripcion);
-                button.innerHTML = `
+                safeSetInnerHTML(button, `
                     <span class="ai-icon">${style.icono}</span>
                     ${style.nombre}
-                `;
+                `);
                 
                 // Add event listener
                 button.addEventListener('click', () => {
@@ -1199,7 +1203,7 @@ class NotesApp {
         }
 
         document.getElementById('note-title').value = this.currentNote.title;
-        document.getElementById('editor').innerHTML = this.currentNote.content;
+        safeSetInnerHTML(document.getElementById('editor'), this.currentNote.content);
 
         this.renderNoteTags(this.currentNote);
         
@@ -1648,7 +1652,7 @@ class NotesApp {
     createFileUploadItem(file) {
         const fileItem = document.createElement('div');
         fileItem.className = 'file-upload-item';
-        fileItem.innerHTML = `
+        safeSetInnerHTML(fileItem, `
             <div class="file-upload-header">
                 <span class="file-upload-name">${file.name}</span>
                 <span class="file-upload-size">${this.formatFileSize(file.size)}</span>
@@ -1658,7 +1662,7 @@ class NotesApp {
                 <div class="progress-bar"></div>
             </div>
             <div class="progress-percentage">0%</div>
-        `;
+        `);
         return fileItem;
     }
 
@@ -1683,10 +1687,10 @@ class NotesApp {
     showUploadCompleteMessage(container) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'upload-complete-message';
-        messageDiv.innerHTML = `
+        safeSetInnerHTML(messageDiv, `
             <i class="fas fa-check-circle message-icon"></i>
             <span class="message-text">All models uploaded successfully! Refreshing providers...</span>
-        `;
+        `);
         container.appendChild(messageDiv);
     }
 
@@ -2010,11 +2014,11 @@ class NotesApp {
         models.forEach(m => {
             const li = document.createElement('li');
             li.className = 'model-item';
-            li.innerHTML = `
+            safeSetInnerHTML(li, `
                 <span class="model-name">${m.name}</span>
                 <button class="btn btn--outline btn--sm delete-model-btn" data-name="${m.name}">
                     <i class="fas fa-trash"></i>
-                </button>`;
+                </button>`);
             list.appendChild(li);
         });
 
@@ -2038,7 +2042,7 @@ class NotesApp {
     htmlToMarkdown(html, title) {
         // Crear un elemento temporal para procesar el HTML
         const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = html;
+        safeSetInnerHTML(tempDiv, html);
 
         let markdown = `# ${title}\n\n`;
         
@@ -2207,7 +2211,7 @@ class NotesApp {
         const container = document.getElementById('tag-filter-bar');
         if (!container) return;
         const tags = this.gatherAllTags();
-        container.innerHTML = tags.map(tag => `<span class="tag-badge" data-tag="${tag}">${tag}</span>`).join('');
+        safeSetInnerHTML(container, tags.map(tag => `<span class="tag-badge" data-tag="${tag}">${tag}</span>`).join(''));
         container.querySelectorAll('.tag-badge').forEach(badge => {
             const tag = badge.dataset.tag;
             if (this.selectedTags.has(tag)) badge.classList.add('active');
@@ -2229,7 +2233,7 @@ class NotesApp {
         const container = document.getElementById('note-tags');
         if (!container) return;
         const tags = (note && note.tags) ? note.tags : [];
-        container.innerHTML = tags.map(t => `<span class="tag-badge" data-tag="${t}">${t}<span class="remove-tag" data-tag="${t}">&times;</span></span>`).join('');
+        safeSetInnerHTML(container, tags.map(t => `<span class="tag-badge" data-tag="${t}">${t}<span class="remove-tag" data-tag="${t}">&times;</span></span>`).join(''));
         const input = document.createElement('input');
         input.type = 'text';
         input.id = 'tag-input';
@@ -2330,7 +2334,7 @@ class NotesApp {
             return;
         }
         
-        container.innerHTML = filteredNotes.map(note => {
+        safeSetInnerHTML(container, filteredNotes.map(note => {
             const preview = this.getTextPreview(note.content);
             const date = new Date(note.createdAt).toLocaleDateString();
             const overwriteCls = this.overwrittenFiles.has(note.filename) ? ' overwritten' : '';
@@ -2342,7 +2346,7 @@ class NotesApp {
                     <div class="note-item-date">${date}</div>
                 </div>
             `;
-        }).join('');
+        }).join(''));
         
         // Agregar event listeners a los items
         container.querySelectorAll('.note-item').forEach(item => {
@@ -2355,7 +2359,7 @@ class NotesApp {
     
     getTextPreview(html) {
         const temp = document.createElement('div');
-        temp.innerHTML = html;
+        safeSetInnerHTML(temp, html);
         const text = temp.textContent || temp.innerText || '';
         return text.length > 100 ? text.substring(0, 100) + '...' : text;
     }
@@ -3466,7 +3470,7 @@ class NotesApp {
         }
         
         const editor = document.getElementById('editor');
-        editor.innerHTML = lastEntry.content;
+        safeSetInnerHTML(editor, lastEntry.content);
         
         this.updateUndoButton();
         this.handleEditorChange();
@@ -3717,12 +3721,12 @@ class NotesApp {
         // Crear elemento de notificación
         const notification = document.createElement('div');
         notification.className = `notification notification--${type}`;
-        notification.innerHTML = `
+        safeSetInnerHTML(notification, `
             <div class="notification-content">
                 <span class="notification-icon">${type === 'success' ? '✓' : type === 'warning' ? '⚠' : 'ℹ'}</span>
                 <span class="notification-message">${message}</span>
             </div>
-        `;
+        `);
         
         // Estilos inline para la notificación
         Object.assign(notification.style, {

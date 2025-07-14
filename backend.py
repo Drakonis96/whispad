@@ -17,6 +17,21 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 import threading
 
+# ---------- Path utilities ----------
+def sanitize_filename(filename: str) -> str:
+    """Return the base name of a filename, removing any path components."""
+    return os.path.basename(filename)
+
+
+def is_path_within_directory(base_dir: str, path: str) -> bool:
+    """Check that the absolute path resides within the base directory."""
+    abs_base = os.path.abspath(base_dir)
+    abs_path = os.path.abspath(path)
+    try:
+        return os.path.commonpath([abs_path, abs_base]) == abs_base
+    except ValueError:
+        return False
+
 # Cargar variables de entorno
 load_dotenv()
 
@@ -40,44 +55,31 @@ OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 # Enable or disable multi-user support (default True)
 MULTI_USER = os.getenv('MULTI_USER', 'true').lower() != 'false'
-# File to persist LM Studio/Ollama configuration set by the admin
-SERVER_CONFIG_FILE = os.path.join('data', 'server_config.json')
 
 def load_server_config():
-    """Load host/port settings from disk if available."""
+    """Load host/port settings from database if available."""
     global LMSTUDIO_HOST, LMSTUDIO_PORT, OLLAMA_HOST, OLLAMA_PORT
-    if os.path.exists(SERVER_CONFIG_FILE):
-        try:
-            with open(SERVER_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-            LMSTUDIO_HOST = data.get('lmstudio_host', LMSTUDIO_HOST)
-            LMSTUDIO_PORT = data.get('lmstudio_port', LMSTUDIO_PORT)
-            OLLAMA_HOST = data.get('ollama_host', OLLAMA_HOST)
-            OLLAMA_PORT = data.get('ollama_port', OLLAMA_PORT)
-        except Exception:
-            pass
+    try:
+        from db import get_setting
+        LMSTUDIO_HOST = get_setting('lmstudio_host', LMSTUDIO_HOST)
+        LMSTUDIO_PORT = get_setting('lmstudio_port', LMSTUDIO_PORT)
+        OLLAMA_HOST = get_setting('ollama_host', OLLAMA_HOST)
+        OLLAMA_PORT = get_setting('ollama_port', OLLAMA_PORT)
+    except Exception:
+        # If database is not available or settings don't exist, use defaults
+        pass
 
 def save_server_config():
-    """Persist current host/port settings to disk."""
-    data = {
-        'lmstudio_host': LMSTUDIO_HOST,
-        'lmstudio_port': LMSTUDIO_PORT,
-        'ollama_host': OLLAMA_HOST,
-        'ollama_port': OLLAMA_PORT,
-    }
-    temp_dir = os.path.dirname(SERVER_CONFIG_FILE) or '.'
-    fd, temp_path = tempfile.mkstemp(dir=temp_dir, prefix='srvcfg.', suffix='.tmp')
-    os.close(fd)
+    """Persist current host/port settings to database."""
     try:
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=2)
-        os.replace(temp_path, SERVER_CONFIG_FILE)
-    except Exception:
-        try:
-            shutil.move(temp_path, SERVER_CONFIG_FILE)
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+        from db import set_setting
+        set_setting('lmstudio_host', LMSTUDIO_HOST)
+        set_setting('lmstudio_port', LMSTUDIO_PORT)
+        set_setting('ollama_host', OLLAMA_HOST)
+        set_setting('ollama_port', OLLAMA_PORT)
+    except Exception as e:
+        print(f"Error saving server config to database: {e}")
+        raise
 
 # Load persisted config if present
 load_server_config()
@@ -97,6 +99,7 @@ from argon2.low_level import Type
 from db import (
     init_db,
     migrate_json,
+    migrate_server_config_to_db,
     get_user,
     list_users as db_list_users,
     create_user as db_create_user,
@@ -109,20 +112,37 @@ HASHER = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=2, hash_len=
 
 init_db()
 migrate_json(hasher=HASHER)
+migrate_server_config_to_db()  # Migrate server config from JSON to database
+
+# Load server configuration from database
+load_server_config()
 
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
 if not ADMIN_PASSWORD:
     raise RuntimeError("ADMIN_PASSWORD environment variable not set")
 
 def ensure_admin_user():
-    if not get_user('admin'):
+    admin_user = get_user('admin')
+    expected_password_hash = HASHER.hash(ADMIN_PASSWORD)
+    
+    if not admin_user:
+        # Create admin user if it doesn't exist
         db_create_user(
             'admin',
-            HASHER.hash(ADMIN_PASSWORD),
+            expected_password_hash,
             True,
             ALL_TRANSCRIPTION_PROVIDERS,
             ALL_POSTPROCESS_PROVIDERS,
         )
+    else:
+        # Update admin password if it's different from the expected one
+        try:
+            HASHER.verify(admin_user['password'], ADMIN_PASSWORD)
+            # Password is correct, no need to update
+        except argon2_exceptions.VerifyMismatchError:
+            # Password is different, update it
+            print("Updating admin password to match ADMIN_PASSWORD environment variable")
+            db_update_password('admin', expected_password_hash)
 
 ensure_admin_user()
 
@@ -444,7 +464,10 @@ def transcribe_audio():
             audio_bytes = audio_file.read()
 
             models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
-            model_path = os.path.join(models_dir, os.path.basename(model_name))
+            model_filename = sanitize_filename(model_name)
+            model_path = os.path.join(models_dir, model_filename)
+            if not is_path_within_directory(models_dir, model_path):
+                return jsonify({"error": "Invalid model path"}), 400
 
             result = whisper_wrapper.transcribe_audio_from_bytes(
                 audio_bytes,
@@ -1681,8 +1704,10 @@ def save_note():
                 title = "Untitled Note"
 
             safe_filename = generate_safe_filename(title)
-            new_filename = f"{safe_filename}.md"
+            new_filename = sanitize_filename(f"{safe_filename}.md")
             new_filepath = os.path.join(saved_notes_dir, new_filename)
+            if not is_path_within_directory(saved_notes_dir, new_filepath):
+                return jsonify({"error": "Invalid file path"}), 400
 
             # Buscar archivo existente para esta nota
             existing_filepath = find_existing_note_file(saved_notes_dir, note_id)
@@ -1693,8 +1718,10 @@ def save_note():
                     counter = 1
                     while True:
                         name_without_ext = os.path.splitext(new_filename)[0]
-                        temp_filename = f"{name_without_ext}-{counter}.md"
+                        temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
                         temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        if not is_path_within_directory(saved_notes_dir, temp_filepath):
+                            return jsonify({"error": "Invalid file path"}), 400
                         if not os.path.exists(temp_filepath):
                             new_filename = temp_filename
                             new_filepath = temp_filepath
@@ -1718,8 +1745,10 @@ def save_note():
                     counter = 1
                     while True:
                         name_without_ext = os.path.splitext(new_filename)[0]
-                        temp_filename = f"{name_without_ext}-{counter}.md"
+                        temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
                         temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        if not is_path_within_directory(saved_notes_dir, temp_filepath):
+                            return jsonify({"error": "Invalid file path"}), 400
                         if not os.path.exists(temp_filepath):
                             new_filename = temp_filename
                             new_filepath = temp_filepath
@@ -2177,11 +2206,14 @@ def upload_note():
 
         saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         os.makedirs(saved_notes_dir, exist_ok=True)
-        filepath = os.path.join(saved_notes_dir, note_file.filename)
+        filename = sanitize_filename(note_file.filename)
+        filepath = os.path.join(saved_notes_dir, filename)
+        if not is_path_within_directory(saved_notes_dir, filepath):
+            return jsonify({"error": "Invalid file path"}), 400
         overwritten = os.path.exists(filepath)
         note_file.save(filepath)
 
-        return jsonify({"success": True, "filename": note_file.filename, "overwritten": overwritten})
+        return jsonify({"success": True, "filename": filename, "overwritten": overwritten})
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
 
@@ -2205,7 +2237,10 @@ def upload_model():
 
         models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
         os.makedirs(models_dir, exist_ok=True)
-        filepath = os.path.join(models_dir, model_file.filename)
+        filename = sanitize_filename(model_file.filename)
+        filepath = os.path.join(models_dir, filename)
+        if not is_path_within_directory(models_dir, filepath):
+            return jsonify({"error": "Invalid file path"}), 400
         overwritten = os.path.exists(filepath)
 
         # Save incrementally to handle very large files without exhausting memory
@@ -2213,7 +2248,7 @@ def upload_model():
             for chunk in iter(lambda: model_file.stream.read(8192), b''):
                 f.write(chunk)
 
-        return jsonify({"success": True, "filename": model_file.filename, "overwritten": overwritten})
+        return jsonify({"success": True, "filename": filename, "overwritten": overwritten})
     except Exception as e:
         return jsonify({"error": f"Error al subir modelo: {str(e)}"}), 500
 
@@ -2243,7 +2278,10 @@ def download_model():
         try:
             models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
             os.makedirs(models_dir, exist_ok=True)
-            filename = os.path.join(models_dir, os.path.basename(url))
+            filename = os.path.join(models_dir, sanitize_filename(os.path.basename(url)))
+            if not is_path_within_directory(models_dir, filename):
+                yield f"data: {json.dumps({'error': 'Invalid file path'})}\n\n"
+                return
 
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
@@ -2536,7 +2574,10 @@ def delete_model():
             return jsonify({"error": "Nombre de modelo requerido"}), 400
 
         models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
-        target = os.path.join(models_dir, os.path.basename(name))
+        filename = sanitize_filename(name)
+        target = os.path.join(models_dir, filename)
+        if not is_path_within_directory(models_dir, target):
+            return jsonify({"error": "Invalid file path"}), 400
 
         if os.path.isfile(target):
             os.remove(target)
@@ -2567,8 +2608,9 @@ def get_note():
         if note_id:
             filepath = find_existing_note_file(saved_notes_dir, note_id)
         elif filename:
-            candidate = os.path.join(saved_notes_dir, filename)
-            if os.path.exists(candidate):
+            name = sanitize_filename(filename)
+            candidate = os.path.join(saved_notes_dir, name)
+            if is_path_within_directory(saved_notes_dir, candidate) and os.path.exists(candidate):
                 filepath = candidate
 
         if not filepath:
