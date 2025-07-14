@@ -1,3 +1,5 @@
+import os
+os.environ.setdefault("ADMIN_PASSWORD", "intpass")
 from backend import app, HASHER
 from db import pool, init_db, create_user
 

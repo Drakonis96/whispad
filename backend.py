@@ -110,11 +110,15 @@ HASHER = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=2, hash_len=
 init_db()
 migrate_json(hasher=HASHER)
 
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+if not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_PASSWORD environment variable not set")
+
 def ensure_admin_user():
     if not get_user('admin'):
         db_create_user(
             'admin',
-            HASHER.hash('whispad'),
+            HASHER.hash(ADMIN_PASSWORD),
             True,
             ALL_TRANSCRIPTION_PROVIDERS,
             ALL_POSTPROCESS_PROVIDERS,
