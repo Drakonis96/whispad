@@ -7,6 +7,9 @@ python-dotenv
 pydub
 librosa
 soundfile
+# Security
+argon2-cffi
+psycopg2-binary
 # Optional dependencies for SenseVoice (installed on-demand)
 torch>=2.0.0
 funasr

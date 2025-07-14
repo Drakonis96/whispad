@@ -103,6 +103,7 @@ Copy `env.example` to `.env` and add your API keys:
 cp env.example .env
 ```
 Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
+You must also set the PostgreSQL variables `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` and `PGSSLMODE=require` so the backend can store credential hashes securely.
 If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
 Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook payload now includes the username so your workflow can fetch the note from the correct folder.
 
@@ -122,7 +123,7 @@ WhisPad is designed to persist your data between container restarts, updates, an
 
 ### Persistent Data
 - **Notes**: Stored in `./saved_notes/` (mounted to `/app/saved_notes` in container)
-- **Users**: Stored in `./data/users.json` (mounted to `/app/data/users.json` in container)
+- **Credentials**: Stored in PostgreSQL (configure via `PG*` env vars)
 - **Provider Config**: Stored in `./data/server_config.json` (mounted to `/app/data/server_config.json` in container)
 - **Models**: Stored in `./whisper-cpp-models/` (mounted to `/app/whisper-cpp-models` in container)
 - **Logs**: Stored in `./logs/` (mounted to `/var/log/nginx` in container)
@@ -134,7 +135,7 @@ WhisPad is designed to persist your data between container restarts, updates, an
 - **Single User Mode**: Set `MULTI_USER=false` in `.env` or the compose file to skip the login screen and always use the admin account
 
 ### Initial Setup
-If you don't have a `data/users.json` file, the application will automatically create one with the default admin account. You can also copy `users.json.template` to `data/users.json` and customize it as needed.
+On first run the application ensures the `usuarios` table exists and creates the default admin user if needed. Legacy `users.json` files are migrated automatically.
 
 **Important**: Change the default admin password immediately after first login for security!
 

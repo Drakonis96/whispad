@@ -24,19 +24,22 @@ mkdir -p /app/saved_notes
 chmod 777 /app/saved_notes
 
 mkdir -p /app/data
+chmod 700 /app/data
 
-# Ensure users.json exists with proper permissions
-if [ ! -f /app/data/users.json ]; then
-    echo "Creating default users.json file..."
-    cp /app/users.json.template /app/data/users.json 2>/dev/null || echo '{"admin":{"password":"whispad","is_admin":true,"transcription_providers":["openai","local","sensevoice"],"postprocess_providers":["openai","google","openrouter","lmstudio","ollama"]}}' > /app/data/users.json
+# Ensure strict permissions on files
+find /app/data -type f -exec chmod 600 {} \;
+
+# Run one-shot migration if legacy users.json is present
+if [ -f /app/data/users.json ]; then
+    echo "Migrating legacy users.json..."
+    python migrate_users.py || true
 fi
-chmod 666 /app/data/users.json
 
 # Ensure server_config.json exists so Docker doesn't create a directory
 if [ ! -f /app/data/server_config.json ]; then
     echo '{}' > /app/data/server_config.json
 fi
-chmod 666 /app/data/server_config.json
+chmod 600 /app/data/server_config.json
 
 # Asegurar que los archivos estáticos tengan los permisos correctos
 echo "Configurando permisos de archivos estáticos..."

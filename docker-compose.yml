@@ -17,9 +17,28 @@ services:
       - BACKEND_PORT=8000
       - CORS_ORIGINS=https://localhost:5037,https://127.0.0.1:5037
       - DEBUG=False
+      - PGHOST=db
+      - PGPORT=5432
+      - PGDATABASE=${PGDATABASE:-whispad}
+      - PGUSER=${PGUSER:-whispad}
+      - PGPASSWORD=${PGPASSWORD:-secret}
+      - PGSSLMODE=require
     volumes:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
       - ./data:/app/data
     restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      - POSTGRES_DB=${PGDATABASE:-whispad}
+      - POSTGRES_USER=${PGUSER:-whispad}
+      - POSTGRES_PASSWORD=${PGPASSWORD:-secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

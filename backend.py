@@ -16,6 +16,7 @@ import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 import threading
+import db
 
 # Cargar variables de entorno
 load_dotenv()
@@ -87,58 +88,62 @@ WORKFLOW_WEBHOOK_TOKEN = os.getenv('WORKFLOW_WEBHOOK_TOKEN')
 WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 
 # ---------- Simple user management ---------
-USERS_FILE = os.path.join('data', 'users.json')
 SESSIONS = {}
 # Locks to avoid concurrent writes that could corrupt files
 SAVE_LOCK = threading.Lock()
-USERS_LOCK = threading.Lock()
 
 # Provider lists
 ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
 ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama"]
 
-def load_users():
-    """Load users from disk ensuring the admin account always exists."""
-    if not os.path.exists(USERS_FILE):
-        users = {}
-    else:
-        try:
-            with open(USERS_FILE, 'r', encoding='utf-8') as f:
-                users = json.load(f)
-        except Exception:
-            users = {}
+DB_CONN = db.get_connection()
+db.init_db(DB_CONN)
 
+def load_users():
+    """Load users from the database ensuring the admin account exists."""
+    users = {}
+    for row in db.list_users(DB_CONN):
+        users[row['login']] = {
+            'pwd_hash': row.get('pwd_hash'),
+            'is_admin': row.get('is_admin', False),
+            'transcription_providers': row.get('transcription_providers') or [],
+            'postprocess_providers': row.get('postprocess_providers') or [],
+        }
     if 'admin' not in users:
+        pwd_hash = db.hash_password('whispad')
+        db.create_user(DB_CONN, 'admin', password=None, is_admin=True,
+                       tp=ALL_TRANSCRIPTION_PROVIDERS,
+                       pp=ALL_POSTPROCESS_PROVIDERS, pwd_hash=pwd_hash)
         users['admin'] = {
-            'password': 'whispad',
+            'pwd_hash': pwd_hash,
             'is_admin': True,
             'transcription_providers': ALL_TRANSCRIPTION_PROVIDERS,
             'postprocess_providers': ALL_POSTPROCESS_PROVIDERS,
         }
-        # Save immediately so the file is created or repaired
-        save_users(users)
-
     return users
 
 def save_users(users):
-    """Persist users.json atomically and handle busy file errors."""
-    temp_dir = os.path.dirname(USERS_FILE) or "."
-    fd, temp_path = tempfile.mkstemp(dir=temp_dir, prefix="users.", suffix=".tmp")
-    os.close(fd)
-    with USERS_LOCK:
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(users, f, indent=2)
-        try:
-            os.replace(temp_path, USERS_FILE)
-        except OSError as e:
-            app.logger.warning("Atomic replace failed: %s; falling back to shutil.move", e)
-            shutil.move(temp_path, USERS_FILE)
-        finally:
-            if os.path.exists(temp_path):
-                try:
-                    os.remove(temp_path)
-                except OSError:
-                    pass
+    """Persist user settings back to the database."""
+    for login, info in users.items():
+        row = db.get_user(DB_CONN, login)
+        if row:
+            db.update_user_info(
+                DB_CONN,
+                login,
+                is_admin=info.get('is_admin', False),
+                tp=info.get('transcription_providers', []),
+                pp=info.get('postprocess_providers', []),
+            )
+        else:
+            db.create_user(
+                DB_CONN,
+                login,
+                password=None,
+                is_admin=info.get('is_admin', False),
+                tp=info.get('transcription_providers', []),
+                pp=info.get('postprocess_providers', []),
+                pwd_hash=info.get('pwd_hash'),
+            )
 
 
 def migrate_notes_to_admin_folder():
@@ -271,7 +276,11 @@ def login_user():
     username = data.get('username')
     password = data.get('password')
     user = USERS.get(username)
-    if user and user.get('password') == password:
+    if user and db.verify_password(user.get('pwd_hash', ''), password or ''):
+        if db.check_needs_rehash(user['pwd_hash']):
+            new_hash = db.hash_password(password)
+            db.update_password_hash(DB_CONN, username, new_hash)
+            user['pwd_hash'] = new_hash
         token = base64.urlsafe_b64encode(os.urandom(24)).decode('utf-8')
         SESSIONS[token] = username
         if username == 'admin':
@@ -334,9 +343,12 @@ def change_password():
     new_password = data.get('new_password')
     if not current or not new_password:
         return jsonify({"error": "Password required"}), 400
-    if USERS.get(username, {}).get('password') != current:
+    user = USERS.get(username, {})
+    if not db.verify_password(user.get('pwd_hash', ''), current or ''):
         return jsonify({"error": "Current password incorrect"}), 400
-    USERS[username]['password'] = new_password
+    new_hash = db.hash_password(new_password)
+    db.update_password_hash(DB_CONN, username, new_hash)
+    user['pwd_hash'] = new_hash
     save_users(USERS)
     return jsonify({"success": True})
 
@@ -353,12 +365,17 @@ def create_user():
         return jsonify({"error": "Username and password required"}), 400
     if username in USERS or username == 'admin':
         return jsonify({"error": "User exists"}), 400
+    pwd_hash = db.hash_password(password)
     USERS[username] = {
-        "password": password,
+        "pwd_hash": pwd_hash,
         "is_admin": False,
         "transcription_providers": data.get('transcription_providers', []),
         "postprocess_providers": data.get('postprocess_providers', [])
     }
+    db.create_user(DB_CONN, username, password=None, is_admin=False,
+                   tp=USERS[username]['transcription_providers'],
+                   pp=USERS[username]['postprocess_providers'],
+                   pwd_hash=pwd_hash)
     save_users(USERS)
     return jsonify({"success": True})
 
@@ -392,6 +409,12 @@ def update_user_providers():
         return jsonify({"error": "Cannot modify admin"}), 400
     USERS[username]['transcription_providers'] = data.get('transcription_providers', USERS[username].get('transcription_providers', []))
     USERS[username]['postprocess_providers'] = data.get('postprocess_providers', USERS[username].get('postprocess_providers', []))
+    db.update_user_info(
+        DB_CONN,
+        username,
+        tp=USERS[username]['transcription_providers'],
+        pp=USERS[username]['postprocess_providers'],
+    )
     save_users(USERS)
     return jsonify({"success": True})
 
@@ -410,6 +433,7 @@ def delete_user():
         return jsonify({"error": "Cannot delete admin"}), 400
 
     USERS.pop(username, None)
+    db.delete_user(DB_CONN, username)
     save_users(USERS)
 
     user_dir = os.path.join(os.getcwd(), 'saved_notes', username)
