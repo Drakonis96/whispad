@@ -116,8 +116,9 @@ models/
 whisper.cpp/
 whisper_models/
 
-# User data and configuration (persisted via Docker volumes)
+# Legacy user data files (now stored in PostgreSQL)
 data/users.json
+data/server_config.json
 
 # Archivos de desarrollo y testing
 .pytest_cache/
