@@ -23,6 +23,15 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS settings (
+                key VARCHAR(255) PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         conn.commit()
 
 
@@ -95,21 +104,41 @@ def delete_user(username: str):
 
 
 def migrate_json(json_path="data/users.json", hasher=None):
-    """Migrate users from a JSON file if table empty."""
+    """Migrate users from a JSON file if table empty, or clean up leftover JSON file."""
     if not os.path.exists(json_path):
         return
+    
     with pool.connection() as conn:
         cur = conn.execute("SELECT COUNT(*) FROM users")
         count = cur.fetchone()[0]
+    
     if count:
+        # Database already has users, just remove the leftover JSON file
+        print(f"Database already contains users. Removing leftover JSON file: {json_path}")
+        os.remove(json_path)
         return
+    
+    # Perform migration if database is empty
     try:
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except Exception:
+        # If JSON is corrupted, just remove it
+        print(f"Corrupted JSON file found. Removing: {json_path}")
+        os.remove(json_path)
         return
+    
+    # Check if we need to update admin password from environment variable
+    admin_password_env = os.getenv("ADMIN_PASSWORD")
+    
     for username, info in data.items():
         password = info.get("password", "")
+        
+        # If this is the admin user and ADMIN_PASSWORD is set, use the env password
+        if username == "admin" and admin_password_env:
+            print(f"Using ADMIN_PASSWORD from environment for admin user during migration")
+            password = admin_password_env
+        
         if hasher:
             password = hasher.hash(password)
         create_user(
@@ -119,7 +148,59 @@ def migrate_json(json_path="data/users.json", hasher=None):
             info.get("transcription_providers", []),
             info.get("postprocess_providers", []),
         )
-    backup = json_path + ".bak"
-    os.rename(json_path, backup)
+    # Remove the JSON file after successful migration
+    print(f"Migration completed successfully. Removing {json_path}")
+    os.remove(json_path)
+
+
+def get_setting(key: str, default_value: str = None):
+    """Get a setting value from the database."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            "SELECT value FROM settings WHERE key = %s",
+            [key],
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0]
+        return default_value
+
+def set_setting(key: str, value: str):
+    """Set a setting value in the database."""
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO settings (key, value, updated_at) 
+            VALUES (%s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (key) 
+            DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP
+            """,
+            [key, value],
+        )
+        conn.commit()
+
+def get_all_settings():
+    """Get all settings as a dictionary."""
+    with pool.connection() as conn:
+        cur = conn.execute("SELECT key, value FROM settings")
+        return dict(cur.fetchall())
+
+def migrate_server_config_to_db(json_path="data/server_config.json"):
+    """Migrate server config from JSON file to database if it exists."""
+    if not os.path.exists(json_path):
+        return
+    
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # Migrate each setting to the database
+        for key, value in data.items():
+            set_setting(key, str(value))
+        
+        print(f"Server config migrated to database successfully. Removing {json_path}")
+        os.remove(json_path)
+    except Exception as e:
+        print(f"Error migrating server config: {e}")
 
 
