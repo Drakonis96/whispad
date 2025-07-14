@@ -7,24 +7,28 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+
       - LMSTUDIO_HOST=${LMSTUDIO_HOST:-127.0.0.1}
       - LMSTUDIO_PORT=${LMSTUDIO_PORT:-1234}
       - OLLAMA_HOST=${OLLAMA_HOST:-127.0.0.1}
       - OLLAMA_PORT=${OLLAMA_PORT:-11434}
+
       - MULTI_USER=${MULTI_USER:-true}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+
       - BACKEND_PORT=8000
       - CORS_ORIGINS=https://localhost:5037,https://127.0.0.1:5037
       - DEBUG=False
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+
+      
     depends_on:
       - db
     volumes:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
       - ./whisper-cpp-models:/app/whisper-cpp-models
-      - ./data:/app/data
     restart: unless-stopped
 
   db:
