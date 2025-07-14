@@ -17,6 +17,21 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 import threading
 
+# ---------- Path utilities ----------
+def sanitize_filename(filename: str) -> str:
+    """Return the base name of a filename, removing any path components."""
+    return os.path.basename(filename)
+
+
+def is_path_within_directory(base_dir: str, path: str) -> bool:
+    """Check that the absolute path resides within the base directory."""
+    abs_base = os.path.abspath(base_dir)
+    abs_path = os.path.abspath(path)
+    try:
+        return os.path.commonpath([abs_path, abs_base]) == abs_base
+    except ValueError:
+        return False
+
 # Cargar variables de entorno
 load_dotenv()
 
@@ -444,7 +459,10 @@ def transcribe_audio():
             audio_bytes = audio_file.read()
 
             models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
-            model_path = os.path.join(models_dir, os.path.basename(model_name))
+            model_filename = sanitize_filename(model_name)
+            model_path = os.path.join(models_dir, model_filename)
+            if not is_path_within_directory(models_dir, model_path):
+                return jsonify({"error": "Invalid model path"}), 400
 
             result = whisper_wrapper.transcribe_audio_from_bytes(
                 audio_bytes,
@@ -1681,8 +1699,10 @@ def save_note():
                 title = "Untitled Note"
 
             safe_filename = generate_safe_filename(title)
-            new_filename = f"{safe_filename}.md"
+            new_filename = sanitize_filename(f"{safe_filename}.md")
             new_filepath = os.path.join(saved_notes_dir, new_filename)
+            if not is_path_within_directory(saved_notes_dir, new_filepath):
+                return jsonify({"error": "Invalid file path"}), 400
 
             # Buscar archivo existente para esta nota
             existing_filepath = find_existing_note_file(saved_notes_dir, note_id)
@@ -1693,8 +1713,10 @@ def save_note():
                     counter = 1
                     while True:
                         name_without_ext = os.path.splitext(new_filename)[0]
-                        temp_filename = f"{name_without_ext}-{counter}.md"
+                        temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
                         temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        if not is_path_within_directory(saved_notes_dir, temp_filepath):
+                            return jsonify({"error": "Invalid file path"}), 400
                         if not os.path.exists(temp_filepath):
                             new_filename = temp_filename
                             new_filepath = temp_filepath
@@ -1718,8 +1740,10 @@ def save_note():
                     counter = 1
                     while True:
                         name_without_ext = os.path.splitext(new_filename)[0]
-                        temp_filename = f"{name_without_ext}-{counter}.md"
+                        temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
                         temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        if not is_path_within_directory(saved_notes_dir, temp_filepath):
+                            return jsonify({"error": "Invalid file path"}), 400
                         if not os.path.exists(temp_filepath):
                             new_filename = temp_filename
                             new_filepath = temp_filepath
@@ -2177,11 +2201,14 @@ def upload_note():
 
         saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         os.makedirs(saved_notes_dir, exist_ok=True)
-        filepath = os.path.join(saved_notes_dir, note_file.filename)
+        filename = sanitize_filename(note_file.filename)
+        filepath = os.path.join(saved_notes_dir, filename)
+        if not is_path_within_directory(saved_notes_dir, filepath):
+            return jsonify({"error": "Invalid file path"}), 400
         overwritten = os.path.exists(filepath)
         note_file.save(filepath)
 
-        return jsonify({"success": True, "filename": note_file.filename, "overwritten": overwritten})
+        return jsonify({"success": True, "filename": filename, "overwritten": overwritten})
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
 
@@ -2205,7 +2232,10 @@ def upload_model():
 
         models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
         os.makedirs(models_dir, exist_ok=True)
-        filepath = os.path.join(models_dir, model_file.filename)
+        filename = sanitize_filename(model_file.filename)
+        filepath = os.path.join(models_dir, filename)
+        if not is_path_within_directory(models_dir, filepath):
+            return jsonify({"error": "Invalid file path"}), 400
         overwritten = os.path.exists(filepath)
 
         # Save incrementally to handle very large files without exhausting memory
@@ -2213,7 +2243,7 @@ def upload_model():
             for chunk in iter(lambda: model_file.stream.read(8192), b''):
                 f.write(chunk)
 
-        return jsonify({"success": True, "filename": model_file.filename, "overwritten": overwritten})
+        return jsonify({"success": True, "filename": filename, "overwritten": overwritten})
     except Exception as e:
         return jsonify({"error": f"Error al subir modelo: {str(e)}"}), 500
 
@@ -2243,7 +2273,10 @@ def download_model():
         try:
             models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
             os.makedirs(models_dir, exist_ok=True)
-            filename = os.path.join(models_dir, os.path.basename(url))
+            filename = os.path.join(models_dir, sanitize_filename(os.path.basename(url)))
+            if not is_path_within_directory(models_dir, filename):
+                yield f"data: {json.dumps({'error': 'Invalid file path'})}\n\n"
+                return
 
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
@@ -2536,7 +2569,10 @@ def delete_model():
             return jsonify({"error": "Nombre de modelo requerido"}), 400
 
         models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
-        target = os.path.join(models_dir, os.path.basename(name))
+        filename = sanitize_filename(name)
+        target = os.path.join(models_dir, filename)
+        if not is_path_within_directory(models_dir, target):
+            return jsonify({"error": "Invalid file path"}), 400
 
         if os.path.isfile(target):
             os.remove(target)
@@ -2567,8 +2603,9 @@ def get_note():
         if note_id:
             filepath = find_existing_note_file(saved_notes_dir, note_id)
         elif filename:
-            candidate = os.path.join(saved_notes_dir, filename)
-            if os.path.exists(candidate):
+            name = sanitize_filename(filename)
+            candidate = os.path.join(saved_notes_dir, name)
+            if is_path_within_directory(saved_notes_dir, candidate) and os.path.exists(candidate):
                 filepath = candidate
 
         if not filepath:
