@@ -2573,10 +2573,21 @@ select.form-control {
     border-left: 1px solid var(--color-border);
     display: none;
     flex-direction: column;
+    position: relative;
 }
 
 .chat-sidebar.active {
     display: flex;
+}
+
+.chat-resizer {
+    width: 5px;
+    cursor: col-resize;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background-color: var(--color-border);
 }
 
 .chat-header {

@@ -575,6 +575,39 @@ class NotesApp {
             });
         }
 
+        const chatResizer = document.getElementById('chat-resizer');
+        if (chatResizer && chatSidebar) {
+            let startX = 0;
+            let startWidth = 0;
+
+            const doDrag = (e) => {
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const newWidth = Math.max(startWidth + (startX - clientX), 220);
+                chatSidebar.style.width = `${newWidth}px`;
+                e.preventDefault();
+            };
+
+            const stopDrag = () => {
+                document.removeEventListener('mousemove', doDrag);
+                document.removeEventListener('touchmove', doDrag);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchend', stopDrag);
+            };
+
+            const startDrag = (e) => {
+                startX = e.touches ? e.touches[0].clientX : e.clientX;
+                startWidth = chatSidebar.offsetWidth;
+                document.addEventListener('mousemove', doDrag);
+                document.addEventListener('touchmove', doDrag);
+                document.addEventListener('mouseup', stopDrag);
+                document.addEventListener('touchend', stopDrag);
+                e.preventDefault();
+            };
+
+            chatResizer.addEventListener('mousedown', startDrag);
+            chatResizer.addEventListener('touchstart', startDrag);
+        }
+
         // Graph button
         const graphBtn = document.getElementById('graph-btn');
         const graphClose = document.getElementById('close-graph-modal');
