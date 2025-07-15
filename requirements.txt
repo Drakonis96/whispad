@@ -1,5 +1,3 @@
-plotly
-pandas
 flask
 flask-cors
 requests
@@ -10,11 +8,8 @@ soundfile
 # Optional dependencies for SenseVoice (installed on-demand)
 torch>=2.0.0
 funasr
-soundfile
 huggingface_hub
 psycopg[binary]
 psycopg-pool
 argon2-cffi
-pytest
-pytest-benchmark
 mermaid-py

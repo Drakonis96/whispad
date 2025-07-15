@@ -1,0 +1,7 @@
+.git
+screenshots/
+api_documentation/
+test/
+tests/
+chart_script.py
+chart_script_1.py

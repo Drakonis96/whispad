@@ -51,7 +51,6 @@ Thumbs.db
 *~
 
 # Docker
-.dockerignore
 
 # Archivos de audio/video (archivos de prueba grandes)
 *.wav
