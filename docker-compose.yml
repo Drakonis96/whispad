@@ -28,6 +28,7 @@ services:
     volumes:
       - ./logs:/var/log/nginx
       - ./saved_notes:/app/saved_notes
+      - ./saved_audios:/app/saved_audios
       - ./whisper-cpp-models:/app/whisper-cpp-models
     restart: unless-stopped
 

@@ -20,8 +20,8 @@ if [ ! -f /etc/nginx/certs/selfsigned.crt ]; then
 fi
 
 # Crear y configurar directorios persistentes
-mkdir -p /app/saved_notes
-chmod 777 /app/saved_notes
+mkdir -p /app/saved_notes /app/saved_audios
+chmod 777 /app/saved_notes /app/saved_audios
 
 # Note: Configuration is now stored in PostgreSQL database
 # users.json and server_config.json will be migrated automatically if they exist
