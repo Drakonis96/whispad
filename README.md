@@ -28,6 +28,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Compatible with multiple providers: OpenAI, SenseVoice and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
 - **NEW: SenseVoice Integration** - Advanced multilingual speech recognition with emotion detection and audio event recognition for 50+ languages.
 - Download or upload local (.bin) whisper.cpp models directly from the interface.
+- Upload audio files which are automatically transcribed and stored alongside your notes.
 - Export all notes in a ZIP file with one click.
 - Mobile-friendly interface.
 - User login with per-user note folders and admin management tools.
