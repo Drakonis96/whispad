@@ -697,7 +697,12 @@ def api_mindmap():
             return jsonify({"error": "Missing note"}), 400
         result = generate_mindmap(note, topic, provider, model or 'gpt-3.5-turbo', host, port)
         if 'error' in result:
-            return jsonify(result), 500
+            msg = result['error']
+            if any(x in msg.lower() for x in ['no configurada', 'not specified', 'required']):
+                status = 400
+            else:
+                status = 500
+            return jsonify({"error": msg}), status
         return jsonify({"html": result['html'], "data": result['data']})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
