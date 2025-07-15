@@ -2585,7 +2585,7 @@ select.form-control {
 /* Graph modal */
 .graph-container {
     overflow: hidden;
-    max-height: 80vh;
+    max-height: 90vh;
     margin-bottom: var(--space-16);
     position: relative;
 }
@@ -2614,4 +2614,9 @@ select.form-control {
     margin-bottom: var(--space-16);
     white-space: pre-wrap;
     color: var(--color-text);
+}
+
+/* Larger modal for graph view */
+#graph-modal .modal-content--wide {
+    max-width: 1000px;
 }
