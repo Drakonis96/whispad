@@ -2930,6 +2930,7 @@ class NotesApp {
             if (transcription) {
                 this.insertTranscription(transcription);
                 this.showNotification('Transcription completed');
+                await this.loadAudioFiles(this.currentNote.id);
             }
             
         } catch (error) {
@@ -2951,9 +2952,11 @@ class NotesApp {
             console.log('Language:', this.config.transcriptionLanguage);
             
             return await backendAPI.transcribeAudio(
-                audioBlob, 
-                this.config.transcriptionLanguage, 
-                model
+                audioBlob,
+                this.config.transcriptionLanguage,
+                model,
+                'openai',
+                this.currentNote.id
             );
         } catch (error) {
             throw new Error(`Transcription error: ${error.message}`);
@@ -2969,7 +2972,8 @@ class NotesApp {
                 audioBlob,
                 this.config.transcriptionLanguage,
                 this.config.transcriptionModel,
-                'local'
+                'local',
+                this.currentNote.id
             );
             
             console.log('Local transcription result:', result);
@@ -3003,7 +3007,8 @@ class NotesApp {
                 this.config.transcriptionLanguage,
                 detectEmotion,
                 detectEvents,
-                useItn
+                useItn,
+                this.currentNote.id
             );
             
             console.log('SenseVoice transcription result:', result);
@@ -3043,7 +3048,7 @@ class NotesApp {
             const originalText = statusElement.textContent;
             statusElement.innerHTML = originalText + ' <span class="streaming-indicator active"></span>';
             
-            const streamResponse = await backendAPI.transcribeAudioGPT4O(audioBlob, options);
+            const streamResponse = await backendAPI.transcribeAudioGPT4O(audioBlob, { ...options, noteId: this.currentNote.id });
             
             let fullTranscription = '';
             let currentTranscriptionElement = null;

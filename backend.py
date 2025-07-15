@@ -459,75 +459,65 @@ def delete_user():
 
 @app.route('/api/transcribe', methods=['POST'])
 def transcribe_audio():
-    """Endpoint para transcribir audio usando OpenAI o whisper.cpp local"""
+    """Endpoint para transcribir audio y opcionalmente guardarlo"""
     try:
         username = get_current_username()
         if not username:
             return jsonify({"error": "Unauthorized"}), 401
 
-        # Obtener el archivo de audio del request
         if 'audio' not in request.files:
             return jsonify({"error": "No se encontró archivo de audio"}), 400
-        
+
         audio_file = request.files['audio']
         if audio_file.filename == '':
             return jsonify({"error": "Archivo de audio vacío"}), 400
-        
-        # Obtener parámetros del request
-        language = request.form.get('language', None)  # None = detección automática
-        provider = request.form.get('provider', 'openai')  # openai o local
+
+        note_id = request.form.get('note_id')
+        language = request.form.get('language', None)
+        provider = request.form.get('provider', 'openai')
 
         tp, _ = get_user_providers(username)
         if tp and provider not in tp:
             return jsonify({"error": "Transcription provider not allowed"}), 403
         model_name = request.form.get('model')
-        
-        # Verificar disponibilidad del proveedor
+
+        audio_bytes = audio_file.read()
+        transcription = ''
+        response_data = {}
+
         if provider == 'local':
             if not WHISPER_CPP_AVAILABLE:
                 return jsonify({"error": "Whisper.cpp local no está disponible"}), 500
-
             if not model_name:
                 return jsonify({"error": "Model not specified"}), 400
-
-            audio_bytes = audio_file.read()
-
             models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
             model_filename = sanitize_filename(model_name)
             model_path = os.path.join(models_dir, model_filename)
             if not is_path_within_directory(models_dir, model_path):
                 return jsonify({"error": "Invalid model path"}), 400
-
             result = whisper_wrapper.transcribe_audio_from_bytes(
                 audio_bytes,
                 audio_file.filename,
                 language,
                 model_path
             )
-            
-            if result.get('success'):
-                return jsonify({
-                    "transcription": result.get('transcription', ''),
-                    "provider": "local",
-                    "model": result.get('model')
-                })
-            else:
+            if not result.get('success'):
                 return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
-        
+            transcription = result.get('transcription', '')
+            response_data.update({
+                "provider": "local",
+                "model": result.get('model')
+            })
+
         elif provider == 'sensevoice':
-            # Check SenseVoice availability dynamically
             sensevoice_available = sensevoice_wrapper and sensevoice_wrapper.is_available()
             if not sensevoice_available:
                 return jsonify({"error": "SenseVoice no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
-            
-            # Usar SenseVoice
-            audio_bytes = audio_file.read()
-            
-            # Obtener opciones adicionales
+
             detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
             detect_events = request.form.get('detect_events', 'true').lower() == 'true'
             use_itn = request.form.get('use_itn', 'true').lower() == 'true'
-            
+
             result = sensevoice_wrapper.transcribe_audio_from_bytes(
                 audio_bytes,
                 audio_file.filename,
@@ -536,63 +526,62 @@ def transcribe_audio():
                 detect_events=detect_events,
                 use_itn=use_itn
             )
-            
-            if result.get('success'):
-                response_data = {
-                    "transcription": result.get('transcription', ''),
-                    "provider": "sensevoice",
-                    "model": result.get('model', 'SenseVoiceSmall'),
-                    "language_detected": result.get('language_detected'),
-                }
-                
-                # Agregar información adicional si está disponible
-                if result.get('emotion'):
-                    response_data["emotion"] = result.get('emotion')
-                if result.get('events'):
-                    response_data["events"] = result.get('events')
-                
-                return jsonify(response_data)
-            else:
+            if not result.get('success'):
                 return jsonify({"error": f"Error en transcripción SenseVoice: {result.get('error', 'Unknown error')}"}), 500
-                
-        else:  # OpenAI
+            transcription = result.get('transcription', '')
+            response_data.update({
+                "provider": "sensevoice",
+                "model": result.get('model', 'SenseVoiceSmall'),
+                "language_detected": result.get('language_detected')
+            })
+            if result.get('emotion'):
+                response_data["emotion"] = result.get('emotion')
+            if result.get('events'):
+                response_data["events"] = result.get('events')
+
+        else:
             if not OPENAI_API_KEY:
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
-
             if not model_name:
                 return jsonify({"error": "Model not specified"}), 400
-
-            # Preparar la petición a OpenAI
-            model_to_use = model_name
             files = {
-                'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
-                'model': (None, model_to_use)
+                'file': (audio_file.filename, io.BytesIO(audio_bytes), audio_file.content_type),
+                'model': (None, model_name)
             }
-            
-            # Solo añadir language si se especifica (None = auto-detectar)
             if language and language != 'auto':
                 files['language'] = (None, language)
-            
-            headers = {
-                'Authorization': f'Bearer {OPENAI_API_KEY}'
-            }
-            
-            response = requests.post(
-                'https://api.openai.com/v1/audio/transcriptions',
-                files=files,
-                headers=headers
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                return jsonify({
-                    "transcription": result.get('text', ''),
-                    "provider": "openai",
-                    "model": model_to_use
-                })
-            else:
+            headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
+            response = requests.post('https://api.openai.com/v1/audio/transcriptions', files=files, headers=headers)
+            if response.status_code != 200:
                 return jsonify({"error": "Error en la transcripción"}), response.status_code
-            
+            transcription = response.json().get('text', '')
+            response_data.update({"provider": "openai", "model": model_name})
+
+        response_data["transcription"] = transcription
+
+        if note_id:
+            with tempfile.NamedTemporaryFile(suffix=f".{audio_file.filename.split('.')[-1]}", delete=False) as tmp:
+                tmp.write(audio_bytes)
+                orig_path = tmp.name
+
+            wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
+            os.unlink(orig_path)
+
+            audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+            os.makedirs(audio_dir, exist_ok=True)
+            base = sanitize_filename(f"{note_id}-audio")
+            counter = 1
+            filename = f"{base}{counter}.wav"
+            while os.path.exists(os.path.join(audio_dir, filename)):
+                counter += 1
+                filename = f"{base}{counter}.wav"
+            final_path = os.path.join(audio_dir, filename)
+            if not is_path_within_directory(audio_dir, final_path):
+                return jsonify({"error": "Invalid file path"}), 400
+            shutil.move(wav_path, final_path)
+            response_data["filename"] = filename
+
+        return jsonify(response_data)
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
@@ -1574,8 +1563,13 @@ def transcribe_audio_gpt4o():
         if audio_file.filename == '':
             print(f"[ERROR] Archivo de audio vacío")
             return jsonify({"error": "Archivo de audio vacío"}), 400
-        
+
+        # Leer bytes para poder guardarlos luego
+        audio_bytes = audio_file.read()
+        audio_file.stream.seek(0)
+
         # Obtener parámetros del request
+        note_id = request.form.get('note_id')
         model = request.form.get('model')
         language = request.form.get('language', None)  # None = detección automática
         prompt = request.form.get('prompt', None)  # Prompt para mejorar transcripción
@@ -1611,7 +1605,7 @@ def transcribe_audio_gpt4o():
         
         # Preparar la petición a OpenAI
         files = {
-            'file': (audio_file.filename, audio_file.stream, audio_file.content_type),
+            'file': (audio_file.filename, io.BytesIO(audio_bytes), audio_file.content_type),
             'model': (None, model),
             'response_format': (None, response_format)
         }
@@ -1653,16 +1647,37 @@ def transcribe_audio_gpt4o():
                 return jsonify({"error": f"Error en la transcripción - {error_text}"}), response.status_code
         
         if response_format == 'text':
-            # Para formato text, la respuesta es directamente el texto
             transcription_text = response.text
-            print(f"[DEBUG] Transcripción (text): {transcription_text[:100]}...")
-            return jsonify({"transcription": transcription_text})
         else:
-            # Para formato json
             result = response.json()
             transcription_text = result.get('text', '')
-            print(f"[DEBUG] Transcripción (json): {transcription_text[:100]}...")
-            return jsonify({"transcription": transcription_text})
+        print(f"[DEBUG] Transcripción: {transcription_text[:100]}...")
+
+        response_data = {"transcription": transcription_text}
+
+        if note_id:
+            with tempfile.NamedTemporaryFile(suffix=f".{audio_file.filename.split('.')[-1]}", delete=False) as tmp:
+                tmp.write(audio_bytes)
+                orig_path = tmp.name
+
+            wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
+            os.unlink(orig_path)
+
+            audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+            os.makedirs(audio_dir, exist_ok=True)
+            base = sanitize_filename(f"{note_id}-audio")
+            counter = 1
+            filename = f"{base}{counter}.wav"
+            while os.path.exists(os.path.join(audio_dir, filename)):
+                counter += 1
+                filename = f"{base}{counter}.wav"
+            final_path = os.path.join(audio_dir, filename)
+            if not is_path_within_directory(audio_dir, final_path):
+                return jsonify({"error": "Invalid file path"}), 400
+            shutil.move(wav_path, final_path)
+            response_data["filename"] = filename
+
+        return jsonify(response_data)
             
     except Exception as e:
         print(f"[ERROR] Error interno en transcripción GPT-4o: {str(e)}")

@@ -30,7 +30,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai') {
+    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai', noteId = null) {
         try {
             const formData = new FormData();
             
@@ -54,6 +54,10 @@ class BackendAPI {
             
             if (language && language !== 'auto') {
                 formData.append('language', language);
+            }
+
+            if (noteId) {
+                formData.append('note_id', noteId);
             }
 
             console.log('Sending transcription request:', { model, provider, language, filename });
@@ -89,7 +93,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true) {
+    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true, noteId = null) {
         try {
             const formData = new FormData();
             
@@ -112,9 +116,13 @@ class BackendAPI {
             formData.append('detect_emotion', detectEmotion.toString());
             formData.append('detect_events', detectEvents.toString());
             formData.append('use_itn', useItn.toString());
-            
+
             if (language && language !== 'auto') {
                 formData.append('language', language);
+            }
+
+            if (noteId) {
+                formData.append('note_id', noteId);
             }
 
             console.log('Sending SenseVoice transcription request:', { 
@@ -282,7 +290,8 @@ class BackendAPI {
                 language = 'auto',
                 prompt = null,
                 responseFormat = 'json',
-                stream = false
+                stream = false,
+                noteId = null
             } = options;
 
             console.log('📝 Opciones procesadas:');
@@ -312,6 +321,10 @@ class BackendAPI {
             formData.append('audio', audioBlob, 'audio.wav');
             formData.append('model', model);
             formData.append('response_format', responseFormat);
+
+            if (noteId) {
+                formData.append('note_id', noteId);
+            }
             
             console.log('📤 FormData preparado:');
             console.log('- audio:', audioBlob);
