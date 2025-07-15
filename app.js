@@ -1333,6 +1333,16 @@ class NotesApp {
         this.clearAIHistory();
 
         this.updateEditorVisibility();
+        const audioSelect = document.getElementById('audio-select');
+        if (audioSelect) {
+            audioSelect.value = '';
+        }
+        const player = document.getElementById('note-audio-player');
+        if (player) {
+            player.pause();
+            player.removeAttribute('src');
+            player.style.display = 'none';
+        }
         this.loadAudioDropdown(this.currentNote.id);
     }
     
