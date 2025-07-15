@@ -4187,7 +4187,8 @@ class NotesApp {
                 { value: 'meta-llama/llama-4-scout:free', text: 'Llama 4 Scout (Free)' },
                 { value: 'deepseek/deepseek-chat-v3-0324:free', text: 'DeepSeek Chat v3 (Free)' },
                 { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
-                { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' }
+                { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' },
+                { value: 'moonshotai/kimi-k2:free', text: 'Kimi K2 (Free)' }
             ],
             'lmstudio': (this.config.lmstudioModels ? this.config.lmstudioModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : []),
             'ollama': (this.config.ollamaModels ? this.config.ollamaModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : [])
