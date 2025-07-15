@@ -126,6 +126,7 @@ class NotesApp {
         this.insertionRange = null;
         this.mediaRecorder = null;
         this.audioChunks = [];
+        this.audioFileToDelete = null;
         
         // History to undo AI changes
         this.aiHistory = [];
@@ -464,6 +465,20 @@ class NotesApp {
         document.getElementById('confirm-delete').addEventListener('click', async () => {
             await this.deleteCurrentNote();
         });
+
+        const cancelDeleteAudio = document.getElementById('cancel-delete-audio');
+        if (cancelDeleteAudio) {
+            cancelDeleteAudio.addEventListener('click', () => {
+                this.hideDeleteAudioModal();
+            });
+        }
+
+        const confirmDeleteAudio = document.getElementById('confirm-delete-audio');
+        if (confirmDeleteAudio) {
+            confirmDeleteAudio.addEventListener('click', async () => {
+                await this.deleteSelectedAudio();
+            });
+        }
         
         // Configuración
         document.getElementById('config-btn').addEventListener('click', () => {
@@ -1591,6 +1606,39 @@ class NotesApp {
         const modal = document.getElementById('audio-modal');
         modal.classList.remove('active');
         this.showMobileFab();
+    }
+
+    showDeleteAudioModal(fileName) {
+        this.audioFileToDelete = fileName;
+        const modal = document.getElementById('delete-audio-modal');
+        this.hideMobileFab();
+        modal.classList.add('active');
+    }
+
+    hideDeleteAudioModal() {
+        const modal = document.getElementById('delete-audio-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    async deleteSelectedAudio() {
+        if (!this.audioFileToDelete) return;
+        try {
+            const resp = await authFetch('/api/delete-audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename: this.audioFileToDelete })
+            });
+            if (resp.ok) {
+                await this.loadAudioFiles(this.currentNote.id);
+                this.showNotification('File deleted');
+            }
+        } catch (err) {
+            console.error('Error deleting audio', err);
+        } finally {
+            this.audioFileToDelete = null;
+            this.hideDeleteAudioModal();
+        }
     }
 
     showUploadModelsModal() {
@@ -3216,22 +3264,23 @@ class NotesApp {
         files.forEach(fname => {
             const li = document.createElement('li');
             li.textContent = `${title} - ${fname}`;
+
             const dl = document.createElement('button');
             dl.className = 'btn btn--outline btn--sm';
-            dl.textContent = 'Download';
+            dl.innerHTML = '<i class="fas fa-download"></i>';
             dl.addEventListener('click', () => {
                 window.open(`/api/download-audio?filename=${encodeURIComponent(fname)}`);
             });
+
             const del = document.createElement('button');
             del.className = 'btn btn--error btn--sm';
-            del.textContent = 'Delete';
-            del.addEventListener('click', async () => {
-                const resp = await authFetch('/api/delete-audio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: fname }) });
-                if (resp.ok) {
-                    this.loadAudioFiles(this.currentNote.id);
-                }
+            del.innerHTML = '<i class="fas fa-trash"></i>';
+            del.addEventListener('click', () => {
+                this.showDeleteAudioModal(fname);
             });
+
             const btnWrap = document.createElement('span');
+            btnWrap.className = 'file-actions';
             btnWrap.appendChild(dl);
             btnWrap.appendChild(del);
             li.appendChild(btnWrap);
