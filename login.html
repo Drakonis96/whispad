@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WhisPad Login</title>
+    <link rel="icon" type="image/png" href="logos/logo.png">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="login-screen" id="login-screen">
+        <div class="login-box">
+            <img src="logos/logo.png" alt="WhisPad Logo" class="login-logo">
+            <h3>Login</h3>
+            <div class="modal-body">
+                <input type="text" class="form-control" id="login-username" placeholder="Username">
+                <div class="password-wrapper" style="margin-top:10px;">
+                    <input type="password" class="form-control" id="login-password" placeholder="Password">
+                    <button type="button" class="toggle-password" id="toggle-password" aria-label="Show password">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn--primary" id="login-submit">Login</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="login.js"></script>
+</body>
+</html>

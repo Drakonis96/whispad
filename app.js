@@ -4323,12 +4323,7 @@ function initApp() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    const loginScreen = document.getElementById('login-screen');
     const appContent = document.getElementById('app-content');
-    const loginBtn = document.getElementById('login-submit');
-    const usernameInput = document.getElementById('login-username');
-    const passwordInput = document.getElementById('login-password');
-    const togglePasswordBtn = document.getElementById('toggle-password');
     const currentUserBtn = document.getElementById('current-user-btn');
     const logoutBtn = document.getElementById('logout-btn');
 
@@ -4407,7 +4402,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             currentUserBtn.classList.remove('hidden');
             logoutBtn.classList.remove('hidden');
             document.getElementById('user-btn').classList.remove('hidden');
-            loginScreen.classList.add('hidden');
             appContent.classList.remove('hidden');
             initApp();
             return true;
@@ -4419,7 +4413,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (multiUser) {
-        restoreSession();
+        const restored = await restoreSession();
+        if (!restored) {
+            window.location.href = 'login.html';
+            return;
+        }
     } else {
         currentUser = 'admin';
         isAdmin = true;
@@ -4437,85 +4435,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         currentUserBtn.classList.add('hidden');
         logoutBtn.classList.add('hidden');
         document.getElementById('user-btn').classList.add('hidden');
-        loginScreen.classList.add('hidden');
         appContent.classList.remove('hidden');
         initApp();
-    }
-
-    async function attemptLogin() {
-        const username = usernameInput.value.trim();
-        const password = passwordInput.value;
-        try {
-            const resp = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            if (resp.ok) {
-                const data = await resp.json();
-                authToken = data.token;
-                currentUser = username;
-                allowedTranscriptionProviders = data.transcription_providers || [];
-                allowedPostprocessProviders = data.postprocess_providers || [];
-                isAdmin = data.is_admin;
-                
-                // Clear any old localStorage data from previous sessions
-                localStorage.removeItem('notes-app-data'); // Remove old global key
-                
-                await loadDefaultProviderConfig();
-                if (!isAdmin) {
-                    const cfgKey = `notes-app-config-${currentUser}`;
-                    let cfg = {};
-                    const savedCfg = localStorage.getItem(cfgKey);
-                    if (savedCfg) cfg = JSON.parse(savedCfg);
-                    if (defaultProviderConfig.lmstudio_host) {
-                        cfg.lmstudioHost = defaultProviderConfig.lmstudio_host;
-                        cfg.lmstudioPort = defaultProviderConfig.lmstudio_port;
-                    }
-                    if (defaultProviderConfig.ollama_host) {
-                        cfg.ollamaHost = defaultProviderConfig.ollama_host;
-                        cfg.ollamaPort = defaultProviderConfig.ollama_port;
-                    }
-                    localStorage.setItem(cfgKey, JSON.stringify(cfg));
-                }
-                if (isAdmin) {
-                    document.querySelectorAll('.admin-only').forEach(el => {
-                        if (!el.classList.contains('tab-content')) {
-                            el.style.display = '';
-                        }
-                    });
-                } else {
-                    document.querySelectorAll('.admin-only').forEach(el => {
-                        if (!el.classList.contains('tab-content')) {
-                            el.style.display = 'none';
-                        }
-                    });
-                }
-                localStorage.setItem('notes-app-session', JSON.stringify({ token: authToken }));
-                currentUserBtn.textContent = username;
-                currentUserBtn.classList.remove('hidden');
-                logoutBtn.classList.remove('hidden');
-                document.getElementById('user-btn').classList.remove('hidden');
-                loginScreen.classList.add('hidden');
-                appContent.classList.remove('hidden');
-                initApp();
-            } else {
-                alert('Login failed');
-            }
-        } catch (e) {
-            alert('Login error');
-        }
-    }
-
-    loginBtn.addEventListener('click', attemptLogin);
-    usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
-    passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
-    if (togglePasswordBtn) {
-        togglePasswordBtn.addEventListener('click', () => {
-            const isHidden = passwordInput.getAttribute('type') === 'password';
-            passwordInput.setAttribute('type', isHidden ? 'text' : 'password');
-            togglePasswordBtn.innerHTML = isHidden ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
-        });
     }
 
     logoutBtn.addEventListener('click', async () => {
@@ -4539,8 +4460,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         allowedTranscriptionProviders = [];
         allowedPostprocessProviders = [];
         isAdmin = false;
-        usernameInput.value = '';
-        passwordInput.value = '';
         currentUserBtn.classList.add('hidden');
         logoutBtn.classList.add('hidden');
         document.getElementById('user-btn').classList.add('hidden');
@@ -4569,11 +4488,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const noteTitle = document.getElementById('note-title');
         if (noteTitle) noteTitle.value = '';
         document.querySelector('.editor-container')?.classList.add('hidden');
-        loginScreen.classList.remove('hidden');
-        appContent.classList.add('hidden');
-
-        // Force a full page reload to ensure all state is cleared
-        window.location.reload(true);
+        if (multiUser) {
+            window.location.href = 'login.html';
+        } else {
+            // Force a full page reload to ensure all state is cleared
+            window.location.reload(true);
+        }
     });
 
     async function refreshUserList() {

@@ -134,7 +134,7 @@ WhisPad is designed to persist your data between container restarts, updates, an
 - **Default Admin**: Username `admin`, password set via `ADMIN_PASSWORD`
 - **User Configuration**: Admins can create users and assign different transcription/postprocessing providers
 - **Per-User Folders**: Each user's notes are isolated in their own folder under `saved_notes/`
-- **Single User Mode**: Set `MULTI_USER=false` in `.env` or the compose file to skip the login screen and always use the admin account
+- **Single User Mode**: Set `MULTI_USER=false` in `.env` or the compose file to automatically sign in with the admin account and bypass the login page
 
 ### Initial Setup
 On first start the backend creates the `admin` user using the password from `ADMIN_PASSWORD`.
