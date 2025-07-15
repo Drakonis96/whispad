@@ -675,11 +675,19 @@ class NotesApp {
     updateEditorVisibility() {
         const container = document.querySelector('.editor-container');
         if (!container) return;
-        if (this.currentNote) {
+        const hasNote = !!this.currentNote;
+        if (hasNote) {
             container.classList.remove('hidden');
         } else {
             container.classList.add('hidden');
         }
+
+        const recordBtn = document.getElementById('record-btn');
+        const uploadBtn = document.getElementById('upload-audio-btn');
+        const mobileFab = document.getElementById('mobile-record-fab');
+        if (recordBtn) recordBtn.disabled = !hasNote;
+        if (uploadBtn) uploadBtn.disabled = !hasNote;
+        if (mobileFab) mobileFab.disabled = !hasNote;
     }
     
     // Actualizar estado de botones de IA
@@ -2707,6 +2715,10 @@ class NotesApp {
     }
 
     async startRecording() {
+        if (!this.currentNote) {
+            this.showNotification('Please create or open a note before recording', 'warning');
+            return;
+        }
         try {
             // Verificar que el backend esté disponible
             const backendAvailable = await this.checkBackendStatus();
@@ -2806,6 +2818,11 @@ class NotesApp {
     }
 
     async transcribeAudio(audioBlob) {
+        if (!this.currentNote) {
+            this.showNotification('Please create or open a note before transcribing', 'warning');
+            return;
+        }
+
         this.showProcessingOverlay('Transcribing audio...');
         
         try {
