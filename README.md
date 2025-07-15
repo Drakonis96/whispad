@@ -198,3 +198,8 @@ SenseVoice is based on FunASR and provides enterprise-grade speech recognition c
 
 This project was developed with the help of AI tools including **Perplexity Labs**, **OpenAI Codex**, and **Claude 4**. Local transcription models run thanks to [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (a copy is bundled here for easier installation).
 
+## Contributors
+
+- **@Drakonis96** - Main idea and core coding.
+- **@laweschan** - Contributed fresh insights and tested the application.
+
