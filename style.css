@@ -2720,3 +2720,18 @@ select.form-control {
     align-items: center;
     margin-bottom: var(--space-8);
 }
+
+# Buttons wrapper for audio files
+# ensures spacing between download and delete icons
+# see renderAudioFiles in app.js
+#
+# Example markup:
+#   <span class="file-actions">
+#       <button>...</button>
+#       <button>...</button>
+#   </span>
+
+.file-actions {
+    display: flex;
+    gap: var(--space-8);
+}
