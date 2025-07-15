@@ -864,6 +864,12 @@ select.form-control {
     color: var(--color-text);
 }
 
+.notes-actions {
+    padding: var(--space-16);
+    display: flex;
+    gap: var(--space-8);
+}
+
 .search-container {
     padding: var(--space-16);
     position: relative;
@@ -975,6 +981,40 @@ select.form-control {
     display: flex;
     align-items: center;
     gap: var(--space-16);
+}
+
+.transcription-grid {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    grid-template-rows: repeat(2, auto);
+    column-gap: var(--space-16);
+    row-gap: var(--space-8);
+}
+
+#styles-config-btn {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+#translation-settings-btn {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+#prompt-sidebar-toggle {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+#chat-sidebar-toggle {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+#graph-btn {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
 }
 
 .recording-status {
