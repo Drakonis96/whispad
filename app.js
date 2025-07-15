@@ -2468,7 +2468,7 @@ class NotesApp {
         
         // Si no hay contenido, añadir un mensaje
         if (!content.trim()) {
-            markdown += '*Esta nota está vacía*\n';
+            markdown += '*This note is empty*\n';
         } else {
             markdown += content;
         }

@@ -1795,7 +1795,7 @@ def save_note():
             if markdown_content:
                 file_content += markdown_content
             else:
-                file_content += "*Esta nota está vacía*\n"
+                file_content += "*This note is empty*\n"
 
             # Guardar el archivo markdown
             with open(new_filepath, 'w', encoding='utf-8') as f:
