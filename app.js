@@ -139,6 +139,8 @@ class NotesApp {
 
         // Mind map data
         this.mindMapTree = null;
+        this.mindMapHistory = [];
+        this.mindMapIndex = -1;
         
         // Provider configuration
         this.config = {
@@ -571,6 +573,8 @@ class NotesApp {
         const graphBtn = document.getElementById('graph-btn');
         const graphClose = document.getElementById('close-graph-modal');
         const graphDownload = document.getElementById('download-graph-btn');
+        const graphPrev = document.getElementById('prev-graph-btn');
+        const graphNext = document.getElementById('next-graph-btn');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -579,6 +583,12 @@ class NotesApp {
         }
         if (graphDownload) {
             graphDownload.addEventListener('click', () => { this.downloadMindmap(); });
+        }
+        if (graphPrev) {
+            graphPrev.addEventListener('click', () => { this.showPreviousGraph(); });
+        }
+        if (graphNext) {
+            graphNext.addEventListener('click', () => { this.showNextGraph(); });
         }
 
         // Auto-guardado cada 30 segundos
@@ -1522,12 +1532,17 @@ class NotesApp {
             } else {
                 this.mindMapTree = data.tree;
             }
+            // store history
+            this.mindMapHistory = this.mindMapHistory.slice(0, this.mindMapIndex + 1);
+            this.mindMapHistory.push({ tree: JSON.parse(JSON.stringify(this.mindMapTree)), svg: data.svg });
+            this.mindMapIndex = this.mindMapHistory.length - 1;
             const container = document.getElementById('graph-container');
             container.innerHTML = data.svg;
             const modal = document.getElementById('graph-modal');
             this.hideMobileFab();
             modal.classList.add('active');
             this.setupGraphNodeListeners();
+            this.updateGraphNavButtons();
         })
         .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'))
         .finally(() => this.hideProcessingOverlay());
@@ -1549,9 +1564,11 @@ class NotesApp {
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
+            const scale = window.devicePixelRatio || 2;
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
             const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
             ctx.drawImage(img, 0, 0);
             URL.revokeObjectURL(url);
             canvas.toBlob(blob => {
@@ -1565,6 +1582,37 @@ class NotesApp {
             });
         };
         img.src = url;
+    }
+
+    showPreviousGraph() {
+        if (this.mindMapIndex > 0) {
+            this.mindMapIndex -= 1;
+            const { tree, svg } = this.mindMapHistory[this.mindMapIndex];
+            this.mindMapTree = JSON.parse(JSON.stringify(tree));
+            const container = document.getElementById('graph-container');
+            container.innerHTML = svg;
+            this.setupGraphNodeListeners();
+            this.updateGraphNavButtons();
+        }
+    }
+
+    showNextGraph() {
+        if (this.mindMapIndex < this.mindMapHistory.length - 1) {
+            this.mindMapIndex += 1;
+            const { tree, svg } = this.mindMapHistory[this.mindMapIndex];
+            this.mindMapTree = JSON.parse(JSON.stringify(tree));
+            const container = document.getElementById('graph-container');
+            container.innerHTML = svg;
+            this.setupGraphNodeListeners();
+            this.updateGraphNavButtons();
+        }
+    }
+
+    updateGraphNavButtons() {
+        const prevBtn = document.getElementById('prev-graph-btn');
+        const nextBtn = document.getElementById('next-graph-btn');
+        if (prevBtn) prevBtn.disabled = this.mindMapIndex <= 0;
+        if (nextBtn) nextBtn.disabled = this.mindMapIndex >= this.mindMapHistory.length - 1;
     }
 
     updateMindMapTree(topic, subtree) {
