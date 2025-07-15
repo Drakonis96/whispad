@@ -16,6 +16,8 @@ import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 import threading
+from mermaid import Mermaid
+import re
 
 # ---------- Path utilities ----------
 def sanitize_filename(filename: str) -> str:
@@ -53,6 +55,12 @@ LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
 LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
+# Prompt rules for the mindmap generator
+MINDMAP_RULES = (
+    "Eres un asistente que analiza notas y genera un resumen jer\u00e1rquico en JSON. "
+    "Utiliza el siguiente esquema: { 'topic': str, 'description': str opcional, "
+    "'children': [ ... ] }. Responde \u00fanicamente con el JSON."
+)
 # Enable or disable multi-user support (default True)
 MULTI_USER = os.getenv('MULTI_USER', 'true').lower() != 'false'
 
@@ -80,6 +88,119 @@ def save_server_config():
     except Exception as e:
         print(f"Error saving server config to database: {e}")
         raise
+
+# ------- Mindmap utilities -------
+def structure_to_mermaid(data, level=0):
+    lines = []
+    indent = '  ' * level
+    topic = data.get('topic', '')
+    desc = data.get('description')
+    if desc:
+        lines.append(f"{indent}{topic}: {desc}")
+    else:
+        lines.append(f"{indent}{topic}")
+    for child in data.get('children', []):
+        lines.extend(structure_to_mermaid(child, level + 1))
+    return lines
+
+def render_mindmap(structure):
+    code = 'mindmap\n' + '\n'.join(structure_to_mermaid(structure, 1))
+    svg = Mermaid(code).svg_response.text
+    return code, svg
+
+def parse_json_response(text: str):
+    """Extract JSON object from AI response text."""
+    m = re.search(r'{.*}', text, re.S)
+    if not m:
+        raise ValueError('No JSON found in response')
+    return json.loads(m.group(0))
+
+
+def chat_completion(messages, provider='openai', model='gpt-4o', host=None, port=None):
+    """Basic chat completion for various providers."""
+    if provider == 'openai':
+        if not OPENAI_API_KEY:
+            raise RuntimeError('API key de OpenAI no configurada')
+        url = 'https://api.openai.com/v1/chat/completions'
+        headers = {'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json'}
+        payload = {'model': model, 'messages': messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise RuntimeError(f'OpenAI error {resp.status_code}')
+        data = resp.json()
+        return data['choices'][0]['message']['content']
+
+    if provider == 'google':
+        if not GOOGLE_API_KEY:
+            raise RuntimeError('API key de Google no configurada')
+        url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}'
+        headers = {'Content-Type': 'application/json'}
+        payload = {
+            'contents': [
+                { 'role': m['role'], 'parts': [ { 'text': m['content'] } ] } for m in messages
+            ]
+        }
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise RuntimeError(f'Google error {resp.status_code}')
+        data = resp.json()
+        return data['candidates'][0]['content']['parts'][0]['text']
+
+    if provider == 'openrouter':
+        if not OPENROUTER_API_KEY:
+            raise RuntimeError('API key de OpenRouter no configurada')
+        url = 'https://openrouter.ai/api/v1/chat/completions'
+        headers = {
+            'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://note-transcribe-ai.local',
+            'X-Title': 'Note Transcribe AI'
+        }
+        payload = {'model': model, 'messages': messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise RuntimeError(f'OpenRouter error {resp.status_code}')
+        data = resp.json()
+        return data['choices'][0]['message']['content']
+
+    if provider == 'lmstudio':
+        if not host or not port:
+            raise RuntimeError('LM Studio host and port required')
+        url = f'http://{host}:{port}/v1/chat/completions'
+        headers = {'Content-Type': 'application/json'}
+        payload = {'model': model, 'messages': messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise RuntimeError(f'LM Studio error {resp.status_code}')
+        data = resp.json()
+        return data['choices'][0]['message']['content']
+
+    if provider == 'ollama':
+        if not host or not port:
+            raise RuntimeError('Ollama host and port required')
+        url = f'http://{host}:{port}/api/chat'
+        headers = {'Content-Type': 'application/json'}
+        payload = {'model': model, 'messages': messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            raise RuntimeError(f'Ollama error {resp.status_code}')
+        data = resp.json()
+        return data['message']['content']
+
+    raise RuntimeError('Proveedor no soportado')
+
+
+def generate_mindmap(note, topic=None, provider='openai', model='gpt-4o', host=None, port=None):
+    """Generate mindmap JSON using the specified chat provider"""
+    messages = [
+        {'role': 'system', 'content': MINDMAP_RULES},
+        {'role': 'user', 'content': note}
+    ]
+    if topic:
+        messages.append({'role': 'user', 'content': f"Expande el tema '{topic}' con m\u00e1s subdivisiones y breves descripciones"})
+
+    text = chat_completion(messages, provider, model, host, port)
+    return parse_json_response(text)
 
 # Load persisted config if present
 load_server_config()
@@ -2633,6 +2754,42 @@ def get_note():
         return jsonify({"filename": basename, "id": note_id, "content": content})
     except Exception as e:
         return jsonify({"error": f"Error al leer nota: {str(e)}"}), 500
+
+@app.route('/api/mindmap', methods=['POST'])
+def mindmap_endpoint():
+    """Generate or expand a mindmap from a note"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        note = data.get('note')
+        if not note:
+            return jsonify({"error": "note required"}), 400
+        topic = data.get('topic')
+        provider = data.get('provider', 'openai')
+        model = data.get('model', 'gpt-4o')
+        host = data.get('host')
+        port = data.get('port')
+
+        # Validate provider access
+        _, pp = get_user_providers(username)
+        if pp and provider not in pp:
+            return jsonify({"error": "Post-process provider not allowed"}), 403
+
+        if provider == 'lmstudio':
+            host = host or LMSTUDIO_HOST
+            port = port or LMSTUDIO_PORT
+        if provider == 'ollama':
+            host = host or OLLAMA_HOST
+            port = port or OLLAMA_PORT
+
+        structure = generate_mindmap(note, topic, provider, model, host, port)
+        _, svg = render_mindmap(structure)
+        return jsonify({"structure": structure, "svg": svg})
+    except Exception as e:
+        return jsonify({"error": f"Error generating mindmap: {str(e)}"}), 500
 
 @app.route('/api/transcription-providers', methods=['GET'])
 def get_transcription_providers():

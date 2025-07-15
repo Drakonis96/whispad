@@ -157,6 +157,9 @@
                     <button class="btn btn--outline btn--sm" id="chat-sidebar-toggle" title="Chat assistant">
                         <i class="fas fa-comments"></i>&nbsp;Chat
                     </button>
+                    <button class="btn btn--outline btn--sm" id="graph-btn" title="Mind map">
+                        <i class="fas fa-project-diagram"></i>&nbsp;Graph
+                    </button>
                 </div>
             </div>
                 
@@ -704,6 +707,15 @@
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-upload-models">Close</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Mind map modal -->
+    <div class="modal" id="graph-modal">
+        <div class="modal-content modal-content--full">
+            <button class="btn btn--outline btn--sm" id="graph-download" style="float:right;margin-right:8px;">Download</button>
+            <button class="btn btn--outline btn--sm" id="graph-close" style="float:right;">Close</button>
+            <div class="modal-body" id="graph-container"></div>
         </div>
     </div>
 

@@ -136,6 +136,7 @@ class NotesApp {
         // Chat conversation history
         this.chatMessages = [];
         this.chatNote = '';
+        this.mindmapData = null;
         
         // Provider configuration
         this.config = {
@@ -534,6 +535,21 @@ class NotesApp {
         const chatNew = document.getElementById('chat-new');
         const addFull = document.getElementById('chat-add-full');
         const addSelected = document.getElementById('chat-add-selected');
+        const graphBtn = document.getElementById('graph-btn');
+        const graphClose = document.getElementById('graph-close');
+        const graphDownload = document.getElementById('graph-download');
+
+        if (graphBtn) {
+            graphBtn.addEventListener('click', () => { this.openGraph(); });
+        }
+        if (graphClose) {
+            graphClose.addEventListener('click', () => {
+                document.getElementById('graph-modal').classList.remove('active');
+            });
+        }
+        if (graphDownload) {
+            graphDownload.addEventListener('click', () => { this.downloadGraph(); });
+        }
 
         if (chatToggle && chatSidebar) {
             chatToggle.addEventListener('click', () => {
@@ -2103,6 +2119,12 @@ class NotesApp {
         }
         closeLists();
         return html;
+    }
+
+    getCurrentNoteMarkdown() {
+        const title = document.getElementById('note-title').value.trim() || 'Untitled';
+        const content = document.getElementById('editor').innerHTML;
+        return this.htmlToMarkdown(content, title);
     }
 
     processNode(node) {
@@ -4307,6 +4329,154 @@ class NotesApp {
         }
         bubble.textContent = assistantMsg.content;
         container.scrollTop = container.scrollHeight;
+    }
+
+    async openGraph() {
+        const noteMd = this.getCurrentNoteMarkdown();
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+
+        if (!provider || !model) {
+            this.showNotification('Please, select a post-processing provider and model', 'error');
+            return;
+        }
+        if (provider === 'openai' && !this.availableAPIs?.openai) {
+            this.showNotification('OpenAI API not configured in backend', 'warning');
+            return;
+        }
+        if (provider === 'google' && !this.availableAPIs?.google) {
+            this.showNotification('Google API not configured in backend', 'warning');
+            this.showConfigModal();
+            return;
+        }
+        if (provider === 'openrouter' && !this.availableAPIs?.openrouter) {
+            this.showNotification('OpenRouter API not configured in backend', 'warning');
+            this.showConfigModal();
+            return;
+        }
+        if (provider === 'lmstudio' && !this.config.lmstudioHost) {
+            this.showNotification('LM Studio host not configured', 'warning');
+            this.showConfigModal();
+            return;
+        }
+        if (provider === 'ollama' && !this.config.ollamaHost) {
+            this.showNotification('Ollama host not configured', 'warning');
+            this.showConfigModal();
+            return;
+        }
+
+        const payload = { note: noteMd, provider, model };
+        if (provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+        try {
+            const resp = await authFetch('/api/mindmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error('Request failed');
+            const data = await resp.json();
+            this.mindmapData = data.structure;
+            const container = document.getElementById('graph-container');
+            container.innerHTML = data.svg;
+            document.getElementById('graph-modal').classList.add('active');
+            this.attachGraphListeners();
+        } catch (e) {
+            this.showNotification('Error generating graph', 'error');
+        }
+    }
+
+    async expandGraphNode(topic) {
+        const noteMd = this.getCurrentNoteMarkdown();
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+
+        if (!provider || !model) {
+            this.showNotification('Please, select a post-processing provider and model', 'error');
+            return;
+        }
+
+        const payload = { note: noteMd, topic, provider, model };
+        if (provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+        try {
+            const resp = await authFetch('/api/mindmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error('Request failed');
+            const data = await resp.json();
+            this.replaceBranch(this.mindmapData, topic, data.structure);
+            const container = document.getElementById('graph-container');
+            container.innerHTML = data.svg;
+            this.attachGraphListeners();
+        } catch (e) {
+            this.showNotification('Error expanding node', 'error');
+        }
+    }
+
+    replaceBranch(node, topic, newBranch) {
+        if (!node) return false;
+        if (node.topic === topic) {
+            node.children = newBranch.children || [];
+            node.description = newBranch.description;
+            return true;
+        }
+        if (node.children) {
+            for (const child of node.children) {
+                if (this.replaceBranch(child, topic, newBranch)) return true;
+            }
+        }
+        return false;
+    }
+
+    attachGraphListeners() {
+        if (!this.mindmapData) return;
+        const topics = new Set();
+        const collect = n => { topics.add(n.topic); (n.children||[]).forEach(collect); };
+        collect(this.mindmapData);
+        document.querySelectorAll('#graph-container text').forEach(el => {
+            const txt = el.textContent.trim();
+            if (topics.has(txt)) {
+                el.style.cursor = 'pointer';
+                el.onclick = () => this.expandGraphNode(txt);
+            }
+        });
+    }
+
+    downloadGraph() {
+        const svgEl = document.querySelector('#graph-container svg');
+        if (!svgEl) return;
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svgEl);
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+        const bbox = svgEl.getBBox();
+        canvas.width = bbox.width || svgEl.clientWidth || 800;
+        canvas.height = bbox.height || svgEl.clientHeight || 600;
+        const ctx = canvas.getContext('2d');
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+            const url = canvas.toDataURL('image/png');
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'mindmap.png';
+            a.click();
+        };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
     }
 
     destroy() {
