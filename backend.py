@@ -34,14 +34,16 @@ def extract_json(text: str):
     try:
         return json.loads(text)
     except Exception:
+        pass
+    fixed = re.sub(r",\s*([}\]])", r"\1", text)
+    fixed = fixed.replace("'", '"')
+    try:
+        return json.loads(fixed)
+    except Exception:
         try:
-            fixed = re.sub(r',\s*([}\]])', r'\1', text)
-            return json.loads(fixed)
+            return ast.literal_eval(text)
         except Exception:
-            try:
-                return ast.literal_eval(text)
-            except Exception:
-                return None
+            return None
 import threading
 
 # ---------- Path utilities ----------

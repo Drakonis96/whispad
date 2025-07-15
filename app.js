@@ -1514,7 +1514,7 @@ class NotesApp {
     }
 
     showGraphModal(topic = null) {
-        const noteText = document.getElementById('editor').innerText || '';
+        const noteText = this.getCurrentMarkdown();
         const payload = {
             note: noteText,
             provider: this.config.postprocessProvider || 'openai',
@@ -1694,7 +1694,7 @@ class NotesApp {
         output.textContent = '';
         output.classList.remove('hidden');
 
-        const noteText = document.getElementById('editor').innerText || '';
+        const noteText = this.getCurrentMarkdown();
         const provider = this.config.postprocessProvider;
         const model = this.config.postprocessModel;
         const payload = { note: noteText, messages: [{ role: 'user', content: topic }], stream: true, provider, model };
@@ -2385,6 +2385,12 @@ class NotesApp {
         }
         
         return markdown.trim();
+    }
+
+    getCurrentMarkdown() {
+        const title = document.getElementById('note-title').value.trim() || 'Untitled Note';
+        const html = document.getElementById('editor').innerHTML;
+        return this.htmlToMarkdown(html, title);
     }
 
     markdownToHtml(markdown) {
@@ -4564,7 +4570,7 @@ class NotesApp {
         const addSelected = document.getElementById('chat-add-selected').checked;
         let noteText = '';
         if (addFull) {
-            noteText = document.getElementById('editor').innerText || '';
+            noteText = this.getCurrentMarkdown();
         } else if (addSelected) {
             noteText = this.selectedText || '';
         }
