@@ -58,10 +58,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
-    loginBtn.addEventListener('click', attemptLogin);
-    usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
-    passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
-    if (togglePasswordBtn) {
+    if (loginBtn) {
+        loginBtn.addEventListener('click', attemptLogin);
+    }
+    if (usernameInput) {
+        usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    }
+    if (passwordInput) {
+        passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+    }
+    if (togglePasswordBtn && passwordInput) {
         togglePasswordBtn.addEventListener('click', () => {
             const isHidden = passwordInput.getAttribute('type') === 'password';
             passwordInput.setAttribute('type', isHidden ? 'text' : 'password');
