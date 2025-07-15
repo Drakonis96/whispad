@@ -1130,6 +1130,7 @@ select.form-control {
     display: flex;
     align-items: center;
     gap: var(--space-16);
+    flex-wrap: wrap;
 }
 
 .note-title {
@@ -1160,12 +1161,14 @@ select.form-control {
 }
 
 .audio-select {
-    flex: 1;
+    width: 200px;
+    flex: 0 0 auto;
 }
 
 .audio-player {
     width: 100%;
     margin-top: var(--space-8);
+    flex: 0 0 100%;
 }
 
 .formatting-toolbar {
