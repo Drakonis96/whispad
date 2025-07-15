@@ -157,6 +157,9 @@
                     <button class="btn btn--outline btn--sm" id="chat-sidebar-toggle" title="Chat assistant">
                         <i class="fas fa-comments"></i>&nbsp;Chat
                     </button>
+                    <button class="btn btn--outline btn--sm" id="graph-btn" title="Graph view">
+                        <i class="fas fa-project-diagram"></i>&nbsp;Graph
+                    </button>
                 </div>
             </div>
                 
@@ -273,6 +276,37 @@
         <div class="processing-content">
             <div class="spinner"></div>
             <p id="processing-text">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Graph modal -->
+    <div class="modal" id="graph-modal">
+        <div class="modal-content modal-content--wide">
+            <div class="graph-container" id="graph-container"></div>
+            <div class="graph-text-output hidden" id="graph-text-output"></div>
+            <div class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="graph-text-toggle">
+                    <span class="checkmark"></span>
+                    Text exploration
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline btn--sm" id="prev-graph-btn" title="Previous graph">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <button class="btn btn--outline btn--sm" id="next-graph-btn" title="Next graph">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="btn btn--outline btn--sm" id="zoom-in-graph-btn" title="Zoom in">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button class="btn btn--outline btn--sm" id="zoom-out-graph-btn" title="Zoom out">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <button class="btn btn--outline btn--sm" id="download-graph-btn">Download</button>
+                <button class="btn btn--outline btn--sm" id="close-graph-modal">Close</button>
+            </div>
         </div>
     </div>
 

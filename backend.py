@@ -15,6 +15,35 @@ from datetime import datetime
 import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
+from mermaid import Mermaid
+import ast
+
+def extract_json(text: str):
+    """Try to extract and parse a JSON object from raw text."""
+    if not text:
+        return None
+    # Remove common code block delimiters
+    text = text.strip()
+    if text.startswith('```'):
+        text = re.sub(r'^```(?:json)?', '', text)
+        text = re.sub(r'```$', '', text)
+    # Find the first JSON object in the string
+    match = re.search(r'{.*}', text, re.DOTALL)
+    if match:
+        text = match.group(0)
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+    fixed = re.sub(r",\s*([}\]])", r"\1", text)
+    fixed = fixed.replace("'", '"')
+    try:
+        return json.loads(fixed)
+    except Exception:
+        try:
+            return ast.literal_eval(text)
+        except Exception:
+            return None
 import threading
 
 # ---------- Path utilities ----------
@@ -1889,8 +1918,203 @@ def html_to_markdown(html_content):
     # Limpiar espacios en blanco excesivos
     markdown = re.sub(r'\n\s*\n\s*\n', '\n\n', markdown)
     markdown = markdown.strip()
-    
+
     return markdown
+
+def json_to_mermaid(data, indent=0):
+    if not isinstance(data, dict):
+        raise ValueError('Invalid mindmap data')
+    lines = []
+    if indent == 0:
+        lines.append('mindmap')
+    prefix = '  ' * indent
+    title = data.get('title') or data.get('topic') or 'Root'
+    lines.append(f"{prefix}{title}")
+    for child in data.get('subtopics', []):
+        lines.extend(json_to_mermaid(child, indent + 1))
+    return lines
+
+def generate_mindmap_openai(note_md, topic, model):
+    if not OPENAI_API_KEY:
+        return None, 'API key de OpenAI no configurada'
+    if not model:
+        return None, 'Model not specified'
+    system_prompt = (
+        "You create a mind map from a markdown note."
+        " Respond only with JSON using this schema:"
+        " {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}."
+    )
+    if topic:
+        user_msg = f"Expand the topic '{topic}' from this note:\n\n{note_md}"
+    else:
+        user_msg = note_md
+    headers = {
+        'Authorization': f'Bearer {OPENAI_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_msg}
+        ]
+    }
+    resp = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=payload)
+    if resp.status_code != 200:
+        return None, 'OpenAI error'
+    try:
+        content = resp.json()['choices'][0]['message']['content']
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid JSON returned: {str(e)}'
+
+def generate_mindmap_google(note_md, topic, model):
+    if not GOOGLE_API_KEY:
+        return None, 'API key de Google no configurada'
+    if not model:
+        return None, 'Model not specified'
+    system_prompt = (
+        "You create a mind map from a markdown note."
+        " Respond only with JSON using this schema:"
+        " {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}"
+    )
+    user_msg = f"Expand the topic '{topic}' from this note:\n\n{note_md}" if topic else note_md
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    messages = [
+        {'role': 'system', 'content': system_prompt},
+        {'role': 'user', 'content': user_msg}
+    ]
+    payload = {
+        'contents': [
+            {
+                'role': m['role'],
+                'parts': [{'text': m['content']}]
+            } for m in messages
+        ]
+    }
+    resp = requests.post(url, headers=headers, json=payload)
+    if resp.status_code != 200:
+        return None, 'Google error'
+    try:
+        result = resp.json()
+        content = result['candidates'][0]['content']['parts'][0]['text']
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid JSON returned: {str(e)}'
+
+def generate_mindmap_openrouter(note_md, topic, model):
+    if not OPENROUTER_API_KEY:
+        return None, 'API key de OpenRouter no configurada'
+    if not model:
+        return None, 'Model not specified'
+    system_prompt = (
+        "You create a mind map from a markdown note."
+        " Respond only with JSON using this schema:"
+        " {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}"
+    )
+    user_msg = f"Expand the topic '{topic}' from this note:\n\n{note_md}" if topic else note_md
+    url = 'https://openrouter.ai/api/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://note-transcribe-ai.local',
+        'X-Title': 'Note Transcribe AI'
+    }
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_msg}
+        ]
+    }
+    resp = requests.post(url, headers=headers, json=payload)
+    if resp.status_code != 200:
+        return None, 'OpenRouter error'
+    try:
+        content = resp.json()['choices'][0]['message']['content']
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid JSON returned: {str(e)}'
+
+def generate_mindmap_lmstudio(note_md, topic, model, host, port):
+    if not host or not port or not model:
+        return None, 'LM Studio host, port and model required'
+    system_prompt = (
+        "You create a mind map from a markdown note."
+        " Respond only with JSON using this schema:"
+        " {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}"
+    )
+    user_msg = f"Expand the topic '{topic}' from this note:\n\n{note_md}" if topic else note_md
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_msg}
+        ]
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload)
+    except requests.RequestException as e:
+        return None, str(e)
+    if resp.status_code != 200:
+        return None, f'LM Studio error {resp.status_code}'
+    try:
+        content = resp.json()['choices'][0]['message']['content']
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid JSON returned: {str(e)}'
+
+def generate_mindmap_ollama(note_md, topic, model, host, port):
+    if not host or not port or not model:
+        return None, 'Ollama host, port and model required'
+    system_prompt = (
+        "You create a mind map from a markdown note."
+        " Respond only with JSON using this schema:"
+        " {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}"
+    )
+    user_msg = f"Expand the topic '{topic}' from this note:\n\n{note_md}" if topic else note_md
+    url = f"http://{host}:{port}/api/chat"
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_msg}
+        ]
+    }
+    try:
+        resp = requests.post(url, headers=headers, json=payload)
+    except requests.RequestException as e:
+        return None, str(e)
+    if resp.status_code != 200:
+        return None, f'Ollama error {resp.status_code}'
+    try:
+        result = resp.json()
+        if isinstance(result, dict) and 'message' in result and result['message']:
+            content = result['message'].get('content', '')
+        else:
+            content = result.get('choices', [{}])[0].get('message', {}).get('content', '')
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid JSON returned: {str(e)}'
 
 @app.route('/api/check-apis', methods=['GET'])
 def check_apis():
@@ -1902,6 +2126,54 @@ def check_apis():
         'openrouter': bool(OPENROUTER_API_KEY)
     }
     return jsonify(apis_status)
+
+
+@app.route('/api/mindmap', methods=['POST'])
+def generate_mindmap():
+    """Generate a mermaid mindmap from note markdown."""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        note = data.get('note', '')
+        topic = data.get('topic')
+        provider = data.get('provider', 'openai')
+        model = data.get('model', 'gpt-3.5-turbo')
+        host = data.get('host')
+        port = data.get('port')
+
+        if provider == 'openai':
+            tree, err = generate_mindmap_openai(note, topic, model)
+        elif provider == 'google':
+            tree, err = generate_mindmap_google(note, topic, model)
+        elif provider == 'openrouter':
+            tree, err = generate_mindmap_openrouter(note, topic, model)
+        elif provider == 'lmstudio':
+            host = host or LMSTUDIO_HOST
+            port = port or LMSTUDIO_PORT
+            tree, err = generate_mindmap_lmstudio(note, topic, model, host, port)
+        elif provider == 'ollama':
+            host = host or OLLAMA_HOST
+            port = port or OLLAMA_PORT
+            tree, err = generate_mindmap_ollama(note, topic, model, host, port)
+        else:
+            return jsonify({"error": "Provider not supported"}), 400
+
+        if err:
+            return jsonify({"error": err}), 500
+
+        if not isinstance(tree, dict):
+            return jsonify({"error": "Invalid JSON returned"}), 500
+
+        mm_lines = json_to_mermaid(tree)
+        mm_script = "\n".join(mm_lines)
+        svg = Mermaid(mm_script).svg_response.text
+
+        return jsonify({"svg": svg, "tree": tree})
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 
 @app.route('/api/app-config', methods=['GET'])

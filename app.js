@@ -136,6 +136,17 @@ class NotesApp {
         // Chat conversation history
         this.chatMessages = [];
         this.chatNote = '';
+
+        // Mind map data
+        this.mindMapTree = null;
+        this.mindMapHistory = [];
+        this.mindMapIndex = -1;
+        this.graphZoom = 1;
+        this.graphPanX = 0;
+        this.graphPanY = 0;
+        this.graphPanning = false;
+        this.graphPanStartX = 0;
+        this.graphPanStartY = 0;
         
         // Provider configuration
         this.config = {
@@ -563,7 +574,37 @@ class NotesApp {
                 this.renderChatMessages();
             });
         }
-        
+
+        // Graph button
+        const graphBtn = document.getElementById('graph-btn');
+        const graphClose = document.getElementById('close-graph-modal');
+        const graphDownload = document.getElementById('download-graph-btn');
+        const graphPrev = document.getElementById('prev-graph-btn');
+        const graphNext = document.getElementById('next-graph-btn');
+        const graphZoomIn = document.getElementById('zoom-in-graph-btn');
+        const graphZoomOut = document.getElementById('zoom-out-graph-btn');
+        if (graphBtn) {
+            graphBtn.addEventListener('click', () => { this.showGraphModal(); });
+        }
+        if (graphClose) {
+            graphClose.addEventListener('click', () => { this.hideGraphModal(); });
+        }
+        if (graphDownload) {
+            graphDownload.addEventListener('click', () => { this.downloadMindmap(); });
+        }
+        if (graphPrev) {
+            graphPrev.addEventListener('click', () => { this.showPreviousGraph(); });
+        }
+        if (graphNext) {
+            graphNext.addEventListener('click', () => { this.showNextGraph(); });
+        }
+        if (graphZoomIn) {
+            graphZoomIn.addEventListener('click', () => { this.zoomInGraph(); });
+        }
+        if (graphZoomOut) {
+            graphZoomOut.addEventListener('click', () => { this.zoomOutGraph(); });
+        }
+
         // Auto-guardado cada 30 segundos
         this.autoSaveInterval = setInterval(() => {
             if (this.currentNote) {
@@ -1472,6 +1513,293 @@ class NotesApp {
         fileUploadList.innerHTML = '';
     }
 
+    showGraphModal(topic = null) {
+        const noteText = this.getCurrentMarkdown();
+        const payload = {
+            note: noteText,
+            provider: this.config.postprocessProvider || 'openai',
+            model: this.config.postprocessModel || 'gpt-3.5-turbo'
+        };
+        if (topic) payload.topic = topic;
+        if (payload.provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (payload.provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+
+        const textOutput = document.getElementById('graph-text-output');
+        if (textOutput) {
+            textOutput.textContent = '';
+            textOutput.classList.add('hidden');
+        }
+
+        this.showProcessingOverlay('Generating mind map...');
+
+        backendAPI.generateMindmap(
+            payload.note,
+            payload.provider,
+            payload.model,
+            topic,
+            payload.host,
+            payload.port
+        )
+        .then(data => {
+            if (topic && this.mindMapTree) {
+                this.updateMindMapTree(topic, data.tree);
+            } else {
+                this.mindMapTree = data.tree;
+            }
+            // store history
+            this.mindMapHistory = this.mindMapHistory.slice(0, this.mindMapIndex + 1);
+            this.mindMapHistory.push({ tree: JSON.parse(JSON.stringify(this.mindMapTree)), svg: data.svg });
+            this.mindMapIndex = this.mindMapHistory.length - 1;
+            const container = document.getElementById('graph-container');
+            container.innerHTML = `<div id="graph-pan-zoom">${data.svg}</div>`;
+            this.resetGraphTransform();
+            const modal = document.getElementById('graph-modal');
+            this.hideMobileFab();
+            modal.classList.add('active');
+            this.setupGraphNodeListeners();
+            this.updateGraphNavButtons();
+        })
+        .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'))
+        .finally(() => this.hideProcessingOverlay());
+    }
+
+    hideGraphModal() {
+        const modal = document.getElementById('graph-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+        const wrapper = document.getElementById('graph-pan-zoom');
+        if (wrapper) {
+            wrapper.onmousedown = null;
+            wrapper.onwheel = null;
+            wrapper.classList.remove('grabbing');
+        }
+        window.onmousemove = null;
+        window.onmouseup = null;
+        const output = document.getElementById('graph-text-output');
+        if (output) {
+            output.textContent = '';
+            output.classList.add('hidden');
+        }
+    }
+
+    downloadMindmap() {
+        const svg = document.querySelector('#graph-container svg');
+        if (!svg) return;
+        const serializer = new XMLSerializer();
+        const svgData = serializer.serializeToString(svg);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const scale = window.devicePixelRatio || 2;
+            canvas.width = img.width * scale;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(blob => {
+                const dl = document.createElement('a');
+                dl.href = URL.createObjectURL(blob);
+                dl.download = 'mindmap.png';
+                document.body.appendChild(dl);
+                dl.click();
+                document.body.removeChild(dl);
+                URL.revokeObjectURL(dl.href);
+            });
+        };
+        img.src = url;
+    }
+
+    showPreviousGraph() {
+        if (this.mindMapIndex > 0) {
+            this.mindMapIndex -= 1;
+            const { tree, svg } = this.mindMapHistory[this.mindMapIndex];
+            this.mindMapTree = JSON.parse(JSON.stringify(tree));
+            const container = document.getElementById('graph-container');
+            container.innerHTML = `<div id="graph-pan-zoom">${svg}</div>`;
+            this.resetGraphTransform();
+            this.setupGraphNodeListeners();
+            this.updateGraphNavButtons();
+        }
+    }
+
+    showNextGraph() {
+        if (this.mindMapIndex < this.mindMapHistory.length - 1) {
+            this.mindMapIndex += 1;
+            const { tree, svg } = this.mindMapHistory[this.mindMapIndex];
+            this.mindMapTree = JSON.parse(JSON.stringify(tree));
+            const container = document.getElementById('graph-container');
+            container.innerHTML = `<div id="graph-pan-zoom">${svg}</div>`;
+            this.resetGraphTransform();
+            this.setupGraphNodeListeners();
+            this.updateGraphNavButtons();
+        }
+    }
+
+    updateGraphNavButtons() {
+        const prevBtn = document.getElementById('prev-graph-btn');
+        const nextBtn = document.getElementById('next-graph-btn');
+        if (prevBtn) prevBtn.disabled = this.mindMapIndex <= 0;
+        if (nextBtn) nextBtn.disabled = this.mindMapIndex >= this.mindMapHistory.length - 1;
+    }
+
+    updateMindMapTree(topic, subtree) {
+        const search = (node) => {
+            if (!node) return false;
+            const title = node.title || node.topic;
+            if (title === topic) {
+                node.subtopics = subtree.subtopics || [];
+                return true;
+            }
+            if (Array.isArray(node.subtopics)) {
+                for (const child of node.subtopics) {
+                    if (search(child)) return true;
+                }
+            }
+            return false;
+        };
+        search(this.mindMapTree);
+    }
+
+    setupGraphNodeListeners() {
+        const svg = document.querySelector('#graph-container svg');
+        if (!svg) return;
+        svg.querySelectorAll('text').forEach(t => {
+            t.style.cursor = 'pointer';
+            t.addEventListener('click', () => {
+                const txt = t.textContent.trim();
+                if (!txt) return;
+                const textMode = document.getElementById('graph-text-toggle')?.checked;
+                if (textMode) {
+                    this.exploreGraphTopic(txt);
+                } else {
+                    this.showGraphModal(txt);
+                }
+            });
+        });
+        this.setupGraphPanZoom();
+    }
+
+    async exploreGraphTopic(topic) {
+        const output = document.getElementById('graph-text-output');
+        if (!output) return;
+        output.textContent = '';
+        output.classList.remove('hidden');
+
+        const noteText = this.getCurrentMarkdown();
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+        const payload = { note: noteText, messages: [{ role: 'user', content: topic }], stream: true, provider, model };
+        if (provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+
+        const response = await authFetch('/api/improve-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok || !response.body) {
+            this.showNotification('Chat request failed', 'error');
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') break;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            output.textContent += data.content;
+                            output.scrollTop = output.scrollHeight;
+                        }
+                        if (data.done) {
+                            return;
+                        }
+                    } catch (e) { continue; }
+                }
+            }
+        }
+    }
+
+    resetGraphTransform() {
+        this.graphZoom = 1;
+        this.graphPanX = 0;
+        this.graphPanY = 0;
+        this.applyGraphTransform();
+    }
+
+    applyGraphTransform() {
+        const wrapper = document.getElementById('graph-pan-zoom');
+        if (wrapper) {
+            wrapper.style.transform = `translate(${this.graphPanX}px, ${this.graphPanY}px) scale(${this.graphZoom})`;
+        }
+    }
+
+    zoomInGraph() {
+        this.graphZoom = Math.min(this.graphZoom * 1.2, 5);
+        this.applyGraphTransform();
+    }
+
+    zoomOutGraph() {
+        this.graphZoom = Math.max(this.graphZoom / 1.2, 0.2);
+        this.applyGraphTransform();
+    }
+
+    setupGraphPanZoom() {
+        const wrapper = document.getElementById('graph-pan-zoom');
+        if (!wrapper) return;
+        wrapper.style.transformOrigin = '0 0';
+        wrapper.classList.remove('grabbing');
+        const startPan = (x, y) => {
+            this.graphPanning = true;
+            this.graphPanStartX = x - this.graphPanX;
+            this.graphPanStartY = y - this.graphPanY;
+            wrapper.classList.add('grabbing');
+        };
+        const movePan = (x, y) => {
+            if (!this.graphPanning) return;
+            this.graphPanX = x - this.graphPanStartX;
+            this.graphPanY = y - this.graphPanStartY;
+            this.applyGraphTransform();
+        };
+        const endPan = () => {
+            this.graphPanning = false;
+            wrapper.classList.remove('grabbing');
+        };
+        wrapper.onmousedown = e => { e.preventDefault(); startPan(e.clientX, e.clientY); };
+        window.onmousemove = e => movePan(e.clientX, e.clientY);
+        window.onmouseup = endPan;
+        wrapper.onwheel = e => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 1.2 : 0.8;
+            this.graphZoom = Math.min(Math.max(this.graphZoom * delta, 0.2), 5);
+            this.applyGraphTransform();
+        };
+    }
+
     setupRestoreDropZone() {
         const dropZone = document.getElementById('restore-drop-zone');
         const fileInput = document.getElementById('restore-file-input');
@@ -2057,6 +2385,12 @@ class NotesApp {
         }
         
         return markdown.trim();
+    }
+
+    getCurrentMarkdown() {
+        const title = document.getElementById('note-title').value.trim() || 'Untitled Note';
+        const html = document.getElementById('editor').innerHTML;
+        return this.htmlToMarkdown(html, title);
     }
 
     markdownToHtml(markdown) {
@@ -4236,7 +4570,7 @@ class NotesApp {
         const addSelected = document.getElementById('chat-add-selected').checked;
         let noteText = '';
         if (addFull) {
-            noteText = document.getElementById('editor').innerText || '';
+            noteText = this.getCurrentMarkdown();
         } else if (addSelected) {
             noteText = this.selectedText || '';
         }

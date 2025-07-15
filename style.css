@@ -2581,3 +2581,42 @@ select.form-control {
 .chat-input button {
     margin-left: var(--space-8);
 }
+
+/* Graph modal */
+.graph-container {
+    overflow: hidden;
+    max-height: 90vh;
+    margin-bottom: var(--space-16);
+    position: relative;
+}
+
+#graph-pan-zoom {
+    transform-origin: 0 0;
+    cursor: grab;
+}
+
+#graph-pan-zoom.grabbing {
+    cursor: grabbing;
+}
+
+#graph-pan-zoom svg {
+    width: 100%;
+    height: auto;
+}
+
+.graph-text-output {
+    max-height: 40vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-12);
+    margin-bottom: var(--space-16);
+    white-space: pre-wrap;
+    color: var(--color-text);
+}
+
+/* Larger modal for graph view */
+#graph-modal .modal-content--wide {
+    max-width: 1000px;
+}

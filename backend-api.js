@@ -647,6 +647,28 @@ class BackendAPI {
             throw error;
         }
     }
+
+    async generateMindmap(note, provider, model, topic = null, host = null, port = null) {
+        try {
+            const payload = { note, provider, model };
+            if (topic) payload.topic = topic;
+            if (host) payload.host = host;
+            if (port) payload.port = port;
+            const response = await authFetch(`${this.baseUrl}/api/mindmap`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || `HTTP ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error generating mindmap:', error);
+            throw error;
+        }
+    }
 }
 
 // Instancia global del API backend
