@@ -2901,7 +2901,8 @@ class NotesApp {
             this.mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(this.audioChunks, { type: mimeType });
                 await this.transcribeAudio(audioBlob);
-                
+                await this.saveRecordedAudio(audioBlob);
+
                 // Stop stream
                 stream.getTracks().forEach(track => track.stop());
             };
@@ -3241,6 +3242,45 @@ class NotesApp {
         } catch (error) {
             console.error('Upload error:', error);
             this.showNotification('Error uploading audio', 'error');
+        } finally {
+            this.hideProcessingOverlay();
+        }
+    }
+
+    async saveRecordedAudio(audioBlob) {
+        if (!this.currentNote) {
+            this.showNotification('Please select a note first', 'error');
+            return;
+        }
+        this.showProcessingOverlay('Saving audio...');
+        try {
+            const formData = new FormData();
+
+            let filename = 'audio.wav';
+            if (audioBlob.type) {
+                if (audioBlob.type.includes('webm')) {
+                    filename = 'audio.webm';
+                } else if (audioBlob.type.includes('ogg')) {
+                    filename = 'audio.ogg';
+                } else if (audioBlob.type.includes('mp4')) {
+                    filename = 'audio.mp4';
+                }
+            }
+
+            formData.append('audio', audioBlob, filename);
+            formData.append('note_id', this.currentNote.id);
+
+            const response = await authFetch('/api/save-audio', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (response.ok) {
+                await this.loadAudioFiles(this.currentNote.id);
+                this.showNotification('Audio saved');
+            } else {
+                this.showNotification(result.error || 'Save failed', 'error');
+            }
+        } catch (error) {
+            console.error('Save audio error:', error);
+            this.showNotification('Error saving audio', 'error');
         } finally {
             this.hideProcessingOverlay();
         }

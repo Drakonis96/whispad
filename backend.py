@@ -2588,6 +2588,52 @@ def upload_audio():
     except Exception as e:
         return jsonify({"error": f"Error al procesar audio: {str(e)}"}), 500
 
+@app.route('/api/save-audio', methods=['POST'])
+def save_audio():
+    """Save a raw audio file linked to a note after converting it to WAV"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if 'audio' not in request.files:
+            return jsonify({"error": "No se encontró archivo de audio"}), 400
+
+        note_id = request.form.get('note_id')
+        if not note_id:
+            return jsonify({"error": "note_id requerido"}), 400
+
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({"error": "Archivo de audio vacío"}), 400
+
+        audio_bytes = audio_file.read()
+
+        with tempfile.NamedTemporaryFile(suffix=f".{audio_file.filename.split('.')[-1]}", delete=False) as tmp:
+            tmp.write(audio_bytes)
+            orig_path = tmp.name
+
+        wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
+        os.unlink(orig_path)
+
+        audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+        os.makedirs(audio_dir, exist_ok=True)
+        base = sanitize_filename(f"{note_id}-audio")
+        counter = 1
+        filename = f"{base}{counter}.wav"
+        while os.path.exists(os.path.join(audio_dir, filename)):
+            counter += 1
+            filename = f"{base}{counter}.wav"
+
+        final_path = os.path.join(audio_dir, filename)
+        if not is_path_within_directory(audio_dir, final_path):
+            return jsonify({"error": "Invalid file path"}), 400
+        shutil.move(wav_path, final_path)
+
+        return jsonify({"success": True, "filename": filename})
+    except Exception as e:
+        return jsonify({"error": f"Error al guardar audio: {str(e)}"}), 500
+
 @app.route('/api/list-audios', methods=['GET'])
 def list_audios():
     """Return audio files associated with a note"""
