@@ -2687,3 +2687,17 @@ select.form-control {
 #graph-modal .modal-content--wide {
     max-width: 1000px;
 }
+
+/* Audio files list */
+#audio-file-list {
+    list-style: none;
+    padding: 0;
+    margin-bottom: var(--space-16);
+}
+
+#audio-file-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-8);
+}
