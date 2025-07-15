@@ -68,6 +68,7 @@ Thumbs.db
 
 # Archivos de notas guardadas (datos de usuario)
 saved_notes/
+saved_audios/
 temp_notes/
 uploads/
 recordings/

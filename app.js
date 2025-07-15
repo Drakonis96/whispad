@@ -317,7 +317,7 @@ class NotesApp {
             uploadInput.addEventListener('change', async (e) => {
                 const file = e.target.files[0];
                 if (file) {
-                    await this.transcribeAudio(file);
+                    await this.uploadAudioFile(file);
                 }
                 uploadInput.value = '';
             });
@@ -346,6 +346,20 @@ class NotesApp {
         document.getElementById('undo-ai-btn').addEventListener('click', () => {
             this.undoAIChange();
         });
+
+        const filesBtn = document.getElementById('files-btn');
+        if (filesBtn) {
+            filesBtn.addEventListener('click', () => {
+                this.showAudioModal();
+            });
+        }
+
+        const closeAudioModal = document.getElementById('close-audio-modal');
+        if (closeAudioModal) {
+            closeAudioModal.addEventListener('click', () => {
+                this.hideAudioModal();
+            });
+        }
         
         // Editor
         const editor = document.getElementById('editor');
@@ -1490,6 +1504,23 @@ class NotesApp {
 
     hideRestoreModal() {
         const modal = document.getElementById('restore-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    showAudioModal() {
+        if (!this.currentNote) {
+            this.showNotification('Please select a note first', 'error');
+            return;
+        }
+        this.loadAudioFiles(this.currentNote.id);
+        const modal = document.getElementById('audio-modal');
+        this.hideMobileFab();
+        modal.classList.add('active');
+    }
+
+    hideAudioModal() {
+        const modal = document.getElementById('audio-modal');
         modal.classList.remove('active');
         this.showMobileFab();
     }
@@ -3052,6 +3083,83 @@ class NotesApp {
         this.handleEditorChange();
         
         console.log('Transcription inserted successfully');
+    }
+
+    async uploadAudioFile(file) {
+        if (!this.currentNote) {
+            this.showNotification('Please select a note first', 'error');
+            return;
+        }
+        this.showProcessingOverlay('Uploading audio...');
+        try {
+            const formData = new FormData();
+            formData.append('audio', file);
+            formData.append('note_id', this.currentNote.id);
+            formData.append('language', this.config.transcriptionLanguage);
+            formData.append('provider', this.config.transcriptionProvider);
+            formData.append('model', this.config.transcriptionModel);
+            formData.append('detect_emotion', document.getElementById('detect-emotion')?.checked ?? true);
+            formData.append('detect_events', document.getElementById('detect-events')?.checked ?? true);
+            formData.append('use_itn', document.getElementById('use-itn')?.checked ?? true);
+
+            const response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (response.ok) {
+                if (result.transcription) {
+                    this.insertTranscription(result.transcription);
+                }
+                await this.loadAudioFiles(this.currentNote.id);
+                this.showNotification('Audio uploaded');
+            } else {
+                this.showNotification(result.error || 'Upload failed', 'error');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showNotification('Error uploading audio', 'error');
+        } finally {
+            this.hideProcessingOverlay();
+        }
+    }
+
+    async loadAudioFiles(noteId) {
+        try {
+            const response = await authFetch(`/api/list-audios?note_id=${noteId}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            this.renderAudioFiles(data.audios, data.title);
+        } catch (err) {
+            console.error('Error loading audios', err);
+        }
+    }
+
+    renderAudioFiles(files, title) {
+        const list = document.getElementById('audio-file-list');
+        if (!list) return;
+        list.innerHTML = '';
+        files.forEach(fname => {
+            const li = document.createElement('li');
+            li.textContent = `${title} - ${fname}`;
+            const dl = document.createElement('button');
+            dl.className = 'btn btn--outline btn--sm';
+            dl.textContent = 'Download';
+            dl.addEventListener('click', () => {
+                window.open(`/api/download-audio?filename=${encodeURIComponent(fname)}`);
+            });
+            const del = document.createElement('button');
+            del.className = 'btn btn--error btn--sm';
+            del.textContent = 'Delete';
+            del.addEventListener('click', async () => {
+                const resp = await authFetch('/api/delete-audio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ filename: fname }) });
+                if (resp.ok) {
+                    this.loadAudioFiles(this.currentNote.id);
+                }
+            });
+            const btnWrap = document.createElement('span');
+            btnWrap.appendChild(dl);
+            btnWrap.appendChild(del);
+            li.appendChild(btnWrap);
+            list.appendChild(li);
+        });
     }
     
     // Mejora con IA

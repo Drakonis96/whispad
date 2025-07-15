@@ -2489,6 +2489,177 @@ def upload_note():
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
 
+@app.route('/api/upload-audio', methods=['POST'])
+def upload_audio():
+    """Transcribe and store an uploaded audio file linked to a note"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if 'audio' not in request.files:
+            return jsonify({"error": "No se encontró archivo de audio"}), 400
+
+        note_id = request.form.get('note_id')
+        if not note_id:
+            return jsonify({"error": "note_id requerido"}), 400
+
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({"error": "Archivo de audio vacío"}), 400
+
+        language = request.form.get('language') or None
+        provider = request.form.get('provider', 'openai')
+        model = request.form.get('model')
+
+        detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
+        detect_events = request.form.get('detect_events', 'true').lower() == 'true'
+        use_itn = request.form.get('use_itn', 'true').lower() == 'true'
+
+        audio_bytes = audio_file.read()
+
+        transcription = ''
+
+        if provider == 'local':
+            if not WHISPER_CPP_AVAILABLE:
+                return jsonify({"error": "Whisper.cpp local no está disponible"}), 500
+            models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+            model_filename = sanitize_filename(model or '')
+            model_path = os.path.join(models_dir, model_filename)
+            if not is_path_within_directory(models_dir, model_path):
+                return jsonify({"error": "Invalid model path"}), 400
+            result = whisper_wrapper.transcribe_audio_from_bytes(audio_bytes, audio_file.filename, language, model_path)
+            if result.get('success'):
+                transcription = result.get('transcription', '')
+        elif provider == 'sensevoice':
+            if not sensevoice_wrapper or not sensevoice_wrapper.is_available():
+                return jsonify({"error": "SenseVoice no está disponible"}), 500
+            result = sensevoice_wrapper.transcribe_audio_from_bytes(
+                audio_bytes,
+                audio_file.filename,
+                language,
+                detect_emotion,
+                detect_events,
+                use_itn
+            )
+            if result.get('success'):
+                transcription = result.get('transcription', '')
+        else:
+            if not OPENAI_API_KEY:
+                return jsonify({"error": "API key de OpenAI no configurada"}), 500
+            if not model:
+                return jsonify({"error": "Model not specified"}), 400
+            files = {
+                'file': (audio_file.filename, io.BytesIO(audio_bytes), audio_file.content_type),
+                'model': (None, model)
+            }
+            if language and language != 'auto':
+                files['language'] = (None, language)
+            headers = {'Authorization': f'Bearer {OPENAI_API_KEY}'}
+            response = requests.post('https://api.openai.com/v1/audio/transcriptions', files=files, headers=headers)
+            if response.status_code == 200:
+                transcription = response.json().get('text', '')
+            else:
+                return jsonify({"error": "Error en la transcripción"}), response.status_code
+
+        # Convert and save WAV file
+        with tempfile.NamedTemporaryFile(suffix=f".{audio_file.filename.split('.')[-1]}", delete=False) as tmp:
+            tmp.write(audio_bytes)
+            orig_path = tmp.name
+
+        wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
+        os.unlink(orig_path)
+
+        audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+        os.makedirs(audio_dir, exist_ok=True)
+        base = sanitize_filename(f"{note_id}-audio")
+        counter = 1
+        filename = f"{base}{counter}.wav"
+        while os.path.exists(os.path.join(audio_dir, filename)):
+            counter += 1
+            filename = f"{base}{counter}.wav"
+
+        final_path = os.path.join(audio_dir, filename)
+        if not is_path_within_directory(audio_dir, final_path):
+            return jsonify({"error": "Invalid file path"}), 400
+        shutil.move(wav_path, final_path)
+
+        return jsonify({"success": True, "transcription": transcription, "filename": filename})
+    except Exception as e:
+        return jsonify({"error": f"Error al procesar audio: {str(e)}"}), 500
+
+@app.route('/api/list-audios', methods=['GET'])
+def list_audios():
+    """Return audio files associated with a note"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        note_id = request.args.get('note_id')
+        if not note_id:
+            return jsonify({"error": "note_id requerido"}), 400
+
+        audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+        files = []
+        if os.path.isdir(audio_dir):
+            for fname in os.listdir(audio_dir):
+                if fname.startswith(f"{note_id}-audio") and fname.endswith('.wav'):
+                    files.append(fname)
+
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        note_file = find_existing_note_file(saved_notes_dir, note_id)
+        title = ''
+        if note_file:
+            meta = f"{note_file}.meta"
+            if os.path.exists(meta):
+                try:
+                    with open(meta, 'r', encoding='utf-8') as f:
+                        title = json.load(f).get('title', '')
+                except Exception:
+                    pass
+
+        return jsonify({"audios": files, "title": title})
+    except Exception as e:
+        return jsonify({"error": f"Error al listar audios: {str(e)}"}), 500
+
+@app.route('/api/download-audio', methods=['GET'])
+def download_audio():
+    """Download an audio file for the current user"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        filename = request.args.get('filename')
+        if not filename:
+            return jsonify({"error": "filename requerido"}), 400
+        audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+        filepath = os.path.join(audio_dir, sanitize_filename(filename))
+        if not is_path_within_directory(audio_dir, filepath) or not os.path.exists(filepath):
+            return jsonify({"error": "File not found"}), 404
+        return send_file(filepath, as_attachment=True, download_name=filename)
+    except Exception as e:
+        return jsonify({"error": f"Error al descargar audio: {str(e)}"}), 500
+
+@app.route('/api/delete-audio', methods=['POST'])
+def delete_audio():
+    """Delete an audio file"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        data = request.get_json() or {}
+        filename = data.get('filename')
+        if not filename:
+            return jsonify({"error": "filename requerido"}), 400
+        audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+        filepath = os.path.join(audio_dir, sanitize_filename(filename))
+        if not is_path_within_directory(audio_dir, filepath) or not os.path.exists(filepath):
+            return jsonify({"error": "File not found"}), 404
+        os.remove(filepath)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": f"Error al eliminar audio: {str(e)}"}), 500
+
 @app.route('/api/upload-model', methods=['POST'])
 def upload_model():
     """Upload a whisper.cpp model file to the whisper-cpp-models directory"""
