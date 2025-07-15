@@ -3,6 +3,7 @@ pandas
 flask
 flask-cors
 requests
+mermaid-python
 python-dotenv
 pydub
 librosa

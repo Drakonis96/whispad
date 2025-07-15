@@ -157,6 +157,9 @@
                     <button class="btn btn--outline btn--sm" id="chat-sidebar-toggle" title="Chat assistant">
                         <i class="fas fa-comments"></i>&nbsp;Chat
                     </button>
+                    <button class="btn btn--outline btn--sm" id="graph-btn" title="Graph view">
+                        <i class="fas fa-project-diagram"></i>&nbsp;Graph
+                    </button>
                 </div>
             </div>
                 
@@ -703,6 +706,17 @@
             
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-upload-models">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graph modal -->
+    <div class="modal" id="graph-modal">
+        <div class="modal-content modal-content--full">
+            <div id="graph-container"></div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="download-graph">Download</button>
+                <button class="btn btn--outline" id="close-graph">Close</button>
             </div>
         </div>
     </div>

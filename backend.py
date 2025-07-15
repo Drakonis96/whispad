@@ -16,6 +16,8 @@ import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 import threading
+import uuid
+from mermaid import Mermaid
 
 # ---------- Path utilities ----------
 def sanitize_filename(filename: str) -> str:
@@ -55,6 +57,116 @@ OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
 OLLAMA_PORT = os.getenv('OLLAMA_PORT', '11434')
 # Enable or disable multi-user support (default True)
 MULTI_USER = os.getenv('MULTI_USER', 'true').lower() != 'false'
+
+# ---------- Mind map utilities ----------
+
+MINDMAP_PROMPT = (
+    "You generate a JSON mind map from a markdown note."
+    " Respond ONLY with JSON using keys 'topic', optional 'desc' and 'children'."
+    " Example: {\"topic\":\"Main\", \"children\":[{\"topic\":\"Sub\"}]}"
+)
+
+def json_to_mermaid(node, level=0):
+    lines = ["    " * level + node.get("topic", "")] 
+    for child in node.get("children", []):
+        lines.extend(json_to_mermaid(child, level + 1))
+    return lines
+
+def run_chat_completion(provider, messages, model=None, host=None, port=None):
+    """Send chat completion request to the specified provider and return text."""
+    if provider == "openai":
+        if not OPENAI_API_KEY:
+            return None, "API key de OpenAI no configurada"
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
+        payload = {"model": model or "gpt-3.5-turbo", "messages": messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            return None, "OpenAI error"
+        text = resp.json()["choices"][0]["message"]["content"]
+        return text, None
+    elif provider == "google":
+        if not GOOGLE_API_KEY:
+            return None, "API key de Google no configurada"
+        if not model:
+            return None, "Model not specified"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
+        headers = {"Content-Type": "application/json"}
+        payload = {"contents": [{"role": m["role"], "parts": [{"text": m["content"]}]} for m in messages]}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            return None, f"Google error {resp.status_code}"
+        result = resp.json()
+        text = result["candidates"][0]["content"]["parts"][0]["text"]
+        return text, None
+    elif provider == "openrouter":
+        if not OPENROUTER_API_KEY:
+            return None, "API key de OpenRouter no configurada"
+        if not model:
+            return None, "Model not specified"
+        url = "https://openrouter.ai/api/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://note-transcribe-ai.local",
+            "X-Title": "Note Transcribe AI",
+        }
+        payload = {"model": model, "messages": messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            try:
+                data = resp.json()
+                msg = data.get("error", {}).get("message", "OpenRouter error")
+            except Exception:
+                msg = "OpenRouter error"
+            return None, msg
+        text = resp.json()["choices"][0]["message"]["content"]
+        return text, None
+    elif provider == "lmstudio":
+        if not host or not port or not model:
+            return None, "LM Studio host, port and model required"
+        url = f"http://{host}:{port}/v1/chat/completions"
+        headers = {"Content-Type": "application/json"}
+        payload = {"model": model, "messages": messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            return None, f"LM Studio error {resp.status_code}"
+        text = resp.json()["choices"][0]["message"]["content"]
+        return text, None
+    elif provider == "ollama":
+        if not host or not port or not model:
+            return None, "Ollama host, port and model required"
+        url = f"http://{host}:{port}/api/chat"
+        headers = {"Content-Type": "application/json"}
+        payload = {"model": model, "messages": messages}
+        resp = requests.post(url, headers=headers, json=payload)
+        if resp.status_code != 200:
+            return None, f"Ollama error {resp.status_code}"
+        data = resp.json()
+        text = data.get("message", {}).get("content", "")
+        return text, None
+    else:
+        return None, "Proveedor no soportado"
+
+
+def generate_mindmap(note, expand=None, provider="openai", model="gpt-3.5-turbo", host=None, port=None):
+    user_content = note
+    if expand:
+        user_content += f"\n\nExpand: {expand}"
+    messages = [
+        {"role": "system", "content": MINDMAP_PROMPT},
+        {"role": "user", "content": user_content},
+    ]
+    text, error = run_chat_completion(provider, messages, model, host, port)
+    if error:
+        return {"error": error}
+    try:
+        data = json.loads(text)
+    except Exception:
+        return {"error": "Invalid JSON from AI"}
+    diagram = "mindmap\n" + "\n".join(json_to_mermaid(data))
+    html = Mermaid(diagram)._repr_html_()
+    return {"data": data, "html": html}
 
 def load_server_config():
     """Load host/port settings from database if available."""
@@ -564,6 +676,29 @@ def transcribe_audio():
             else:
                 return jsonify({"error": "Error en la transcripción"}), response.status_code
             
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+@app.route('/api/mindmap', methods=['POST'])
+def api_mindmap():
+    """Generate a mind map for the given note"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        data = request.get_json() or {}
+        note = data.get('note')
+        topic = data.get('topic')
+        provider = data.get('provider', 'openai')
+        model = data.get('model')
+        host = data.get('host')
+        port = data.get('port')
+        if not note:
+            return jsonify({"error": "Missing note"}), 400
+        result = generate_mindmap(note, topic, provider, model or 'gpt-3.5-turbo', host, port)
+        if 'error' in result:
+            return jsonify(result), 500
+        return jsonify({"html": result['html'], "data": result['data']})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 

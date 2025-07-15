@@ -136,6 +136,8 @@ class NotesApp {
         // Chat conversation history
         this.chatMessages = [];
         this.chatNote = '';
+
+        this.currentMindMap = null;
         
         // Provider configuration
         this.config = {
@@ -563,6 +565,28 @@ class NotesApp {
                 this.renderChatMessages();
             });
         }
+
+        const graphBtn = document.getElementById('graph-btn');
+        const graphModal = document.getElementById('graph-modal');
+        const closeGraph = document.getElementById('close-graph');
+        const downloadGraph = document.getElementById('download-graph');
+        if (graphBtn) {
+            graphBtn.addEventListener('click', () => { this.showGraphModal(); });
+        }
+        if (closeGraph) {
+            closeGraph.addEventListener('click', () => { this.hideGraphModal(); });
+        }
+        if (downloadGraph) {
+            downloadGraph.addEventListener('click', () => { this.downloadGraph(); });
+        }
+        if (graphModal) {
+            graphModal.addEventListener('click', (e) => {
+                if (e.target.tagName === 'tspan') {
+                    const topic = e.target.textContent.trim();
+                    this.showGraphModal(topic);
+                }
+            });
+        }
         
         // Auto-guardado cada 30 segundos
         this.autoSaveInterval = setInterval(() => {
@@ -956,6 +980,81 @@ class NotesApp {
         const modal = document.getElementById('translation-modal');
         modal.classList.remove('active');
         this.showMobileFab();
+    }
+
+    showGraphModal(topic = null) {
+        const note = this.getCurrentNoteMarkdown();
+        const payload = {
+            note,
+            provider: this.config.postprocessProvider || 'openai',
+            model: this.config.postprocessModel,
+        };
+        if (this.config.postprocessProvider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (this.config.postprocessProvider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+        if (topic) payload.topic = topic;
+        authFetch('/api/mindmap', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(resp => resp.json()).then(data => {
+            if (data.html) {
+                document.getElementById('graph-container').innerHTML = data.html;
+                document.getElementById('graph-modal').classList.add('active');
+                this.currentMindMap = data.data;
+            } else {
+                this.showNotification('Graph generation failed', 'error');
+            }
+        }).catch(err => {
+            console.error('Mindmap error', err);
+            this.showNotification('Graph generation failed', 'error');
+        });
+    }
+
+    hideGraphModal() {
+        const modal = document.getElementById('graph-modal');
+        modal.classList.remove('active');
+        this.currentMindMap = null;
+    }
+
+    downloadGraph() {
+        const svg = document.querySelector('#graph-container svg');
+        if (!svg) return;
+        const serializer = new XMLSerializer();
+        const svgStr = serializer.serializeToString(svg);
+        const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob((blob2) => {
+                const url2 = URL.createObjectURL(blob2);
+                const a = document.createElement('a');
+                a.href = url2;
+                a.download = 'mindmap.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url2);
+            });
+        };
+        img.src = url;
+    }
+
+    getCurrentNoteMarkdown() {
+        const title = document.getElementById('note-title').value.trim() || 'Untitled Note';
+        const html = document.getElementById('editor').innerHTML;
+        return this.htmlToMarkdown(html, title);
     }
 
     saveTranslationConfig() {
