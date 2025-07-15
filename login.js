@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', async () => {
+(async () => {
     const loginBtn = document.getElementById('login-submit');
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
@@ -74,4 +74,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             togglePasswordBtn.innerHTML = isHidden ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
         });
     }
-});
+})();
