@@ -2900,8 +2900,8 @@ class NotesApp {
 
             this.mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-                await this.transcribeAudio(audioBlob);
-                
+                await this.processRecordedAudio(audioBlob);
+
                 // Stop stream
                 stream.getTracks().forEach(track => track.stop());
             };
@@ -3243,6 +3243,18 @@ class NotesApp {
             this.showNotification('Error uploading audio', 'error');
         } finally {
             this.hideProcessingOverlay();
+        }
+    }
+
+    async processRecordedAudio(audioBlob) {
+        try {
+            const file = new File([audioBlob], 'recording.wav', { type: audioBlob.type || 'audio/wav' });
+            await this.uploadAudioFile(file);
+        } catch (error) {
+            console.error('Error processing recording:', error);
+            this.showNotification('Error processing recording', 'error');
+        } finally {
+            document.getElementById('recording-status').querySelector('.status-text').textContent = 'Ready to record';
         }
     }
 
