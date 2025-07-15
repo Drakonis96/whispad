@@ -141,6 +141,12 @@ class NotesApp {
         this.mindMapTree = null;
         this.mindMapHistory = [];
         this.mindMapIndex = -1;
+        this.graphZoom = 1;
+        this.graphPanX = 0;
+        this.graphPanY = 0;
+        this.graphPanning = false;
+        this.graphPanStartX = 0;
+        this.graphPanStartY = 0;
         
         // Provider configuration
         this.config = {
@@ -575,6 +581,8 @@ class NotesApp {
         const graphDownload = document.getElementById('download-graph-btn');
         const graphPrev = document.getElementById('prev-graph-btn');
         const graphNext = document.getElementById('next-graph-btn');
+        const graphZoomIn = document.getElementById('zoom-in-graph-btn');
+        const graphZoomOut = document.getElementById('zoom-out-graph-btn');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -589,6 +597,12 @@ class NotesApp {
         }
         if (graphNext) {
             graphNext.addEventListener('click', () => { this.showNextGraph(); });
+        }
+        if (graphZoomIn) {
+            graphZoomIn.addEventListener('click', () => { this.zoomInGraph(); });
+        }
+        if (graphZoomOut) {
+            graphZoomOut.addEventListener('click', () => { this.zoomOutGraph(); });
         }
 
         // Auto-guardado cada 30 segundos
@@ -1537,7 +1551,8 @@ class NotesApp {
             this.mindMapHistory.push({ tree: JSON.parse(JSON.stringify(this.mindMapTree)), svg: data.svg });
             this.mindMapIndex = this.mindMapHistory.length - 1;
             const container = document.getElementById('graph-container');
-            container.innerHTML = data.svg;
+            container.innerHTML = `<div id="graph-pan-zoom">${data.svg}</div>`;
+            this.resetGraphTransform();
             const modal = document.getElementById('graph-modal');
             this.hideMobileFab();
             modal.classList.add('active');
@@ -1552,6 +1567,14 @@ class NotesApp {
         const modal = document.getElementById('graph-modal');
         modal.classList.remove('active');
         this.showMobileFab();
+        const wrapper = document.getElementById('graph-pan-zoom');
+        if (wrapper) {
+            wrapper.onmousedown = null;
+            wrapper.onwheel = null;
+            wrapper.classList.remove('grabbing');
+        }
+        window.onmousemove = null;
+        window.onmouseup = null;
     }
 
     downloadMindmap() {
@@ -1590,7 +1613,8 @@ class NotesApp {
             const { tree, svg } = this.mindMapHistory[this.mindMapIndex];
             this.mindMapTree = JSON.parse(JSON.stringify(tree));
             const container = document.getElementById('graph-container');
-            container.innerHTML = svg;
+            container.innerHTML = `<div id="graph-pan-zoom">${svg}</div>`;
+            this.resetGraphTransform();
             this.setupGraphNodeListeners();
             this.updateGraphNavButtons();
         }
@@ -1602,7 +1626,8 @@ class NotesApp {
             const { tree, svg } = this.mindMapHistory[this.mindMapIndex];
             this.mindMapTree = JSON.parse(JSON.stringify(tree));
             const container = document.getElementById('graph-container');
-            container.innerHTML = svg;
+            container.innerHTML = `<div id="graph-pan-zoom">${svg}</div>`;
+            this.resetGraphTransform();
             this.setupGraphNodeListeners();
             this.updateGraphNavButtons();
         }
@@ -1643,6 +1668,63 @@ class NotesApp {
                 if (txt) this.showGraphModal(txt);
             });
         });
+        this.setupGraphPanZoom();
+    }
+
+    resetGraphTransform() {
+        this.graphZoom = 1;
+        this.graphPanX = 0;
+        this.graphPanY = 0;
+        this.applyGraphTransform();
+    }
+
+    applyGraphTransform() {
+        const wrapper = document.getElementById('graph-pan-zoom');
+        if (wrapper) {
+            wrapper.style.transform = `translate(${this.graphPanX}px, ${this.graphPanY}px) scale(${this.graphZoom})`;
+        }
+    }
+
+    zoomInGraph() {
+        this.graphZoom = Math.min(this.graphZoom * 1.2, 5);
+        this.applyGraphTransform();
+    }
+
+    zoomOutGraph() {
+        this.graphZoom = Math.max(this.graphZoom / 1.2, 0.2);
+        this.applyGraphTransform();
+    }
+
+    setupGraphPanZoom() {
+        const wrapper = document.getElementById('graph-pan-zoom');
+        if (!wrapper) return;
+        wrapper.style.transformOrigin = '0 0';
+        wrapper.classList.remove('grabbing');
+        const startPan = (x, y) => {
+            this.graphPanning = true;
+            this.graphPanStartX = x - this.graphPanX;
+            this.graphPanStartY = y - this.graphPanY;
+            wrapper.classList.add('grabbing');
+        };
+        const movePan = (x, y) => {
+            if (!this.graphPanning) return;
+            this.graphPanX = x - this.graphPanStartX;
+            this.graphPanY = y - this.graphPanStartY;
+            this.applyGraphTransform();
+        };
+        const endPan = () => {
+            this.graphPanning = false;
+            wrapper.classList.remove('grabbing');
+        };
+        wrapper.onmousedown = e => { e.preventDefault(); startPan(e.clientX, e.clientY); };
+        window.onmousemove = e => movePan(e.clientX, e.clientY);
+        window.onmouseup = endPan;
+        wrapper.onwheel = e => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 1.2 : 0.8;
+            this.graphZoom = Math.min(Math.max(this.graphZoom * delta, 0.2), 5);
+            this.applyGraphTransform();
+        };
     }
 
     setupRestoreDropZone() {

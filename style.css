@@ -2584,12 +2584,22 @@ select.form-control {
 
 /* Graph modal */
 .graph-container {
-    overflow: auto;
+    overflow: hidden;
     max-height: 80vh;
     margin-bottom: var(--space-16);
+    position: relative;
 }
 
-.graph-container svg {
+#graph-pan-zoom {
+    transform-origin: 0 0;
+    cursor: grab;
+}
+
+#graph-pan-zoom.grabbing {
+    cursor: grabbing;
+}
+
+#graph-pan-zoom svg {
     width: 100%;
     height: auto;
 }
