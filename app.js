@@ -1506,6 +1506,8 @@ class NotesApp {
             payload.port = this.config.ollamaPort;
         }
 
+        this.showProcessingOverlay('Generating mind map...');
+
         backendAPI.generateMindmap(
             payload.note,
             payload.provider,
@@ -1515,7 +1517,11 @@ class NotesApp {
             payload.port
         )
         .then(data => {
-            this.mindMapTree = data.tree;
+            if (topic && this.mindMapTree) {
+                this.updateMindMapTree(topic, data.tree);
+            } else {
+                this.mindMapTree = data.tree;
+            }
             const container = document.getElementById('graph-container');
             container.innerHTML = data.svg;
             const modal = document.getElementById('graph-modal');
@@ -1523,7 +1529,8 @@ class NotesApp {
             modal.classList.add('active');
             this.setupGraphNodeListeners();
         })
-        .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'));
+        .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'))
+        .finally(() => this.hideProcessingOverlay());
     }
 
     hideGraphModal() {
@@ -1558,6 +1565,24 @@ class NotesApp {
             });
         };
         img.src = url;
+    }
+
+    updateMindMapTree(topic, subtree) {
+        const search = (node) => {
+            if (!node) return false;
+            const title = node.title || node.topic;
+            if (title === topic) {
+                node.subtopics = subtree.subtopics || [];
+                return true;
+            }
+            if (Array.isArray(node.subtopics)) {
+                for (const child of node.subtopics) {
+                    if (search(child)) return true;
+                }
+            }
+            return false;
+        };
+        search(this.mindMapTree);
     }
 
     setupGraphNodeListeners() {

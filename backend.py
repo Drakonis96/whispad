@@ -16,6 +16,7 @@ import shutil
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 from mermaid import Mermaid
+import ast
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -34,10 +35,13 @@ def extract_json(text: str):
         return json.loads(text)
     except Exception:
         try:
-            fixed = re.sub(r',\s*}', '}', text)
+            fixed = re.sub(r',\s*([}\]])', r'\1', text)
             return json.loads(fixed)
         except Exception:
-            return None
+            try:
+                return ast.literal_eval(text)
+            except Exception:
+                return None
 import threading
 
 # ---------- Path utilities ----------
@@ -1916,6 +1920,8 @@ def html_to_markdown(html_content):
     return markdown
 
 def json_to_mermaid(data, indent=0):
+    if not isinstance(data, dict):
+        raise ValueError('Invalid mindmap data')
     lines = []
     if indent == 0:
         lines.append('mindmap')
@@ -2155,6 +2161,9 @@ def generate_mindmap():
 
         if err:
             return jsonify({"error": err}), 500
+
+        if not isinstance(tree, dict):
+            return jsonify({"error": "Invalid JSON returned"}), 500
 
         mm_lines = json_to_mermaid(tree)
         mm_script = "\n".join(mm_lines)
