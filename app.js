@@ -360,6 +360,22 @@ class NotesApp {
                 this.hideAudioModal();
             });
         }
+
+        const playBtn = document.getElementById('play-audio-btn');
+        if (playBtn) {
+            playBtn.addEventListener('click', () => {
+                this.playSelectedAudio();
+            });
+        }
+
+        const refreshBtn = document.getElementById('refresh-audio-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                if (this.currentNote) {
+                    this.loadAudioDropdown(this.currentNote.id);
+                }
+            });
+        }
         
         // Editor
         const editor = document.getElementById('editor');
@@ -1317,6 +1333,7 @@ class NotesApp {
         this.clearAIHistory();
 
         this.updateEditorVisibility();
+        this.loadAudioDropdown(this.currentNote.id);
     }
     
     updateNoteSelection() {
@@ -3210,6 +3227,35 @@ class NotesApp {
             li.appendChild(btnWrap);
             list.appendChild(li);
         });
+    }
+
+    async loadAudioDropdown(noteId) {
+        const select = document.getElementById('audio-select');
+        if (!select) return;
+        select.innerHTML = '';
+        if (!noteId) return;
+        try {
+            const response = await authFetch(`/api/list-audios?note_id=${noteId}`);
+            if (!response.ok) return;
+            const data = await response.json();
+            (data.audios || []).forEach(fname => {
+                const opt = document.createElement('option');
+                opt.value = fname;
+                opt.textContent = fname;
+                select.appendChild(opt);
+            });
+        } catch (err) {
+            console.error('Error loading audios', err);
+        }
+    }
+
+    playSelectedAudio() {
+        const select = document.getElementById('audio-select');
+        const player = document.getElementById('note-audio-player');
+        if (!select || !player || !select.value) return;
+        player.src = `/api/get-audio?filename=${encodeURIComponent(select.value)}`;
+        player.style.display = 'block';
+        player.play().catch(err => console.error('Audio play error', err));
     }
     
     // Mejora con IA

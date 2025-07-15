@@ -2640,6 +2640,24 @@ def download_audio():
     except Exception as e:
         return jsonify({"error": f"Error al descargar audio: {str(e)}"}), 500
 
+@app.route('/api/get-audio', methods=['GET'])
+def get_audio():
+    """Serve an audio file for playback"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        filename = request.args.get('filename')
+        if not filename:
+            return jsonify({"error": "filename requerido"}), 400
+        audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+        filepath = os.path.join(audio_dir, sanitize_filename(filename))
+        if not is_path_within_directory(audio_dir, filepath) or not os.path.exists(filepath):
+            return jsonify({"error": "File not found"}), 404
+        return send_file(filepath, as_attachment=False, download_name=filename)
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener audio: {str(e)}"}), 500
+
 @app.route('/api/delete-audio', methods=['POST'])
 def delete_audio():
     """Delete an audio file"""
