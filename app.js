@@ -1530,6 +1530,12 @@ class NotesApp {
             payload.port = this.config.ollamaPort;
         }
 
+        const textOutput = document.getElementById('graph-text-output');
+        if (textOutput) {
+            textOutput.textContent = '';
+            textOutput.classList.add('hidden');
+        }
+
         this.showProcessingOverlay('Generating mind map...');
 
         backendAPI.generateMindmap(
@@ -1575,6 +1581,11 @@ class NotesApp {
         }
         window.onmousemove = null;
         window.onmouseup = null;
+        const output = document.getElementById('graph-text-output');
+        if (output) {
+            output.textContent = '';
+            output.classList.add('hidden');
+        }
     }
 
     downloadMindmap() {
@@ -1665,10 +1676,72 @@ class NotesApp {
             t.style.cursor = 'pointer';
             t.addEventListener('click', () => {
                 const txt = t.textContent.trim();
-                if (txt) this.showGraphModal(txt);
+                if (!txt) return;
+                const textMode = document.getElementById('graph-text-toggle')?.checked;
+                if (textMode) {
+                    this.exploreGraphTopic(txt);
+                } else {
+                    this.showGraphModal(txt);
+                }
             });
         });
         this.setupGraphPanZoom();
+    }
+
+    async exploreGraphTopic(topic) {
+        const output = document.getElementById('graph-text-output');
+        if (!output) return;
+        output.textContent = '';
+        output.classList.remove('hidden');
+
+        const noteText = document.getElementById('editor').innerText || '';
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+        const payload = { note: noteText, messages: [{ role: 'user', content: topic }], stream: true, provider, model };
+        if (provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+
+        const response = await authFetch('/api/improve-text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok || !response.body) {
+            this.showNotification('Chat request failed', 'error');
+            return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') break;
+                    try {
+                        const data = JSON.parse(dataStr);
+                        if (data.content) {
+                            output.textContent += data.content;
+                            output.scrollTop = output.scrollHeight;
+                        }
+                        if (data.done) {
+                            return;
+                        }
+                    } catch (e) { continue; }
+                }
+            }
+        }
     }
 
     resetGraphTransform() {
