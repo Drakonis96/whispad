@@ -1013,8 +1013,12 @@ select.form-control {
 
 #graph-btn {
     grid-column: 3;
-    grid-row: 1 / span 2;
-    align-self: center;
+    grid-row: 1;
+}
+
+#files-btn {
+    grid-column: 3;
+    grid-row: 2;
 }
 
 .recording-status {
