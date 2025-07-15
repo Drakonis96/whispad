@@ -2581,3 +2581,15 @@ select.form-control {
 .chat-input button {
     margin-left: var(--space-8);
 }
+
+/* Graph modal */
+.graph-container {
+    overflow: auto;
+    max-height: 80vh;
+    margin-bottom: var(--space-16);
+}
+
+.graph-container svg {
+    width: 100%;
+    height: auto;
+}

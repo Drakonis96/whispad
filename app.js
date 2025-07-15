@@ -136,6 +136,9 @@ class NotesApp {
         // Chat conversation history
         this.chatMessages = [];
         this.chatNote = '';
+
+        // Mind map data
+        this.mindMapTree = null;
         
         // Provider configuration
         this.config = {
@@ -563,7 +566,21 @@ class NotesApp {
                 this.renderChatMessages();
             });
         }
-        
+
+        // Graph button
+        const graphBtn = document.getElementById('graph-btn');
+        const graphClose = document.getElementById('close-graph-modal');
+        const graphDownload = document.getElementById('download-graph-btn');
+        if (graphBtn) {
+            graphBtn.addEventListener('click', () => { this.showGraphModal(); });
+        }
+        if (graphClose) {
+            graphClose.addEventListener('click', () => { this.hideGraphModal(); });
+        }
+        if (graphDownload) {
+            graphDownload.addEventListener('click', () => { this.downloadMindmap(); });
+        }
+
         // Auto-guardado cada 30 segundos
         this.autoSaveInterval = setInterval(() => {
             if (this.currentNote) {
@@ -1470,6 +1487,89 @@ class NotesApp {
         const fileUploadList = document.getElementById('file-upload-list');
         progressSection.style.display = 'none';
         fileUploadList.innerHTML = '';
+    }
+
+    showGraphModal(topic = null) {
+        const noteText = document.getElementById('editor').innerText || '';
+        const payload = {
+            note: noteText,
+            provider: this.config.postprocessProvider || 'openai',
+            model: this.config.postprocessModel || 'gpt-3.5-turbo'
+        };
+        if (topic) payload.topic = topic;
+        if (payload.provider === 'lmstudio') {
+            payload.host = this.config.lmstudioHost;
+            payload.port = this.config.lmstudioPort;
+        }
+        if (payload.provider === 'ollama') {
+            payload.host = this.config.ollamaHost;
+            payload.port = this.config.ollamaPort;
+        }
+
+        backendAPI.generateMindmap(
+            payload.note,
+            payload.provider,
+            payload.model,
+            topic,
+            payload.host,
+            payload.port
+        )
+        .then(data => {
+            this.mindMapTree = data.tree;
+            const container = document.getElementById('graph-container');
+            container.innerHTML = data.svg;
+            const modal = document.getElementById('graph-modal');
+            this.hideMobileFab();
+            modal.classList.add('active');
+            this.setupGraphNodeListeners();
+        })
+        .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'));
+    }
+
+    hideGraphModal() {
+        const modal = document.getElementById('graph-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    downloadMindmap() {
+        const svg = document.querySelector('#graph-container svg');
+        if (!svg) return;
+        const serializer = new XMLSerializer();
+        const svgData = serializer.serializeToString(svg);
+        const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(blob => {
+                const dl = document.createElement('a');
+                dl.href = URL.createObjectURL(blob);
+                dl.download = 'mindmap.png';
+                document.body.appendChild(dl);
+                dl.click();
+                document.body.removeChild(dl);
+                URL.revokeObjectURL(dl.href);
+            });
+        };
+        img.src = url;
+    }
+
+    setupGraphNodeListeners() {
+        const svg = document.querySelector('#graph-container svg');
+        if (!svg) return;
+        svg.querySelectorAll('text').forEach(t => {
+            t.style.cursor = 'pointer';
+            t.addEventListener('click', () => {
+                const txt = t.textContent.trim();
+                if (txt) this.showGraphModal(txt);
+            });
+        });
     }
 
     setupRestoreDropZone() {
