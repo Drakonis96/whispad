@@ -2839,6 +2839,17 @@ select.form-control {
     max-width: 1000px;
 }
 
+/* Smaller dropdown for graph type */
+#graph-type-select {
+    width: 150px;
+    font-size: var(--font-size-sm);
+    padding: var(--space-4) var(--space-8);
+}
+
+#regenerate-graph-btn {
+    margin-left: var(--space-8);
+}
+
 /* Audio files list */
 #audio-file-list {
     list-style: none;

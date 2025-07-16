@@ -1957,6 +1957,103 @@ def json_to_mermaid(data, indent=0):
 
     return lines
 
+def timeline_json_to_mermaid(data):
+    lines = ["timeline"]
+    title = data.get("title")
+    if title:
+        lines.append(f"    title {title}")
+    for ev in data.get("events", []):
+        time = ev.get("time", "")
+        text = ev.get("text", "")
+        lines.append(f"    {time} : {text}")
+    return lines
+
+def treemap_json_to_mermaid(data, indent=0):
+    lines = []
+    if indent == 0:
+        lines.append("treemap")
+    if isinstance(data, str):
+        lines.append("  " * indent + data)
+        return lines
+    if not isinstance(data, dict):
+        raise ValueError("Invalid treemap data")
+    prefix = "  " * indent
+    title = data.get("title") or data.get("name") or "Root"
+    lines.append(f"{prefix}{title}")
+    children = data.get("children", [])
+    if isinstance(children, dict):
+        children = [children]
+    elif isinstance(children, str):
+        children = [{"title": children}]
+    for ch in children:
+        lines.extend(treemap_json_to_mermaid(ch, indent + 1))
+    return lines
+
+def radar_json_to_mermaid(data):
+    lines = ["radar"]
+    title = data.get("title")
+    if title:
+        lines.append(f"    title {title}")
+    axes = data.get("axis", [])
+    for a in axes:
+        lines.append(f"    axis {a} {a}")
+    for d in data.get("data", []):
+        name = d.get("name", "data")
+        vals = ",".join(str(v) for v in d.get("values", []))
+        lines.append(f"    data {name} [{vals}]")
+    return lines
+
+def sequence_json_to_mermaid(data):
+    lines = ["sequenceDiagram"]
+    for msg in data.get("messages", []):
+        frm = msg.get("from", "")
+        to = msg.get("to", "")
+        text = msg.get("text", "")
+        lines.append(f"    {frm}->>{to}: {text}")
+    return lines
+
+def journey_json_to_mermaid(data):
+    lines = ["journey"]
+    title = data.get("title")
+    if title:
+        lines.append(f"    title {title}")
+    for sec in data.get("sections", []):
+        lines.append(f"    section {sec.get('name', '')}")
+        for task in sec.get("tasks", []):
+            actor = task.get("actor", "")
+            rating = task.get("rating", 0)
+            text = task.get("text", "")
+            lines.append(f"        {actor}: {rating}: {text}")
+    return lines
+
+def pie_json_to_mermaid(data):
+    lines = ["pie"]
+    title = data.get("title")
+    if title:
+        lines.append(f"    title {title}")
+    for item in data.get("items", []):
+        label = item.get("label", "")
+        value = item.get("value", 0)
+        lines.append(f"    \"{label}\" : {value}")
+    return lines
+
+def diagram_json_to_mermaid(diagram_type, data):
+    if diagram_type == "mindmap":
+        return json_to_mermaid(data)
+    if diagram_type == "timeline":
+        return timeline_json_to_mermaid(data)
+    if diagram_type == "treemap":
+        return treemap_json_to_mermaid(data)
+    if diagram_type == "radar":
+        return radar_json_to_mermaid(data)
+    if diagram_type == "sequence":
+        return sequence_json_to_mermaid(data)
+    if diagram_type == "user journey":
+        return journey_json_to_mermaid(data)
+    if diagram_type == "pie chart":
+        return pie_json_to_mermaid(data)
+    raise ValueError("Unsupported diagram type")
+
 def generate_mindmap_openai(note_md, topic, model):
     if not OPENAI_API_KEY:
         return None, 'API key de OpenAI no configurada'
@@ -2140,15 +2237,29 @@ def generate_mindmap_ollama(note_md, topic, model, host, port):
         return None, f'Invalid JSON returned: {str(e)}'
 
 
+def diagram_prompt(diagram_type):
+    if diagram_type == 'timeline':
+        return ("You create a timeline diagram from a markdown note. "
+                "Respond only with JSON using this schema: {\"title\":string, \"events\":[{\"time\":string, \"text\":string}]}.")
+    if diagram_type == 'treemap':
+        return ("You create a treemap from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"children\":[{\"title\":string, \"children\":[]}]}.")
+    if diagram_type == 'radar':
+        return ("You create a radar chart from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"axis\":[string], \"data\":[{\"name\":string, \"values\":[number]}]}.")
+    if diagram_type == 'sequence':
+        return ("You create a sequence diagram from a markdown note. Respond only with JSON using this schema: {\"messages\":[{\"from\":string, \"to\":string, \"text\":string}]}.")
+    if diagram_type == 'user journey':
+        return ("You create a user journey diagram from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"sections\":[{\"name\":string, \"tasks\":[{\"actor\":string, \"rating\":int, \"text\":string}]}]}.")
+    if diagram_type == 'pie chart':
+        return ("You create a pie chart from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"items\":[{\"label\":string, \"value\":number}]}.")
+    return ("You create a mind map from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}.")
+
+
 def generate_diagram_openai(note_md, diagram_type, model):
     if not OPENAI_API_KEY:
         return None, 'API key de OpenAI no configurada'
     if not model:
         return None, 'Model not specified'
-    system_prompt = (
-        f"You create a {diagram_type} diagram in Mermaid syntax from a markdown note."
-        " Respond only with the Mermaid code."
-    )
+    system_prompt = diagram_prompt(diagram_type)
     headers = {
         'Authorization': f'Bearer {OPENAI_API_KEY}',
         'Content-Type': 'application/json'
@@ -2165,7 +2276,10 @@ def generate_diagram_openai(note_md, diagram_type, model):
         return None, 'OpenAI error'
     try:
         content = resp.json()['choices'][0]['message']['content']
-        return content.strip(), None
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
     except Exception as e:
         return None, f'Invalid response: {str(e)}'
 
@@ -2175,10 +2289,7 @@ def generate_diagram_google(note_md, diagram_type, model):
         return None, 'API key de Google no configurada'
     if not model:
         return None, 'Model not specified'
-    system_prompt = (
-        f"You create a {diagram_type} diagram in Mermaid syntax from a markdown note."
-        " Respond only with the Mermaid code."
-    )
+    system_prompt = diagram_prompt(diagram_type)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GOOGLE_API_KEY}"
     headers = {'Content-Type': 'application/json'}
     messages = [
@@ -2199,7 +2310,10 @@ def generate_diagram_google(note_md, diagram_type, model):
     try:
         result = resp.json()
         content = result['candidates'][0]['content']['parts'][0]['text']
-        return content.strip(), None
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
     except Exception as e:
         return None, f'Invalid response: {str(e)}'
 
@@ -2209,10 +2323,7 @@ def generate_diagram_openrouter(note_md, diagram_type, model):
         return None, 'API key de OpenRouter no configurada'
     if not model:
         return None, 'Model not specified'
-    system_prompt = (
-        f"You create a {diagram_type} diagram in Mermaid syntax from a markdown note."
-        " Respond only with the Mermaid code."
-    )
+    system_prompt = diagram_prompt(diagram_type)
     url = 'https://openrouter.ai/api/v1/chat/completions'
     headers = {
         'Authorization': f'Bearer {OPENROUTER_API_KEY}',
@@ -2232,7 +2343,10 @@ def generate_diagram_openrouter(note_md, diagram_type, model):
         return None, 'OpenRouter error'
     try:
         content = resp.json()['choices'][0]['message']['content']
-        return content.strip(), None
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
     except Exception as e:
         return None, f'Invalid response: {str(e)}'
 
@@ -2240,10 +2354,7 @@ def generate_diagram_openrouter(note_md, diagram_type, model):
 def generate_diagram_lmstudio(note_md, diagram_type, model, host, port):
     if not host or not port or not model:
         return None, 'LM Studio host, port and model required'
-    system_prompt = (
-        f"You create a {diagram_type} diagram in Mermaid syntax from a markdown note."
-        " Respond only with the Mermaid code."
-    )
+    system_prompt = diagram_prompt(diagram_type)
     url = f"http://{host}:{port}/v1/chat/completions"
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -2261,7 +2372,10 @@ def generate_diagram_lmstudio(note_md, diagram_type, model, host, port):
         return None, f'LM Studio error {resp.status_code}'
     try:
         content = resp.json()['choices'][0]['message']['content']
-        return content.strip(), None
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
     except Exception as e:
         return None, f'Invalid response: {str(e)}'
 
@@ -2269,10 +2383,7 @@ def generate_diagram_lmstudio(note_md, diagram_type, model, host, port):
 def generate_diagram_ollama(note_md, diagram_type, model, host, port):
     if not host or not port or not model:
         return None, 'Ollama host, port and model required'
-    system_prompt = (
-        f"You create a {diagram_type} diagram in Mermaid syntax from a markdown note."
-        " Respond only with the Mermaid code."
-    )
+    system_prompt = diagram_prompt(diagram_type)
     url = f"http://{host}:{port}/api/chat"
     headers = {'Content-Type': 'application/json'}
     payload = {
@@ -2294,7 +2405,10 @@ def generate_diagram_ollama(note_md, diagram_type, model, host, port):
             content = result['message'].get('content', '')
         else:
             content = result.get('choices', [{}])[0].get('message', {}).get('content', '')
-        return content.strip(), None
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
     except Exception as e:
         return None, f'Invalid response: {str(e)}'
 
@@ -2402,29 +2516,34 @@ def generate_diagram():
             svg = Mermaid(mm_script).svg_response.text
             return jsonify({"svg": svg, "tree": tree})
 
-        # other diagram types return Mermaid code directly
+        # other diagram types: convert JSON structure to Mermaid
         if provider == 'openai':
-            script, err = generate_diagram_openai(note, diagram_type, model)
+            tree, err = generate_diagram_openai(note, diagram_type, model)
         elif provider == 'google':
-            script, err = generate_diagram_google(note, diagram_type, model)
+            tree, err = generate_diagram_google(note, diagram_type, model)
         elif provider == 'openrouter':
-            script, err = generate_diagram_openrouter(note, diagram_type, model)
+            tree, err = generate_diagram_openrouter(note, diagram_type, model)
         elif provider == 'lmstudio':
             host = host or LMSTUDIO_HOST
             port = port or LMSTUDIO_PORT
-            script, err = generate_diagram_lmstudio(note, diagram_type, model, host, port)
+            tree, err = generate_diagram_lmstudio(note, diagram_type, model, host, port)
         elif provider == 'ollama':
             host = host or OLLAMA_HOST
             port = port or OLLAMA_PORT
-            script, err = generate_diagram_ollama(note, diagram_type, model, host, port)
+            tree, err = generate_diagram_ollama(note, diagram_type, model, host, port)
         else:
             return jsonify({"error": "Provider not supported"}), 400
 
         if err:
             return jsonify({"error": err}), 500
 
+        if not isinstance(tree, dict):
+            return jsonify({"error": "Invalid JSON returned"}), 500
+
+        lines = diagram_json_to_mermaid(diagram_type, tree)
+        script = "\n".join(lines)
         svg = Mermaid(script).svg_response.text
-        return jsonify({"svg": svg})
+        return jsonify({"svg": svg, "tree": tree})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 

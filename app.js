@@ -682,6 +682,7 @@ class NotesApp {
         const graphZoomIn = document.getElementById('zoom-in-graph-btn');
         const graphZoomOut = document.getElementById('zoom-out-graph-btn');
         const graphTypeSelect = document.getElementById('graph-type-select');
+        const regenerateGraphBtn = document.getElementById('regenerate-graph-btn');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -706,6 +707,11 @@ class NotesApp {
         if (graphTypeSelect) {
             graphTypeSelect.addEventListener('change', e => {
                 this.graphType = e.target.value;
+            });
+        }
+        if (regenerateGraphBtn) {
+            regenerateGraphBtn.addEventListener('click', () => {
+                this.showGraphModal();
             });
         }
 
@@ -1763,7 +1769,7 @@ class NotesApp {
             )
             .then(data => {
                 this.mindMapTree = null;
-                handleSvg({ svg: data.svg, tree: null });
+                handleSvg({ svg: data.svg, tree: data.tree || null });
             })
             .catch(err => this.showNotification(err.message || 'Diagram request failed', 'error'))
             .finally(() => this.hideProcessingOverlay());
