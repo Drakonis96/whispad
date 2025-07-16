@@ -1922,6 +1922,16 @@ def html_to_markdown(html_content):
 
     return markdown
 
+def sanitize_mermaid_label(text: str) -> str:
+    """Remove characters that commonly break Mermaid parsing."""
+    if text is None:
+        return ''
+    text = str(text)
+    text = re.sub(r'[\n\r]+', ' ', text)
+    text = re.sub(r'[^\w\s.,!\-]', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
 def json_to_mermaid(data, indent=0):
     """Convert a nested dict/list structure to Mermaid mindmap syntax.
 
@@ -1937,14 +1947,14 @@ def json_to_mermaid(data, indent=0):
 
     # Accept a bare string as a leaf node
     if isinstance(data, str):
-        lines.append('  ' * indent + data)
+        lines.append('  ' * indent + sanitize_mermaid_label(data))
         return lines
 
     if not isinstance(data, dict):
         raise ValueError('Invalid mindmap data')
 
     prefix = '  ' * indent
-    title = data.get('title') or data.get('topic') or 'Root'
+    title = sanitize_mermaid_label(data.get('title') or data.get('topic') or 'Root')
     shape = (data.get('shape') or '').lower()
     icon = data.get('icon')
     class_name = data.get('class') or data.get('className')
@@ -1981,12 +1991,12 @@ def json_to_mermaid(data, indent=0):
 
 def timeline_json_to_mermaid(data):
     lines = ["timeline"]
-    title = data.get("title")
+    title = sanitize_mermaid_label(data.get("title"))
     if title:
         lines.append(f"    title {title}")
     for ev in data.get("events", []):
-        time = ev.get("time", "")
-        text = ev.get("text", "")
+        time = sanitize_mermaid_label(ev.get("time", ""))
+        text = sanitize_mermaid_label(ev.get("text", ""))
         lines.append(f"    {time} : {text}")
     return lines
 
@@ -1996,12 +2006,12 @@ def treemap_json_to_mermaid(data, indent=0):
     if indent == 0:
         lines.append("treemap-beta")
     if isinstance(data, str):
-        lines.append("  " * indent + f'"{data}"')
+        lines.append("  " * indent + f'"{sanitize_mermaid_label(data)}"')
         return lines
     if not isinstance(data, dict):
         raise ValueError("Invalid treemap data")
     prefix = "  " * indent
-    title = data.get("title") or data.get("name") or data.get("label") or "Root"
+    title = sanitize_mermaid_label(data.get("title") or data.get("name") or data.get("label") or "Root")
     value = data.get("value")
     class_name = data.get("class") or data.get("className")
     line = f"{prefix}\"{title}\""
@@ -2027,7 +2037,7 @@ def treemap_json_to_mermaid(data, indent=0):
 def radar_json_to_mermaid(data):
     """Convert radar chart JSON to Mermaid radar-beta syntax."""
     lines = []
-    title = data.get("title")
+    title = sanitize_mermaid_label(data.get("title"))
     if title:
         lines.append("---")
         lines.append(f"title: \"{title}\"")
@@ -2043,13 +2053,13 @@ def radar_json_to_mermaid(data):
         parts = []
         for j, label in enumerate(group):
             alias = alias_letters[i + j]
-            parts.append(f"{alias}[\"{label}\"]")
+            parts.append(f"{alias}[\"{sanitize_mermaid_label(label)}\"]")
         lines.append("  axis " + ", ".join(parts))
 
     for idx, dataset in enumerate(data.get("data", [])):
         alias = alias_letters[idx]
         values = ", ".join(str(v) for v in dataset.get("values", []))
-        name = dataset.get("name", f"series{idx+1}")
+        name = sanitize_mermaid_label(dataset.get("name", f"series{idx+1}"))
         lines.append(f"  curve {alias}[\"{name}\"]{{{values}}}")
 
     max_val = data.get("max")
@@ -2065,33 +2075,33 @@ def radar_json_to_mermaid(data):
 def sequence_json_to_mermaid(data):
     lines = ["sequenceDiagram"]
     for msg in data.get("messages", []):
-        frm = msg.get("from", "")
-        to = msg.get("to", "")
-        text = msg.get("text", "")
+        frm = sanitize_mermaid_label(msg.get("from", ""))
+        to = sanitize_mermaid_label(msg.get("to", ""))
+        text = sanitize_mermaid_label(msg.get("text", ""))
         lines.append(f"    {frm}->>{to}: {text}")
     return lines
 
 def journey_json_to_mermaid(data):
     lines = ["journey"]
-    title = data.get("title")
+    title = sanitize_mermaid_label(data.get("title"))
     if title:
         lines.append(f"    title {title}")
     for sec in data.get("sections", []):
-        lines.append(f"    section {sec.get('name', '')}")
+        lines.append(f"    section {sanitize_mermaid_label(sec.get('name', ''))}")
         for task in sec.get("tasks", []):
-            actor = task.get("actor", "")
+            actor = sanitize_mermaid_label(task.get("actor", ""))
             rating = task.get("rating", 0)
-            text = task.get("text", "")
+            text = sanitize_mermaid_label(task.get("text", ""))
             lines.append(f"        {actor}: {rating}: {text}")
     return lines
 
 def pie_json_to_mermaid(data):
     lines = ["pie"]
-    title = data.get("title")
+    title = sanitize_mermaid_label(data.get("title"))
     if title:
         lines.append(f"    title {title}")
     for item in data.get("items", []):
-        label = item.get("label", "")
+        label = sanitize_mermaid_label(item.get("label", ""))
         value = item.get("value", 0)
         lines.append(f"    \"{label}\" : {value}")
     return lines
