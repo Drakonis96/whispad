@@ -3,6 +3,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
     const togglePasswordBtn = document.getElementById('toggle-password');
+
+    // If the expected elements are missing, the wrong page was likely served.
+    // Avoid throwing errors by exiting early and logging a warning so the user
+    // can adjust the proxy configuration.
+    if (!loginBtn || !usernameInput || !passwordInput) {
+        console.warn('Login elements missing. Ensure login.html is served.');
+        return;
+    }
     let multiUser = true;
 
     try {
