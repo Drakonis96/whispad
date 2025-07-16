@@ -188,12 +188,7 @@
                 <div class="editor-header collapsible" id="note-header">
                     <div class="section-header">
                         <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
-                        <button class="collapse-toggle" aria-label="Toggle note tools">
-                            <i class="fas fa-chevron-up"></i>
-                        </button>
-                    </div>
-                    <div class="section-content">
-                        <div class="editor-actions">
+                        <div class="editor-actions section-content">
                             <button class="btn btn--outline btn--sm" id="save-btn">
                                 <i class="fas fa-save"></i>&nbsp;<span id="save-text">Save</span>
                             </button>
@@ -213,8 +208,11 @@
                                 </button>
                             </div>
                         </div>
-                        <audio id="note-audio-player" class="audio-player" controls style="display:none;margin-top:4px;"></audio>
+                        <button class="collapse-toggle" aria-label="Toggle note tools">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
                     </div>
+                    <audio id="note-audio-player" class="audio-player" controls style="display:none;margin-top:4px;"></audio>
                 </div>
 
                 <div class="note-tags" id="note-tags"></div>

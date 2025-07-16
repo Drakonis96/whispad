@@ -1174,6 +1174,18 @@ select.form-control {
     gap: var(--space-12);
 }
 
+/* Align note title and actions on a single line */
+#note-header .section-header {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--space-8);
+}
+
+#note-header .section-header .editor-actions {
+    justify-self: center;
+}
+
 .note-title {
     flex: 1;
     font-size: var(--font-size-lg);
@@ -1628,6 +1640,16 @@ select.form-control {
         flex-direction: column;
         align-items: stretch;
         gap: var(--space-12);
+    }
+
+    #note-header .section-header {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #note-header .section-header .editor-actions {
+        width: 100%;
     }
     
     .editor-actions {
