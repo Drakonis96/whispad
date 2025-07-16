@@ -3129,15 +3129,17 @@ def get_note():
         basename = os.path.basename(filepath)
 
         meta_path = f"{filepath}.meta"
+        tags = []
         if os.path.exists(meta_path):
             try:
                 with open(meta_path, 'r', encoding='utf-8') as meta_file:
                     meta = json.load(meta_file)
                 note_id = meta.get('id', note_id)
+                tags = [t.lower() for t in meta.get('tags', []) if isinstance(t, str)]
             except Exception:
                 pass
 
-        return jsonify({"filename": basename, "id": note_id, "content": content})
+        return jsonify({"filename": basename, "id": note_id, "content": content, "tags": tags})
     except Exception as e:
         return jsonify({"error": f"Error al leer nota: {str(e)}"}), 500
 
