@@ -827,6 +827,9 @@ class NotesApp {
             const data = await response.json();
             let markdown = data.content || '';
 
+            // Set tags from server response
+            note.tags = data.tags || [];
+
             // Remove metadata section
             const metaIndex = markdown.indexOf('\n---');
             if (metaIndex !== -1) {
@@ -2758,6 +2761,8 @@ class NotesApp {
             this.currentNote.tags.push(tag);
             this.renderNoteTags(this.currentNote);
             this.renderTagFilter();
+            // Trigger auto-save when tags are modified
+            this.scheduleAutoSave();
         }
     }
 
@@ -2766,6 +2771,8 @@ class NotesApp {
         this.currentNote.tags = this.currentNote.tags.filter(t => t !== tag);
         this.renderNoteTags(this.currentNote);
         this.renderTagFilter();
+        // Trigger auto-save when tags are modified
+        this.scheduleAutoSave();
     }
 
     sanitizeFilename(filename) {
