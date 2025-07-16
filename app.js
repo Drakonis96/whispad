@@ -4,7 +4,7 @@ let currentUser = '';
 let isAdmin = false;
 
 const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
-const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'lmstudio', 'ollama'];
+const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'groq', 'lmstudio', 'ollama'];
 let allowedTranscriptionProviders = [];
 let allowedPostprocessProviders = [];
 let defaultProviderConfig = {};
@@ -16,6 +16,7 @@ const PROVIDER_LABELS = {
     sensevoice: 'SenseVoice',
     google: 'Google',
     openrouter: 'OpenRouter',
+    groq: 'Groq',
     lmstudio: 'LM Studio',
     ollama: 'Ollama'
 };
@@ -3463,6 +3464,7 @@ class NotesApp {
         const isGemini = provider === 'google';
         const isOpenAI = provider === 'openai';
         const isOpenRouter = provider === 'openrouter';
+        const isGroq = provider === 'groq';
         const isLmStudio = provider === 'lmstudio';
         const isOllama = provider === 'ollama';
 
@@ -3485,6 +3487,11 @@ class NotesApp {
 
         if (isOpenRouter && !this.availableAPIs?.openrouter) {
             this.showNotification('OpenRouter API not configured in backend', 'warning');
+            this.showConfigModal();
+            return;
+        }
+        if (isGroq && !this.availableAPIs?.groq) {
+            this.showNotification('Groq API not configured in backend', 'warning');
             this.showConfigModal();
             return;
         }
@@ -3546,6 +3553,8 @@ class NotesApp {
                 improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
             } else if (isOpenRouter) {
                 improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
+            } else if (isGroq) {
+                improvedText = await this.improveWithGroqStream(textToImprove, action, tempSpan);
             } else if (isLmStudio) {
                 improvedText = await this.improveWithLmStudioStream(textToImprove, action, tempSpan);
             } else if (isOllama) {
@@ -3811,11 +3820,22 @@ class NotesApp {
             // Verificar si es un estilo personalizado y enviar su prompt
             const style = this.stylesConfig[action];
             const customPrompt = (style && style.custom) ? style.prompt : null;
-            
+
             const model = this.config.postprocessModel;
             return await backendAPI.improveText(text, action, 'openrouter', false, model, customPrompt);
         } catch (error) {
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
+        }
+    }
+
+    async improveWithGroq(text, action) {
+        try {
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.postprocessModel;
+            return await backendAPI.improveText(text, action, 'groq', false, model, customPrompt);
+        } catch (error) {
+            throw new Error(`Error improving text with Groq: ${error.message}`);
         }
     }
 
@@ -3930,6 +3950,80 @@ class NotesApp {
         } catch (error) {
             console.error('Error in improveWithOpenRouterStream:', error);
             throw new Error(`Error improving text with OpenRouter: ${error.message}`);
+        }
+    }
+
+    async improveWithGroqStream(text, action, tempElement) {
+        try {
+            console.log('Starting Groq stream for action:', action);
+            const style = this.stylesConfig[action];
+            const customPrompt = (style && style.custom) ? style.prompt : null;
+            const model = this.config.postprocessModel;
+            const response = await backendAPI.improveText(text, action, 'groq', true, model, customPrompt);
+
+            if (!response.body) {
+                throw new Error('No response body received');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let chunkCount = 0;
+            const state = { improvedText: '', inThink: false, thinkBuffer: '', tempElement };
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                    console.log('Groq stream completed. Total chunks:', chunkCount);
+                    break;
+                }
+
+                chunkCount++;
+                const chunk = decoder.decode(value);
+                console.log('Received Groq chunk:', chunkCount, chunk);
+                const lines = chunk.split('\n');
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const dataStr = line.slice(6).trim();
+                            if (dataStr === '[DONE]') {
+                                console.log('Received Groq [DONE] signal');
+                                break;
+                            }
+
+                            const data = JSON.parse(dataStr);
+                            console.log('Parsed Groq data:', data);
+
+                            if (data.content) {
+                                this.processThinkChunk(data.content, state);
+                                tempElement.className = 'ai-generating-text';
+                            }
+                            if (data.done) {
+                                console.log('Groq stream marked as done');
+                                const finalText = this.cleanAIResponse(state.improvedText);
+                                tempElement.textContent = finalText;
+                                tempElement.className = 'ai-generated-text';
+                                setTimeout(() => { tempElement.className = ''; }, 1000);
+                                return finalText;
+                            }
+                            if (data.error) {
+                                console.error('Error in Groq stream data:', data.error);
+                                throw new Error(data.error);
+                            }
+                        } catch (parseError) {
+                            console.warn('Failed to parse Groq JSON:', parseError, 'Line:', line);
+                            continue;
+                        }
+                    }
+                }
+            }
+
+            const finalResult = this.cleanAIResponse(state.improvedText);
+            console.log('Returning final Groq result:', finalResult);
+            return finalResult;
+        } catch (error) {
+            console.error('Error in improveWithGroqStream:', error);
+            throw new Error(`Error improving text with Groq: ${error.message}`);
         }
     }
 
@@ -4563,6 +4657,13 @@ class NotesApp {
                 { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
                 { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' },
                 { value: 'moonshotai/kimi-k2:free', text: 'Kimi K2 (Free)' }
+            ],
+            'groq': [
+                { value: 'deepseek-r1-distill-llama-70b', text: 'DeepSeek R1 Distill Llama 70B' },
+                { value: 'qwen/qwen3-32b', text: 'Qwen3 32B' },
+                { value: 'moonshotai/kimi-k2-instruct', text: 'Kimi K2 Instruct' },
+                { value: 'meta-llama/llama-4-scout-17b-16e-instruct', text: 'Llama 4 Scout 17B 16e' },
+                { value: 'meta-llama/llama-4-maverick-17b-128e-instruct', text: 'Llama 4 Maverick 17B 128e' }
             ],
             'lmstudio': (this.config.lmstudioModels ? this.config.lmstudioModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : []),
             'ollama': (this.config.ollamaModels ? this.config.ollamaModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : [])

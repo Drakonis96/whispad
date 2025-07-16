@@ -80,6 +80,7 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
 DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 LMSTUDIO_HOST = os.getenv('LMSTUDIO_HOST', '127.0.0.1')
 LMSTUDIO_PORT = os.getenv('LMSTUDIO_PORT', '1234')
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', '127.0.0.1')
@@ -123,7 +124,7 @@ WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 SAVE_LOCK = threading.Lock()
 SESSIONS = {}
 ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
-ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama"]
+ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama", "groq"]
 
 from argon2 import PasswordHasher, exceptions as argon2_exceptions
 from argon2.low_level import Type
@@ -633,6 +634,8 @@ def improve_text():
                     return chat_google_stream(messages, model)
                 elif provider == 'openrouter':
                     return chat_openrouter_stream(messages, model)
+                elif provider == 'groq':
+                    return chat_groq_stream(messages, model)
                 elif provider == 'lmstudio':
                     host = data.get('host', LMSTUDIO_HOST)
                     port = data.get('port', LMSTUDIO_PORT)
@@ -676,6 +679,11 @@ def improve_text():
                 if not model:
                     return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openrouter_stream(text, improvement_type, model, custom_prompt)
+            elif provider == 'groq':
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
+                return improve_text_groq_stream(text, improvement_type, model, custom_prompt)
             elif provider == 'lmstudio':
                 model = data.get('model')
                 host = data.get('host', LMSTUDIO_HOST)
@@ -704,6 +712,11 @@ def improve_text():
                 if not model:
                     return jsonify({"error": "Model not specified"}), 400
                 return improve_text_openrouter(text, improvement_type, model, custom_prompt)
+            elif provider == 'groq':
+                model = data.get('model')
+                if not model:
+                    return jsonify({"error": "Model not specified"}), 400
+                return improve_text_groq(text, improvement_type, model, custom_prompt)
             elif provider == 'lmstudio':
                 model = data.get('model')
                 host = data.get('host', LMSTUDIO_HOST)
@@ -1157,6 +1170,129 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
     
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
+def improve_text_groq(text, improvement_type, model, custom_prompt=None):
+    """Mejorar texto usando Groq"""
+    if not GROQ_API_KEY:
+        return jsonify({"error": "API key de Groq no configurada"}), 500
+
+    if not model:
+        return jsonify({"error": "Model not specified"}), 400
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
+            'formal': f"Rewrite the following text in a formal tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n{text}",
+            'casual': f"Rewrite the following text in a casual and friendly tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n{text}",
+            'academic': f"Rewrite the following text in an academic style. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n{text}",
+            'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
+            'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
+            'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
+
+    headers = {
+        'Authorization': f'Bearer {GROQ_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+
+    payload = {
+        'model': model,
+        'messages': [
+            {
+                'role': 'user',
+                'content': prompt
+            }
+        ],
+        'max_tokens': 1000,
+        'temperature': 0.7
+    }
+
+    response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=payload)
+
+    if response.status_code == 200:
+        result = response.json()
+        improved_text = result['choices'][0]['message']['content']
+        return jsonify({"improved_text": improved_text})
+    else:
+        return jsonify({"error": "Error al mejorar el texto"}), response.status_code
+
+def improve_text_groq_stream(text, improvement_type, model, custom_prompt=None):
+    """Mejorar texto usando Groq con streaming"""
+    if not GROQ_API_KEY:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'API key de Groq no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    if not model:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'Model not specified'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    if custom_prompt:
+        prompt = f"{custom_prompt}\n\n{text}"
+    else:
+        prompts = {
+            'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
+            'formal': f"Rewrite the following text in a formal tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n{text}",
+            'casual': f"Rewrite the following text in a casual and friendly tone. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n{text}",
+            'academic': f"Rewrite the following text in an academic style. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the rewritten text, without additional explanations:\n\n{text}",
+            'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
+            'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
+            'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+        }
+
+        prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
+
+    headers = {
+        'Authorization': f'Bearer {GROQ_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+
+    payload = {
+        'model': model,
+        'messages': [
+            { 'role': 'user', 'content': prompt }
+        ],
+        'max_tokens': 1000,
+        'temperature': 0.7,
+        'stream': True
+    }
+
+    def generate():
+        try:
+            response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'Groq error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            if 'choices' in data and len(data['choices']) > 0:
+                                delta = data['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    content = delta['content']
+                                    yield f"data: {json.dumps({'content': content})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except requests.RequestException as e:
+            yield f"data: {json.dumps({'error': f'Error de conexión con Groq API: {str(e)}'})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': f'Error interno: {str(e)}'})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
 def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prompt=None):
     """Mejorar texto usando LM Studio local"""
     if not host or not port or not model:
@@ -1460,6 +1596,42 @@ def chat_openrouter_stream(messages, model):
             response = requests.post(url, headers=headers, json=payload, stream=True)
             if response.status_code != 200:
                 yield f"data: {json.dumps({'error': f'OpenRouter error {response.status_code}'})}\n\n"
+                return
+            for line in response.iter_lines():
+                if line:
+                    line = line.decode('utf-8')
+                    if line.startswith('data: '):
+                        data_str = line[6:]
+                        if data_str.strip() == '[DONE]':
+                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            delta = data['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+def chat_groq_stream(messages, model):
+    if not GROQ_API_KEY:
+        def generate_error():
+            yield f"data: {json.dumps({'error': 'API key de Groq no configurada'})}\n\n"
+        return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
+
+    url = 'https://api.groq.com/openai/v1/chat/completions'
+    headers = { 'Authorization': f'Bearer {GROQ_API_KEY}', 'Content-Type': 'application/json' }
+    payload = { 'model': model, 'messages': messages, 'stream': True }
+
+    def generate():
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True)
+            if response.status_code != 200:
+                yield f"data: {json.dumps({'error': f'Groq error {response.status_code}'})}\n\n"
                 return
             for line in response.iter_lines():
                 if line:
@@ -2211,6 +2383,41 @@ def generate_mindmap_openrouter(note_md, topic, model):
     except Exception as e:
         return None, f'Invalid JSON returned: {str(e)}'
 
+def generate_mindmap_groq(note_md, topic, model):
+    if not GROQ_API_KEY:
+        return None, 'API key de Groq no configurada'
+    if not model:
+        return None, 'Model not specified'
+    system_prompt = (
+        "You create a mind map from a markdown note."
+        " Respond only with JSON using this schema:"
+        " {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}"
+    )
+    user_msg = f"Expand the topic '{topic}' from this note:\n\n{note_md}" if topic else note_md
+    url = 'https://api.groq.com/openai/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {GROQ_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': user_msg}
+        ]
+    }
+    resp = requests.post(url, headers=headers, json=payload)
+    if resp.status_code != 200:
+        return None, 'Groq error'
+    try:
+        content = resp.json()['choices'][0]['message']['content']
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid JSON returned: {str(e)}'
+
 def generate_mindmap_lmstudio(note_md, topic, model, host, port):
     if not host or not port or not model:
         return None, 'LM Studio host, port and model required'
@@ -2411,6 +2618,36 @@ def generate_diagram_openrouter(note_md, diagram_type, model):
     except Exception as e:
         return None, f'Invalid response: {str(e)}'
 
+def generate_diagram_groq(note_md, diagram_type, model):
+    if not GROQ_API_KEY:
+        return None, 'API key de Groq no configurada'
+    if not model:
+        return None, 'Model not specified'
+    system_prompt = diagram_prompt(diagram_type)
+    url = 'https://api.groq.com/openai/v1/chat/completions'
+    headers = {
+        'Authorization': f'Bearer {GROQ_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    payload = {
+        'model': model,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'user', 'content': note_md}
+        ]
+    }
+    resp = requests.post(url, headers=headers, json=payload)
+    if resp.status_code != 200:
+        return None, 'Groq error'
+    try:
+        content = resp.json()['choices'][0]['message']['content']
+        data = extract_json(content)
+        if data is None:
+            return None, 'Invalid JSON returned'
+        return data, None
+    except Exception as e:
+        return None, f'Invalid response: {str(e)}'
+
 
 def generate_diagram_lmstudio(note_md, diagram_type, model, host, port):
     if not host or not port or not model:
@@ -2480,7 +2717,8 @@ def check_apis():
         'openai': bool(OPENAI_API_KEY),
         'google': bool(GOOGLE_API_KEY),
         'deepseek': bool(DEEPSEEK_API_KEY),
-        'openrouter': bool(OPENROUTER_API_KEY)
+        'openrouter': bool(OPENROUTER_API_KEY),
+        'groq': bool(GROQ_API_KEY)
     }
     return jsonify(apis_status)
 
@@ -2507,6 +2745,8 @@ def generate_mindmap():
             tree, err = generate_mindmap_google(note, topic, model)
         elif provider == 'openrouter':
             tree, err = generate_mindmap_openrouter(note, topic, model)
+        elif provider == 'groq':
+            tree, err = generate_mindmap_groq(note, topic, model)
         elif provider == 'lmstudio':
             host = host or LMSTUDIO_HOST
             port = port or LMSTUDIO_PORT
@@ -2557,6 +2797,8 @@ def generate_diagram():
                 tree, err = generate_mindmap_google(note, topic, model)
             elif provider == 'openrouter':
                 tree, err = generate_mindmap_openrouter(note, topic, model)
+            elif provider == 'groq':
+                tree, err = generate_mindmap_groq(note, topic, model)
             elif provider == 'lmstudio':
                 host = host or LMSTUDIO_HOST
                 port = port or LMSTUDIO_PORT
@@ -2584,6 +2826,8 @@ def generate_diagram():
             tree, err = generate_diagram_google(note, diagram_type, model)
         elif provider == 'openrouter':
             tree, err = generate_diagram_openrouter(note, diagram_type, model)
+        elif provider == 'groq':
+            tree, err = generate_diagram_groq(note, diagram_type, model)
         elif provider == 'lmstudio':
             host = host or LMSTUDIO_HOST
             port = port or LMSTUDIO_PORT

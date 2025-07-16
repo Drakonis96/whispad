@@ -24,7 +24,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Real-time voice-to-text transcription from the browser.
 - Write and edit markdown notes.
 - Integrated note manager: create, search, tag, save, restore and download in Markdown format.
-- Automatic text enhancement using AI (OpenAI, Google or OpenRouter) with streaming responses.
+- Automatic text enhancement using AI (OpenAI, Google, OpenRouter or Groq) with streaming responses.
 - A blue marker indicating where the transcription will be inserted.
 - Compatible with multiple providers: OpenAI, SenseVoice and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
 - **NEW: SenseVoice Integration** - Advanced multilingual speech recognition with emotion detection and audio event recognition for 50+ languages.
@@ -105,7 +105,7 @@ Copy `env.example` to `.env` and add your API keys:
 ```bash
 cp env.example .env
 ```
-Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY` and `OPENROUTER_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
+Edit the `.env` file and fill in the variables `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY` and `GROQ_API_KEY` for the services you want to use. These keys enable cloud transcription and text enhancement.
 If you want to send each saved note to an external workflow (for example, an n8n or Dify instance), also set `WORKFLOW_WEBHOOK_URL` and optionally `WORKFLOW_WEBHOOK_TOKEN`.
 Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook payload now includes the username so your workflow can fetch the note from the correct folder.
 Set the database credentials in your `.env` file using `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`.

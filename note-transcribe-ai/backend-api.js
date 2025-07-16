@@ -26,7 +26,7 @@ class BackendAPI {
             throw new Error('Error checking API status');
         } catch (error) {
             console.error('Error checking APIs:', error);
-            return { openai: false, google: false, deepseek: false, openrouter: false };
+            return { openai: false, google: false, deepseek: false, openrouter: false, groq: false };
         }
     }
 
