@@ -2803,7 +2803,7 @@ select.form-control {
 /* Graph modal */
 .graph-container {
     overflow: auto;
-    max-height: 90vh;
+    max-height: 60vh;
     margin-bottom: var(--space-16);
     position: relative;
 }

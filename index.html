@@ -309,26 +309,28 @@
     <!-- Graph modal -->
     <div class="modal" id="graph-modal">
         <div class="modal-content modal-content--wide">
-            <div class="graph-container" id="graph-container"></div>
-            <div class="graph-text-output hidden" id="graph-text-output"></div>
-            <div class="checkbox-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="graph-text-toggle">
-                    <span class="checkmark"></span>
-                    Text exploration
-                </label>
-            </div>
-            <div class="graph-controls">
-                <select class="form-control" id="graph-type-select">
-                    <option value="mindmap" selected>Mindmap</option>
-                    <option value="timeline">Timeline</option>
-                    <option value="treemap">Treemap</option>
-                    <option value="radar">Radar</option>
-                    <option value="sequence">Sequence</option>
-                    <option value="user journey">User journey</option>
-                    <option value="pie chart">Pie chart</option>
-                </select>
-                <button class="btn btn--outline btn--sm" id="regenerate-graph-btn" title="Regenerate graph">↻</button>
+            <div class="modal-body">
+                <div class="graph-container" id="graph-container"></div>
+                <div class="graph-text-output hidden" id="graph-text-output"></div>
+                <div class="checkbox-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="graph-text-toggle">
+                        <span class="checkmark"></span>
+                        Text exploration
+                    </label>
+                </div>
+                <div class="graph-controls">
+                    <select class="form-control" id="graph-type-select">
+                        <option value="mindmap" selected>Mindmap</option>
+                        <option value="timeline">Timeline</option>
+                        <option value="treemap">Treemap</option>
+                        <option value="radar">Radar</option>
+                        <option value="sequence">Sequence</option>
+                        <option value="user journey">User journey</option>
+                        <option value="pie chart">Pie chart</option>
+                    </select>
+                    <button class="btn btn--outline btn--sm" id="regenerate-graph-btn" title="Regenerate graph">↻</button>
+                </div>
             </div>
             <div class="modal-actions">
                 <button class="btn btn--outline btn--sm" id="prev-graph-btn" title="Previous graph">
