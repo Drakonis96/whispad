@@ -13,7 +13,6 @@ import base64
 import re
 from datetime import datetime
 import shutil
-from markdownify import markdownify
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 from mermaid import Mermaid
@@ -1883,19 +1882,45 @@ def find_existing_note_file(saved_notes_dir, note_id):
         return None
 
 def html_to_markdown(html_content):
-    """Convert HTML from the editor into well-formed Markdown."""
+    """Convierte HTML básico a Markdown"""
     if not html_content:
         return ""
+    
+    # Reemplazos básicos de HTML a Markdown
+    markdown = html_content
+    
+    # Títulos
+    markdown = re.sub(r'<h1[^>]*>(.*?)</h1>', r'# \1', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<h2[^>]*>(.*?)</h2>', r'## \1', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<h3[^>]*>(.*?)</h3>', r'### \1', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<h4[^>]*>(.*?)</h4>', r'#### \1', markdown, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Formateo de texto
+    markdown = re.sub(r'<strong[^>]*>(.*?)</strong>', r'**\1**', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<b[^>]*>(.*?)</b>', r'**\1**', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<em[^>]*>(.*?)</em>', r'*\1*', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<i[^>]*>(.*?)</i>', r'*\1*', markdown, flags=re.IGNORECASE | re.DOTALL)
+    markdown = re.sub(r'<u[^>]*>(.*?)</u>', r'<u>\1</u>', markdown, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Listas
+    markdown = re.sub(r'<ul[^>]*>', '', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'</ul>', '', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'<ol[^>]*>', '', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'</ol>', '', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'<li[^>]*>(.*?)</li>', r'- \1', markdown, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Párrafos y saltos de línea
+    markdown = re.sub(r'<p[^>]*>', '', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'</p>', '\n\n', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'<br[^>]*/?>', '\n', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'<div[^>]*>', '', markdown, flags=re.IGNORECASE)
+    markdown = re.sub(r'</div>', '\n', markdown, flags=re.IGNORECASE)
+    
+    # Limpiar espacios en blanco excesivos
+    markdown = re.sub(r'\n\s*\n\s*\n', '\n\n', markdown)
+    markdown = markdown.strip()
 
-    # Use markdownify for a more robust conversion that preserves headings
-    # and ordered lists.
-    markdown = markdownify(html_content, heading_style="ATX")
-
-    # Normalise whitespace so the resulting markdown is easier to process
-    markdown = re.sub(r"\s+\n", "\n", markdown)
-    markdown = re.sub(r"\n{3,}", "\n\n", markdown)
-
-    return markdown.strip()
+    return markdown
 
 def sanitize_mermaid_label(text: str) -> str:
     """Remove characters that commonly break Mermaid parsing."""
