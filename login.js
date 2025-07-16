@@ -5,12 +5,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const togglePasswordBtn = document.getElementById('toggle-password');
     let multiUser = true;
 
-    // Check if we're on the right page with the expected elements
-    if (!loginBtn || !usernameInput || !passwordInput) {
-        console.warn('Login page elements not found. Make sure you are on the login page.');
-        return;
-    }
-
     try {
         const resp = await fetch('/api/app-config');
         if (resp.ok) {
@@ -44,70 +38,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     await restoreSession();
 
     async function attemptLogin() {
-        const username = usernameInput?.value?.trim();
-        const password = passwordInput?.value;
-        
-        if (!username || !password) {
-            alert('Please enter both username and password');
-            return;
-        }
-        
-        // Disable login button during request
-        if (loginBtn) {
-            loginBtn.disabled = true;
-            loginBtn.textContent = 'Logging in...';
-        }
-        
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
         try {
             const resp = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            
             if (resp.ok) {
                 const data = await resp.json();
                 localStorage.setItem('notes-app-session', JSON.stringify({ token: data.token }));
                 window.location.href = 'index.html';
             } else {
-                const errorData = await resp.json().catch(() => ({}));
-                alert(errorData.message || 'Login failed. Please check your credentials.');
+                alert('Login failed');
             }
-        } catch (error) {
-            console.error('Login error:', error);
-            alert('Login error. Please check your connection and try again.');
-        } finally {
-            // Re-enable login button
-            if (loginBtn) {
-                loginBtn.disabled = false;
-                loginBtn.textContent = 'Login';
-            }
+        } catch {
+            alert('Login error');
         }
     }
 
-    // Add event listeners with proper null checking
     if (loginBtn) {
         loginBtn.addEventListener('click', attemptLogin);
-    } else {
-        console.warn('Login button not found');
     }
-    
     if (usernameInput) {
-        usernameInput.addEventListener('keydown', e => { 
-            if (e.key === 'Enter') attemptLogin(); 
-        });
-    } else {
-        console.warn('Username input not found');
+        usernameInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
     }
-    
     if (passwordInput) {
-        passwordInput.addEventListener('keydown', e => { 
-            if (e.key === 'Enter') attemptLogin(); 
-        });
-    } else {
-        console.warn('Password input not found');
+        passwordInput.addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
     }
-    
     if (togglePasswordBtn && passwordInput) {
         togglePasswordBtn.addEventListener('click', () => {
             const isHidden = passwordInput.getAttribute('type') === 'password';
