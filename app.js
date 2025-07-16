@@ -142,6 +142,7 @@ class NotesApp {
         this.mindMapTree = null;
         this.mindMapHistory = [];
         this.mindMapIndex = -1;
+        this.graphType = 'mindmap';
         this.graphZoom = 1;
         this.graphPanX = 0;
         this.graphPanY = 0;
@@ -680,6 +681,7 @@ class NotesApp {
         const graphNext = document.getElementById('next-graph-btn');
         const graphZoomIn = document.getElementById('zoom-in-graph-btn');
         const graphZoomOut = document.getElementById('zoom-out-graph-btn');
+        const graphTypeSelect = document.getElementById('graph-type-select');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -700,6 +702,11 @@ class NotesApp {
         }
         if (graphZoomOut) {
             graphZoomOut.addEventListener('click', () => { this.zoomOutGraph(); });
+        }
+        if (graphTypeSelect) {
+            graphTypeSelect.addEventListener('change', e => {
+                this.graphType = e.target.value;
+            });
         }
 
         // Auto-guardado cada 30 segundos
@@ -1699,43 +1706,68 @@ class NotesApp {
             payload.port = this.config.ollamaPort;
         }
 
+        const typeSelect = document.getElementById('graph-type-select');
+        if (typeSelect) typeSelect.value = this.graphType;
+
         const textOutput = document.getElementById('graph-text-output');
         if (textOutput) {
             textOutput.textContent = '';
             textOutput.classList.add('hidden');
         }
 
-        this.showProcessingOverlay('Generating mind map...');
+        const diagramType = this.graphType || 'mindmap';
+        this.showProcessingOverlay(`Generating ${diagramType}...`);
 
-        backendAPI.generateMindmap(
-            payload.note,
-            payload.provider,
-            payload.model,
-            topic,
-            payload.host,
-            payload.port
-        )
-        .then(data => {
-            if (topic && this.mindMapTree) {
-                this.updateMindMapTree(topic, data.tree);
-            } else {
-                this.mindMapTree = data.tree;
-            }
-            // store history
+        const modal = document.getElementById('graph-modal');
+        const container = document.getElementById('graph-container');
+
+        const handleSvg = (data) => {
             this.mindMapHistory = this.mindMapHistory.slice(0, this.mindMapIndex + 1);
-            this.mindMapHistory.push({ tree: JSON.parse(JSON.stringify(this.mindMapTree)), svg: data.svg });
+            this.mindMapHistory.push({ tree: data.tree || null, svg: data.svg });
             this.mindMapIndex = this.mindMapHistory.length - 1;
-            const container = document.getElementById('graph-container');
             container.innerHTML = `<div id="graph-pan-zoom">${data.svg}</div>`;
             this.resetGraphTransform();
-            const modal = document.getElementById('graph-modal');
             this.hideMobileFab();
             modal.classList.add('active');
             this.setupGraphNodeListeners();
             this.updateGraphNavButtons();
-        })
-        .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'))
-        .finally(() => this.hideProcessingOverlay());
+        };
+
+        if (diagramType === 'mindmap') {
+            backendAPI.generateMindmap(
+                payload.note,
+                payload.provider,
+                payload.model,
+                topic,
+                payload.host,
+                payload.port
+            )
+            .then(data => {
+                if (topic && this.mindMapTree) {
+                    this.updateMindMapTree(topic, data.tree);
+                } else {
+                    this.mindMapTree = data.tree;
+                }
+                handleSvg(data);
+            })
+            .catch(err => this.showNotification(err.message || 'Mindmap request failed', 'error'))
+            .finally(() => this.hideProcessingOverlay());
+        } else {
+            backendAPI.generateDiagram(
+                payload.note,
+                payload.provider,
+                payload.model,
+                diagramType,
+                payload.host,
+                payload.port
+            )
+            .then(data => {
+                this.mindMapTree = null;
+                handleSvg({ svg: data.svg, tree: null });
+            })
+            .catch(err => this.showNotification(err.message || 'Diagram request failed', 'error'))
+            .finally(() => this.hideProcessingOverlay());
+        }
     }
 
     hideGraphModal() {
@@ -1777,7 +1809,8 @@ class NotesApp {
             canvas.toBlob(blob => {
                 const dl = document.createElement('a');
                 dl.href = URL.createObjectURL(blob);
-                dl.download = 'mindmap.png';
+                const type = this.graphType || 'mindmap';
+                dl.download = `${type}.png`;
                 document.body.appendChild(dl);
                 dl.click();
                 document.body.removeChild(dl);
@@ -1841,19 +1874,21 @@ class NotesApp {
     setupGraphNodeListeners() {
         const svg = document.querySelector('#graph-container svg');
         if (!svg) return;
-        svg.querySelectorAll('text').forEach(t => {
-            t.style.cursor = 'pointer';
-            t.addEventListener('click', () => {
-                const txt = t.textContent.trim();
-                if (!txt) return;
-                const textMode = document.getElementById('graph-text-toggle')?.checked;
-                if (textMode) {
-                    this.exploreGraphTopic(txt);
-                } else {
-                    this.showGraphModal(txt);
-                }
+        if (this.graphType === 'mindmap') {
+            svg.querySelectorAll('text').forEach(t => {
+                t.style.cursor = 'pointer';
+                t.addEventListener('click', () => {
+                    const txt = t.textContent.trim();
+                    if (!txt) return;
+                    const textMode = document.getElementById('graph-text-toggle')?.checked;
+                    if (textMode) {
+                        this.exploreGraphTopic(txt);
+                    } else {
+                        this.showGraphModal(txt);
+                    }
+                });
             });
-        });
+        }
         this.setupGraphPanZoom();
     }
 
