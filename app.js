@@ -206,6 +206,7 @@ class NotesApp {
         this.setupSidebarResponsive();
         this.setupMobileHeaderActions();
         this.updateMobileFabVisibility();
+        this.setupCollapsibleSections();
 
         // Migrate existing notes without ID
         await this.migrateExistingNotes();
@@ -332,6 +333,24 @@ class NotesApp {
                 this.toggleRecording();
             };
             mobileFab.addEventListener('click', handleMobileFab);
+        }
+
+        const toolsFab = document.getElementById('mobile-tools-fab');
+        const toolsMenu = document.getElementById('mobile-tools-menu');
+        if (toolsFab && toolsMenu) {
+            toolsFab.addEventListener('click', () => {
+                toolsMenu.classList.toggle('hidden');
+            });
+            toolsMenu.querySelectorAll('.mobile-tool-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.dataset.target;
+                    if (target) {
+                        const el = document.getElementById(target);
+                        if (el) el.click();
+                    }
+                    toolsMenu.classList.add('hidden');
+                });
+            });
         }
         
         // Botones de IA - Se configurarán dinámicamente con updateAIButtons()
@@ -4838,18 +4857,57 @@ class NotesApp {
 
     updateMobileFabVisibility() {
         const mobileFab = document.getElementById('mobile-record-fab');
-        if (!mobileFab) return;
+        const toolsFab = document.getElementById('mobile-tools-fab');
+        const toolsMenu = document.getElementById('mobile-tools-menu');
 
-        const shouldShow = this.config.showMobileRecordButton !== false && window.innerWidth <= 768;
-        mobileFab.classList.toggle('hidden', !shouldShow);
+        const isMobile = window.innerWidth <= 768;
+        if (mobileFab) {
+            const shouldShowRecord = this.config.showMobileRecordButton !== false && isMobile;
+            mobileFab.classList.toggle('hidden', !shouldShowRecord);
+        }
+        if (toolsFab) {
+            toolsFab.classList.toggle('hidden', !isMobile);
+            if (!isMobile && toolsMenu) {
+                toolsMenu.classList.add('hidden');
+            }
+        }
+    }
+
+    setupCollapsibleSections() {
+        const sections = document.querySelectorAll('.collapsible');
+        const handleResize = () => {
+            if (window.innerWidth > 768) {
+                sections.forEach(sec => sec.classList.remove('collapsed'));
+            }
+        };
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        sections.forEach(sec => {
+            const toggle = sec.querySelector('.collapse-toggle');
+            if (toggle) {
+                toggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (window.innerWidth <= 768) {
+                        sec.classList.toggle('collapsed');
+                    }
+                });
+            }
+        });
     }
 
     hideMobileFab() {
         const mobileFab = document.getElementById('mobile-record-fab');
+        const toolsFab = document.getElementById('mobile-tools-fab');
+        const toolsMenu = document.getElementById('mobile-tools-menu');
         if (mobileFab) mobileFab.classList.add('hidden');
+        if (toolsFab) toolsFab.classList.add('hidden');
+        if (toolsMenu) toolsMenu.classList.add('hidden');
     }
 
     showMobileFab() {
+        const toolsMenu = document.getElementById('mobile-tools-menu');
+        if (toolsMenu) toolsMenu.classList.add('hidden');
         this.updateMobileFabVisibility();
     }
 
@@ -4970,6 +5028,7 @@ function initApp() {
 document.addEventListener('DOMContentLoaded', async () => {
     const appContent = document.getElementById('app-content');
     const currentUserBtn = document.getElementById('current-user-btn');
+    const currentUserText = document.getElementById('current-user-text');
     const logoutBtn = document.getElementById('logout-btn');
 
     try {
@@ -5043,7 +5102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             }
-            currentUserBtn.textContent = currentUser;
+            if (currentUserText) currentUserText.textContent = currentUser;
             currentUserBtn.classList.remove('hidden');
             logoutBtn.classList.remove('hidden');
             document.getElementById('user-btn').classList.remove('hidden');

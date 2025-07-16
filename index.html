@@ -61,16 +61,16 @@
         </div>
         <div class="header-actions">
             <button class="btn btn--outline btn--sm admin-only" id="upload-models-btn" title="Manage whisper.cpp models">
-                <i class="fas fa-download"></i>&nbsp;Models
+                <i class="fas fa-download"></i>&nbsp;<span class="header-btn-text">Models</span>
             </button>
             <button class="btn btn--outline btn--sm" id="config-btn" title="Configure providers">
-                <i class="fas fa-cog"></i>&nbsp;Config
+                <i class="fas fa-cog"></i>&nbsp;<span class="header-btn-text">Config</span>
             </button>
             <button class="btn btn--outline btn--sm hidden" id="user-btn" title="User management">
-                <i class="fas fa-users"></i>&nbsp;Users
+                <i class="fas fa-users"></i>&nbsp;<span class="header-btn-text">Users</span>
             </button>
-            <button class="btn btn--outline btn--sm hidden" id="current-user-btn"></button>
-            <button class="btn btn--error btn--sm hidden" id="logout-btn">Logout</button>
+            <button class="btn btn--outline btn--sm hidden" id="current-user-btn"><span class="header-btn-text" id="current-user-text"></span></button>
+            <button class="btn btn--error btn--sm hidden" id="logout-btn"><span class="header-btn-text">Logout</span></button>
             <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
                 <span></span><span></span><span></span>
             </button>
@@ -117,14 +117,19 @@
         <div class="main-content">
             <!-- Top toolbar -->
             <div class="toolbar">
-                <div class="toolbar-section">
-                <h3>Transcription Tools</h3>
-                <div class="transcription-controls">
+                <div class="toolbar-section collapsible" id="transcription-section">
+                    <div class="section-header">
+                        <h3>Transcription Tools</h3>
+                        <button class="collapse-toggle" aria-label="Toggle transcription tools">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                    <div class="transcription-controls section-content">
                     <button class="btn btn--primary" id="record-btn">
                         <i class="fas fa-microphone" id="record-icon"></i>&nbsp;<span id="record-text">Record</span>
                     </button>
                     <button class="btn btn--secondary btn--sm" id="upload-audio-btn" title="Upload audio file">
-                        <i class="fas fa-file-audio"></i>&nbsp;Upload Audio
+                        <i class="fas fa-file-audio"></i>&nbsp;<span id="upload-audio-text">Upload Audio</span>
                     </button>
                     <input type="file" id="upload-audio-input" accept=".mp3,.wav" style="display:none">
                     <div class="recording-status" id="recording-status">
@@ -151,12 +156,17 @@
                             <i class="fas fa-folder"></i>&nbsp;Files
                         </button>
                     </div>
+                    </div>
                 </div>
-            </div>
-                
-                <div class="toolbar-section">
-                    <h3>AI Enhancement</h3>
-                    <div class="ai-controls" id="ai-controls">
+
+                <div class="toolbar-section collapsible" id="ai-section">
+                    <div class="section-header">
+                        <h3>AI Enhancement</h3>
+                        <button class="collapse-toggle" aria-label="Toggle AI enhancement">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                    <div class="ai-controls section-content" id="ai-controls">
                         <button class="btn btn--secondary btn--sm ai-btn" data-action="clarity" title="Improve text clarity">
                             <span class="ai-icon">✨</span>&nbsp;Clarity
                         </button>
@@ -175,29 +185,36 @@
             
             <!-- Editing area -->
             <div class="editor-container hidden">
-                <div class="editor-header">
-                    <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
-                    <div class="editor-actions">
-                        <button class="btn btn--outline btn--sm" id="save-btn">
-                            <i class="fas fa-save"></i>&nbsp;Save
-                        </button>
-                        <button class="btn btn--outline btn--sm" id="download-btn">
-                            <i class="fas fa-download"></i>&nbsp;Download
-                        </button>
-                        <button class="btn btn--outline btn--sm" id="delete-btn">
-                            <i class="fas fa-trash"></i>&nbsp;Delete
+                <div class="editor-header collapsible" id="note-header">
+                    <div class="section-header">
+                        <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
+                        <button class="collapse-toggle" aria-label="Toggle note tools">
+                            <i class="fas fa-chevron-up"></i>
                         </button>
                     </div>
-                    <div class="audio-row">
-                        <select id="audio-select" class="form-control audio-select"></select>
-                        <button class="btn btn--outline btn--sm" id="refresh-audio-btn" title="Refresh audio list">
-                            <i class="fas fa-sync"></i>
-                        </button>
-                        <button class="btn btn--outline btn--sm" id="play-audio-btn" title="Play audio">
-                            <i class="fas fa-play"></i>
-                        </button>
+                    <div class="section-content">
+                        <div class="editor-actions">
+                            <button class="btn btn--outline btn--sm" id="save-btn">
+                                <i class="fas fa-save"></i>&nbsp;<span id="save-text">Save</span>
+                            </button>
+                            <button class="btn btn--outline btn--sm" id="download-btn">
+                                <i class="fas fa-download"></i>&nbsp;<span id="download-text">Download</span>
+                            </button>
+                            <button class="btn btn--outline btn--sm" id="delete-btn">
+                                <i class="fas fa-trash"></i>&nbsp;<span id="delete-text">Delete</span>
+                            </button>
+                            <div class="audio-row">
+                                <button class="btn btn--outline btn--sm" id="refresh-audio-btn" title="Refresh audio list">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                                <select id="audio-select" class="form-control audio-select"></select>
+                                <button class="btn btn--outline btn--sm" id="play-audio-btn" title="Play audio">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <audio id="note-audio-player" class="audio-player" controls style="display:none;margin-top:4px;"></audio>
                     </div>
-                    <audio id="note-audio-player" class="audio-player" controls style="display:none;margin-top:4px;"></audio>
                 </div>
 
                 <div class="note-tags" id="note-tags"></div>
@@ -777,6 +794,29 @@
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
+    <button id="mobile-tools-fab" class="mobile-fab" aria-label="Tools">
+        <i class="fas fa-tools"></i>
+    </button>
+    <div id="mobile-tools-menu" class="mobile-tools-menu hidden">
+        <button class="mobile-tool-btn" data-target="styles-config-btn" aria-label="Styles">
+            <i class="fas fa-palette"></i>
+        </button>
+        <button class="mobile-tool-btn" data-target="translation-settings-btn" aria-label="Translation">
+            <i class="fas fa-language"></i>
+        </button>
+        <button class="mobile-tool-btn" data-target="prompt-sidebar-toggle" aria-label="Prompt">
+            <i class="fas fa-terminal"></i>
+        </button>
+        <button class="mobile-tool-btn" data-target="chat-sidebar-toggle" aria-label="Chat">
+            <i class="fas fa-comments"></i>
+        </button>
+        <button class="mobile-tool-btn" data-target="graph-btn" aria-label="Graph">
+            <i class="fas fa-project-diagram"></i>
+        </button>
+        <button class="mobile-tool-btn" data-target="files-btn" aria-label="Files">
+            <i class="fas fa-folder"></i>
+        </button>
+    </div>
     </div> <!-- end app-content -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script src="backend-api.js"></script>
