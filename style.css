@@ -2802,7 +2802,7 @@ select.form-control {
 
 /* Graph modal */
 .graph-container {
-    overflow: hidden;
+    overflow: auto;
     max-height: 90vh;
     margin-bottom: var(--space-16);
     position: relative;
@@ -2820,6 +2820,11 @@ select.form-control {
 #graph-pan-zoom svg {
     width: 100%;
     height: auto;
+}
+
+/* Ensure graph text is visible in all themes */
+#graph-container svg text {
+    fill: var(--color-text);
 }
 
 .graph-text-output {
