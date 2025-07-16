@@ -2877,6 +2877,18 @@ select.form-control {
     margin-left: var(--space-8);
 }
 
+/* Left aligned controls in graph modal */
+.graph-options {
+    display: flex;
+    align-items: center;
+    gap: var(--space-12);
+    margin-right: auto;
+}
+
+.graph-options .checkbox-group {
+    margin: 0;
+}
+
 /* Audio files list */
 #audio-file-list {
     list-style: none;
