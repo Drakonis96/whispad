@@ -165,6 +165,10 @@ Here are some screenshots of WhisPad in action:
   <img src="screenshots/screenshot4.png" alt="Transcribed notes list" width="700"/>
 </p>
 
+<p align="center">
+  <img src="screenshots/screenshot5.png" alt="Transcribed notes list" width="700"/>
+</p>
+
 ## SenseVoice Integration - Advanced Multilingual Transcription
 
 WhisPad now includes **SenseVoice**, a state-of-the-art multilingual speech recognition model with unique capabilities:
