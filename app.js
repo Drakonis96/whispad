@@ -825,6 +825,7 @@ class NotesApp {
                 throw new Error(`HTTP ${response.status}`);
             }
             const data = await response.json();
+            note.tags = (data.tags || []).map(t => t.toLowerCase());
             let markdown = data.content || '';
 
             // Remove metadata section
