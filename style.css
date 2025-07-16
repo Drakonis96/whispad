@@ -991,7 +991,7 @@ select.form-control {
     display: none;
 }
 
-.toolbar-section.collapsed .collapse-toggle i {
+.collapsible.collapsed .collapse-toggle i {
     transform: rotate(180deg);
 }
 
@@ -1159,9 +1159,8 @@ select.form-control {
     padding: var(--space-16) var(--space-20);
     border-bottom: 1px solid var(--color-border);
     display: flex;
-    align-items: center;
-    gap: var(--space-16);
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: var(--space-12);
 }
 
 .note-title {
@@ -1641,7 +1640,7 @@ select.form-control {
         display: inline-flex;
     }
 
-    .toolbar-section.collapsible.collapsed .section-content {
+    .collapsible.collapsed .section-content {
         display: none;
     }
 }

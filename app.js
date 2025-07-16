@@ -4874,7 +4874,7 @@ class NotesApp {
     }
 
     setupCollapsibleSections() {
-        const sections = document.querySelectorAll('.toolbar-section.collapsible');
+        const sections = document.querySelectorAll('.collapsible');
         const handleResize = () => {
             if (window.innerWidth > 768) {
                 sections.forEach(sec => sec.classList.remove('collapsed'));

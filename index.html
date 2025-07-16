@@ -185,29 +185,36 @@
             
             <!-- Editing area -->
             <div class="editor-container hidden">
-                <div class="editor-header">
-                    <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
-                    <div class="editor-actions">
-                        <button class="btn btn--outline btn--sm" id="save-btn">
-                            <i class="fas fa-save"></i>&nbsp;<span id="save-text">Save</span>
-                        </button>
-                        <button class="btn btn--outline btn--sm" id="download-btn">
-                            <i class="fas fa-download"></i>&nbsp;<span id="download-text">Download</span>
-                        </button>
-                        <button class="btn btn--outline btn--sm" id="delete-btn">
-                            <i class="fas fa-trash"></i>&nbsp;<span id="delete-text">Delete</span>
+                <div class="editor-header collapsible" id="note-header">
+                    <div class="section-header">
+                        <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
+                        <button class="collapse-toggle" aria-label="Toggle note tools">
+                            <i class="fas fa-chevron-up"></i>
                         </button>
                     </div>
-                    <div class="audio-row">
-                        <button class="btn btn--outline btn--sm" id="refresh-audio-btn" title="Refresh audio list">
-                            <i class="fas fa-sync"></i>
-                        </button>
-                        <select id="audio-select" class="form-control audio-select"></select>
-                        <button class="btn btn--outline btn--sm" id="play-audio-btn" title="Play audio">
-                            <i class="fas fa-play"></i>
-                        </button>
+                    <div class="section-content">
+                        <div class="editor-actions">
+                            <button class="btn btn--outline btn--sm" id="save-btn">
+                                <i class="fas fa-save"></i>&nbsp;<span id="save-text">Save</span>
+                            </button>
+                            <button class="btn btn--outline btn--sm" id="download-btn">
+                                <i class="fas fa-download"></i>&nbsp;<span id="download-text">Download</span>
+                            </button>
+                            <button class="btn btn--outline btn--sm" id="delete-btn">
+                                <i class="fas fa-trash"></i>&nbsp;<span id="delete-text">Delete</span>
+                            </button>
+                        </div>
+                        <div class="audio-row">
+                            <button class="btn btn--outline btn--sm" id="refresh-audio-btn" title="Refresh audio list">
+                                <i class="fas fa-sync"></i>
+                            </button>
+                            <select id="audio-select" class="form-control audio-select"></select>
+                            <button class="btn btn--outline btn--sm" id="play-audio-btn" title="Play audio">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        </div>
+                        <audio id="note-audio-player" class="audio-player" controls style="display:none;margin-top:4px;"></audio>
                     </div>
-                    <audio id="note-audio-player" class="audio-player" controls style="display:none;margin-top:4px;"></audio>
                 </div>
 
                 <div class="note-tags" id="note-tags"></div>
