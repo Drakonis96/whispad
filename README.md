@@ -18,8 +18,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 6. [API Key Configuration](#api-key-configuration)
 7. [Usage Guide](#usage-guide)
 8. [Screenshots](#screenshots)
-9. [Acknowledgements](#acknowledgements)
-10. [Contributors](#contributors)
+9. [Contributors](#contributors)
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
@@ -169,45 +168,9 @@ Here are some screenshots of WhisPad in action:
   <img src="screenshots/screenshot5.png" alt="Transcribed notes list" width="700"/>
 </p>
 
-## SenseVoice Integration - Advanced Multilingual Transcription
-
-WhisPad now includes **SenseVoice**, a state-of-the-art multilingual speech recognition model with unique capabilities:
-
-### Key Features
-- **50+ Language Support**: Including Chinese (Mandarin), Cantonese, English, Japanese, Korean, and many more
-- **Emotion Recognition**: Automatically detects emotions (Happy, Sad, Angry, Neutral, Fearful, Disgusted, Surprised)
-- **Audio Event Detection**: Identifies background music, applause, laughter, crying, coughing, sneezing, and more
-- **Superior Performance**: 15x faster than Whisper-Large with higher accuracy for Asian languages
-- **Complete Privacy**: All processing happens locally - no data leaves your device
-
-### How to Use SenseVoice
-
-1. **Download the Model**: Go to "Models" → Click "SenseVoice Small" to download the model (first time only)
-2. **Configure**: In "Config" → Select "SenseVoice" as your transcription provider
-3. **Customize**: Enable/disable emotion detection and audio event detection as needed
-4. **Transcribe**: Record audio and get enhanced transcriptions with emotional context
-
-### Supported Languages
-- **Chinese**: Mandarin (zh), Cantonese (yue)
-- **East Asian**: Japanese (ja), Korean (ko)
-- **Western**: English (en), and 40+ additional languages
-- **Auto-detection**: Automatically identifies the spoken language
-
-### Advanced Features
-- **Inverse Text Normalization**: Automatic punctuation and formatting
-- **Batch Processing**: Efficient processing of longer audio segments
-- **Rich Transcription**: Includes metadata about emotions and audio events
-- **High Accuracy**: Outperforms Whisper on Chinese and Cantonese content
-
-### Technical Details
-SenseVoice is based on FunASR and provides enterprise-grade speech recognition capabilities. The model is approximately 234MB and runs efficiently on both CPU and GPU.
-
-## Acknowledgements
-
-This project was developed with the help of AI tools including **Perplexity Labs**, **OpenAI Codex**, and **Claude 4**. Local transcription models run thanks to [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (a copy is bundled here for easier installation).
-
 ## Contributors
 
 - **@Drakonis96** - Main idea and core coding.
 - **@laweschan** - Contributed fresh insights and tested the application.
 
+This project was developed with the help of AI tools including **Perplexity Labs**, **OpenAI Codex**, and **Claude 4**. Local transcription models run thanks to [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (a copy is bundled here for easier installation).
