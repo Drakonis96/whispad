@@ -18,6 +18,8 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 6. [API Key Configuration](#api-key-configuration)
 7. [Usage Guide](#usage-guide)
 8. [Screenshots](#screenshots)
+9. [Acknowledgements](#acknowledgements)
+10. [Contributors](#contributors)
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
