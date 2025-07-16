@@ -1945,7 +1945,28 @@ def json_to_mermaid(data, indent=0):
 
     prefix = '  ' * indent
     title = data.get('title') or data.get('topic') or 'Root'
-    lines.append(f"{prefix}{title}")
+    shape = (data.get('shape') or '').lower()
+    icon = data.get('icon')
+    class_name = data.get('class') or data.get('className')
+
+    shape_map = {
+        'square': ('[', ']'),
+        'rounded': ('(', ')'),
+        'circle': ('((', '))'),
+        'bang': ('))', '(('),
+        'cloud': (')', '('),
+        'hexagon': ('{{', '}}'),
+    }
+    if shape in shape_map:
+        start, end = shape_map[shape]
+        title = f"{start}{title}{end}"
+
+    line = f"{prefix}{title}"
+    if icon:
+        line += f" ::icon({icon})"
+    if class_name:
+        line += f" :::{class_name}"
+    lines.append(line)
 
     subtopics = data.get('subtopics', [])
     if isinstance(subtopics, dict):
@@ -2299,7 +2320,13 @@ def diagram_prompt(diagram_type):
         return ("You create a user journey diagram from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"sections\":[{\"name\":string, \"tasks\":[{\"actor\":string, \"rating\":int, \"text\":string}]}]}.")
     if diagram_type == 'pie chart':
         return ("You create a pie chart from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"items\":[{\"label\":string, \"value\":number}]}.")
-    return ("You create a mind map from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"subtopics\":[{\"title\":string, \"subtopics\":[]}]}.")
+    return (
+        "You create a mind map from a markdown note. Respond only with JSON "
+        "using this schema: {"
+        "\"title\":string, \"shape\"?:string, \"icon\"?:string, \"class\"?:string, "
+        "\"subtopics\":[{...}]" 
+        "}. Allowed shapes: square, rounded, circle, bang, cloud, hexagon."
+    )
 
 
 def generate_diagram_openai(note_md, diagram_type, model):
