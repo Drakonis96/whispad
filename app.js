@@ -3512,15 +3512,18 @@ class NotesApp {
 
         this.showProcessingOverlay(`Improving text with AI...`);
         
+        let tempSpan;
+        let textToImprove = '';
+        let rangeToReplace;
         try {
             let improvedText = '';
-            
+
             // Guardar información importante antes de modificar el DOM
-            const textToImprove = this.selectedText;
-            const rangeToReplace = this.selectedRange.cloneRange();
+            textToImprove = this.selectedText;
+            rangeToReplace = this.selectedRange.cloneRange();
             
             // Crear un elemento span temporal para el streaming con estilo visual
-            const tempSpan = document.createElement('span');
+            tempSpan = document.createElement('span');
             tempSpan.className = 'ai-generating-text';
             tempSpan.style.padding = '2px 4px';
             tempSpan.style.borderRadius = '3px';
@@ -3582,7 +3585,8 @@ class NotesApp {
             this.updateUndoButton();
             
             this.hideProcessingOverlay();
-            this.showNotification(`Text improved: ${configuracionMejoras[action].nombre}`);
+            const styleName = this.stylesConfig[action]?.nombre || configuracionMejoras[action]?.nombre || action;
+            this.showNotification(`Text improved: ${styleName}`);
             this.handleEditorChange();
             localStorage.removeItem(this.aiBackupKey);
             this.aiInProgress = false;
