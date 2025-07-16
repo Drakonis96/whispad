@@ -5028,6 +5028,7 @@ function initApp() {
 document.addEventListener('DOMContentLoaded', async () => {
     const appContent = document.getElementById('app-content');
     const currentUserBtn = document.getElementById('current-user-btn');
+    const currentUserText = document.getElementById('current-user-text');
     const logoutBtn = document.getElementById('logout-btn');
 
     try {
@@ -5101,7 +5102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 });
             }
-            currentUserBtn.textContent = currentUser;
+            if (currentUserText) currentUserText.textContent = currentUser;
             currentUserBtn.classList.remove('hidden');
             logoutBtn.classList.remove('hidden');
             document.getElementById('user-btn').classList.remove('hidden');

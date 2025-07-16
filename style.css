@@ -48,7 +48,7 @@
     display: none;
   }
   .mobile-header-actions {
-    display: flex;
+    display: grid;
   }
 }
 
@@ -384,10 +384,20 @@ body {
 /* Container for header buttons when on mobile */
 .mobile-header-actions {
   display: none;
-  flex-direction: column;
-  gap: var(--space-12);
-  padding: var(--space-16);
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-16);
   border-bottom: 1px solid var(--color-border);
+}
+
+.mobile-header-actions .btn {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.mobile-header-actions .header-btn-text {
+  display: none;
 }
 
 *,
