@@ -17,6 +17,7 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 from mermaid import Mermaid
 import ast
+import string
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -1969,17 +1970,25 @@ def timeline_json_to_mermaid(data):
     return lines
 
 def treemap_json_to_mermaid(data, indent=0):
+    """Convert a treemap JSON structure to Mermaid syntax."""
     lines = []
     if indent == 0:
-        lines.append("treemap")
+        lines.append("treemap-beta")
     if isinstance(data, str):
-        lines.append("  " * indent + data)
+        lines.append("  " * indent + f'"{data}"')
         return lines
     if not isinstance(data, dict):
         raise ValueError("Invalid treemap data")
     prefix = "  " * indent
-    title = data.get("title") or data.get("name") or "Root"
-    lines.append(f"{prefix}{title}")
+    title = data.get("title") or data.get("name") or data.get("label") or "Root"
+    value = data.get("value")
+    class_name = data.get("class") or data.get("className")
+    line = f"{prefix}\"{title}\""
+    if value is not None:
+        line += f": {value}"
+    if class_name:
+        line += f":::{class_name}"
+    lines.append(line)
     children = data.get("children", [])
     if isinstance(children, dict):
         children = [children]
@@ -1987,20 +1996,49 @@ def treemap_json_to_mermaid(data, indent=0):
         children = [{"title": children}]
     for ch in children:
         lines.extend(treemap_json_to_mermaid(ch, indent + 1))
+    if indent == 0:
+        class_defs = data.get("classDefs") or data.get("classes")
+        if isinstance(class_defs, dict):
+            for cname, style in class_defs.items():
+                lines.append(f"\nclassDef {cname} {style}")
     return lines
 
 def radar_json_to_mermaid(data):
-    lines = ["radar"]
+    """Convert radar chart JSON to Mermaid radar-beta syntax."""
+    lines = []
     title = data.get("title")
     if title:
-        lines.append(f"    title {title}")
-    axes = data.get("axis", [])
-    for a in axes:
-        lines.append(f"    axis {a} {a}")
-    for d in data.get("data", []):
-        name = d.get("name", "data")
-        vals = ",".join(str(v) for v in d.get("values", []))
-        lines.append(f"    data {name} [{vals}]")
+        lines.append("---")
+        lines.append(f"title: \"{title}\"")
+        lines.append("---")
+    lines.append("radar-beta")
+
+    axes = data.get("axis") or data.get("axes") or []
+    if isinstance(axes, dict):
+        axes = list(axes.values())
+    alias_letters = list(string.ascii_lowercase)
+    for i in range(0, len(axes), 3):
+        group = axes[i:i+3]
+        parts = []
+        for j, label in enumerate(group):
+            alias = alias_letters[i + j]
+            parts.append(f"{alias}[\"{label}\"]")
+        lines.append("  axis " + ", ".join(parts))
+
+    for idx, dataset in enumerate(data.get("data", [])):
+        alias = alias_letters[idx]
+        values = ", ".join(str(v) for v in dataset.get("values", []))
+        name = dataset.get("name", f"series{idx+1}")
+        lines.append(f"  curve {alias}[\"{name}\"]{{{values}}}")
+
+    max_val = data.get("max")
+    min_val = data.get("min")
+    if max_val is not None or min_val is not None:
+        lines.append("")
+    if max_val is not None:
+        lines.append(f"  max {max_val}")
+    if min_val is not None:
+        lines.append(f"  min {min_val}")
     return lines
 
 def sequence_json_to_mermaid(data):
@@ -2242,9 +2280,19 @@ def diagram_prompt(diagram_type):
         return ("You create a timeline diagram from a markdown note. "
                 "Respond only with JSON using this schema: {\"title\":string, \"events\":[{\"time\":string, \"text\":string}]}.")
     if diagram_type == 'treemap':
-        return ("You create a treemap from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"children\":[{\"title\":string, \"children\":[]}]}.")
+        return (
+            "You create a treemap from a markdown note. Respond only with JSON "
+            "using this schema: {\"title\":string, \"value\"?:number, "
+            "\"class\"?:string, \"children\":[{...}], "
+            "\"classDefs\"?:{class:string}}."
+        )
     if diagram_type == 'radar':
-        return ("You create a radar chart from a markdown note. Respond only with JSON using this schema: {\"title\":string, \"axis\":[string], \"data\":[{\"name\":string, \"values\":[number]}]}.")
+        return (
+            "You create a radar chart from a markdown note. Respond only with JSON "
+            "using this schema: {\"title\":string, \"axis\":[string], "
+            "\"data\":[{\"name\":string, \"values\":[number]}], "
+            "\"max\"?:number, \"min\"?:number}."
+        )
     if diagram_type == 'sequence':
         return ("You create a sequence diagram from a markdown note. Respond only with JSON using this schema: {\"messages\":[{\"from\":string, \"to\":string, \"text\":string}]}.")
     if diagram_type == 'user journey':
