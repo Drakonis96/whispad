@@ -2802,7 +2802,7 @@ select.form-control {
 
 /* Graph modal */
 .graph-container {
-    overflow: hidden;
+    overflow: auto;
     max-height: 90vh;
     margin-bottom: var(--space-16);
     position: relative;
@@ -2822,6 +2822,11 @@ select.form-control {
     height: auto;
 }
 
+/* Ensure graph text is visible in all themes */
+#graph-container svg text {
+    fill: var(--color-text);
+}
+
 .graph-text-output {
     max-height: 40vh;
     overflow-y: auto;
@@ -2837,6 +2842,17 @@ select.form-control {
 /* Larger modal for graph view */
 #graph-modal .modal-content--wide {
     max-width: 1000px;
+}
+
+/* Smaller dropdown for graph type */
+#graph-type-select {
+    width: 150px;
+    font-size: var(--font-size-sm);
+    padding: var(--space-4) var(--space-8);
+}
+
+#regenerate-graph-btn {
+    margin-left: var(--space-8);
 }
 
 /* Audio files list */
