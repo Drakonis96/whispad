@@ -14,3 +14,5 @@ psycopg[binary]
 psycopg-pool
 argon2-cffi
 mermaid-py
+markdownify
+beautifulsoup4
