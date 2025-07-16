@@ -2475,10 +2475,14 @@ select.form-control {
     bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
     left: calc(50% + 72px);
     transform: translateX(-50%);
-    display: flex;
     flex-direction: column;
     gap: 8px;
     z-index: 1100;
+    display: none;
+}
+
+#mobile-tools-menu.hidden {
+    display: none;
 }
 
 #mobile-tools-menu button {
@@ -2496,6 +2500,9 @@ select.form-control {
 
 @media (max-width: 768px) {
     #mobile-tools-fab {
+        display: flex;
+    }
+    #mobile-tools-menu {
         display: flex;
     }
 }
