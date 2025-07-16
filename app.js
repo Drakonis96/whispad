@@ -4885,7 +4885,9 @@ class NotesApp {
         sections.forEach(sec => {
             const toggle = sec.querySelector('.collapse-toggle');
             if (toggle) {
-                toggle.addEventListener('click', () => {
+                toggle.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     if (window.innerWidth <= 768) {
                         sec.classList.toggle('collapsed');
                     }
@@ -4896,10 +4898,16 @@ class NotesApp {
 
     hideMobileFab() {
         const mobileFab = document.getElementById('mobile-record-fab');
+        const toolsFab = document.getElementById('mobile-tools-fab');
+        const toolsMenu = document.getElementById('mobile-tools-menu');
         if (mobileFab) mobileFab.classList.add('hidden');
+        if (toolsFab) toolsFab.classList.add('hidden');
+        if (toolsMenu) toolsMenu.classList.add('hidden');
     }
 
     showMobileFab() {
+        const toolsMenu = document.getElementById('mobile-tools-menu');
+        if (toolsMenu) toolsMenu.classList.add('hidden');
         this.updateMobileFabVisibility();
     }
 

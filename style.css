@@ -989,6 +989,7 @@ select.form-control {
     font-size: 16px;
     padding: 0;
     display: none;
+    cursor: pointer;
 }
 
 .collapsible.collapsed .collapse-toggle i {
@@ -1181,18 +1182,22 @@ select.form-control {
 .editor-actions {
     display: flex;
     gap: var(--space-8);
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .audio-row {
     display: flex;
     align-items: center;
     gap: var(--space-8);
-    margin-top: var(--space-8);
+    margin-top: 0;
 }
 
 .audio-select {
     width: 200px;
     flex: 0 0 auto;
+    height: 40px;
 }
 
 .audio-player {
@@ -1630,10 +1635,12 @@ select.form-control {
     .audio-row {
         justify-content: center;
         width: 100%;
+        margin-top: var(--space-8);
     }
     #audio-select {
         flex: 1 1 auto;
         width: auto;
+        height: 40px;
     }
 
     .collapse-toggle {
@@ -2473,8 +2480,9 @@ select.form-control {
     display: none;
 }
 
-#mobile-tools-menu.hidden {
-    display: none;
+
+#mobile-tools-menu:not(.hidden) {
+    display: flex;
 }
 
 #mobile-tools-menu button {
@@ -2492,9 +2500,6 @@ select.form-control {
 
 @media (max-width: 768px) {
     #mobile-tools-fab {
-        display: flex;
-    }
-    #mobile-tools-menu {
         display: flex;
     }
 }
