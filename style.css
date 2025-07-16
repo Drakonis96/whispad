@@ -1629,19 +1629,12 @@ select.form-control {
 
     /* Center audio dropdown with buttons on sides */
     .audio-row {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        align-items: center;
-    }
-    #audio-select {
-        grid-column: 2;
+        justify-content: center;
         width: 100%;
     }
-    #refresh-audio-btn {
-        grid-column: 1;
-    }
-    #play-audio-btn {
-        grid-column: 3;
+    #audio-select {
+        flex: 1 1 auto;
+        width: auto;
     }
 
     .collapse-toggle {
