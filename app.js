@@ -5171,6 +5171,19 @@ function initApp() {
     window.notesApp = new NotesApp();
 }
 
+function buildPath(file) {
+    let path = window.location.pathname;
+    if (!path.endsWith('/')) {
+        const last = path.split('/').pop();
+        if (last && !last.includes('.')) {
+            path += '/';
+        } else {
+            path = path.slice(0, path.lastIndexOf('/') + 1);
+        }
+    }
+    return path + file;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const appContent = document.getElementById('app-content');
     const currentUserBtn = document.getElementById('current-user-btn');
@@ -5265,7 +5278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (multiUser) {
         const restored = await restoreSession();
         if (!restored) {
-            window.location.href = 'login.html';
+            window.location.href = buildPath('login.html');
             return;
         }
     } else {
@@ -5339,7 +5352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (noteTitle) noteTitle.value = '';
         document.querySelector('.editor-container')?.classList.add('hidden');
         if (multiUser) {
-            window.location.href = 'login.html';
+            window.location.href = buildPath('login.html');
         } else {
             // Force a full page reload to ensure all state is cleared
             window.location.reload(true);

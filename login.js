@@ -1,3 +1,16 @@
+function buildPath(file) {
+    let path = window.location.pathname;
+    if (!path.endsWith('/')) {
+        const last = path.split('/').pop();
+        if (last && !last.includes('.')) {
+            path += '/';
+        } else {
+            path = path.slice(0, path.lastIndexOf('/') + 1);
+        }
+    }
+    return path + file;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const loginBtn = document.getElementById('login-submit');
     const usernameInput = document.getElementById('login-username');
@@ -16,7 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!multiUser) {
-        window.location.href = 'index.html';
+        window.location.href = buildPath('index.html');
         return;
     }
 
@@ -27,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const session = JSON.parse(saved);
             const resp = await fetch('/api/session-info', { headers: { 'Authorization': session.token } });
             if (resp.ok) {
-                window.location.href = 'index.html';
+                window.location.href = buildPath('index.html');
                 return true;
             }
         } catch {}
@@ -49,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (resp.ok) {
                 const data = await resp.json();
                 localStorage.setItem('notes-app-session', JSON.stringify({ token: data.token }));
-                window.location.href = 'index.html';
+                window.location.href = buildPath('index.html');
             } else {
                 alert('Login failed');
             }
