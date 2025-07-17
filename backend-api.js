@@ -1,5 +1,5 @@
-// Configuración del backend - usa rutas relativas ya que nginx hace el proxy
-const BACKEND_URL = '';
+// Configuración del backend - usa el mismo prefijo que la página actual
+const BACKEND_URL = window.location.pathname.replace(/\/[^\/]*$/, '');
 
 // Clase para manejar las llamadas al backend
 class BackendAPI {
