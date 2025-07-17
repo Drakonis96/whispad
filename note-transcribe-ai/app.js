@@ -117,7 +117,7 @@ class NotesApp {
     
     async migrateExistingNotes() {
         try {
-            const response = await fetch('/api/cleanup-notes', {
+            const response = await fetch('api/cleanup-notes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -468,7 +468,7 @@ class NotesApp {
         if (!this.currentNote) return;
         
         try {
-            const response = await fetch('/api/save-note', {
+            const response = await fetch('api/save-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -518,7 +518,7 @@ class NotesApp {
     
     async deleteNoteFromServer(noteId) {
         try {
-            const response = await fetch('/api/delete-note', {
+            const response = await fetch('api/delete-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

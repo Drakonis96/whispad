@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     let multiUser = true;
 
     try {
-        const resp = await fetch('/api/app-config');
+        const resp = await fetch('api/app-config');
         if (resp.ok) {
             const cfg = await resp.json();
             multiUser = cfg.multi_user;
@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!multiUser) {
-        window.location.href = '/index.html';
+        window.location.href = 'index.html';
         return;
     }
 
@@ -25,9 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!saved) return false;
         try {
             const session = JSON.parse(saved);
-            const resp = await fetch('/api/session-info', { headers: { 'Authorization': session.token } });
+            const resp = await fetch('api/session-info', { headers: { 'Authorization': session.token } });
             if (resp.ok) {
-                window.location.href = '/index.html';
+                window.location.href = 'index.html';
                 return true;
             }
         } catch {}
@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
         try {
-            const resp = await fetch('/api/login', {
+            const resp = await fetch('api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (resp.ok) {
                 const data = await resp.json();
                 localStorage.setItem('notes-app-session', JSON.stringify({ token: data.token }));
-                window.location.href = '/index.html';
+                window.location.href = 'index.html';
             } else {
                 alert('Login failed');
             }

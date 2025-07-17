@@ -177,7 +177,7 @@
                 
                 addLog(`📤 Enviando petición directa...`, 'info');
                 
-                const apiResponse = await fetch('/api/transcribe-gpt4o', {
+                const apiResponse = await fetch('api/transcribe-gpt4o', {
                     method: 'POST',
                     body: formData
                 });

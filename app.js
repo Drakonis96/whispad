@@ -216,7 +216,7 @@ class NotesApp {
     
     async migrateExistingNotes() {
         try {
-            const response = await authFetch('/api/cleanup-notes', {
+            const response = await authFetch('api/cleanup-notes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -824,7 +824,7 @@ class NotesApp {
     // Gestión de notas
     async loadNotes() {
         try {
-            const response = await authFetch('/api/list-saved-notes');
+            const response = await authFetch('api/list-saved-notes');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -853,7 +853,7 @@ class NotesApp {
             ? `?id=${note.id}`
             : `?filename=${encodeURIComponent(note.filename)}`;
         try {
-            const response = await authFetch(`/api/get-note${params}`);
+            const response = await authFetch(`api/get-note${params}`);
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -952,7 +952,7 @@ class NotesApp {
         localStorage.setItem(storageKey, JSON.stringify(this.config));
 
         if (isAdmin) {
-            authFetch('/api/update-provider-config', {
+            authFetch('api/update-provider-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1492,7 +1492,7 @@ class NotesApp {
         this.saveInProgress = true;
 
         try {
-            const response = await authFetch('/api/save-note', {
+            const response = await authFetch('api/save-note', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1542,7 +1542,7 @@ class NotesApp {
     
     async deleteNoteFromServer(noteId) {
         try {
-            const response = await authFetch('/api/delete-note', {
+            const response = await authFetch('api/delete-note', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1595,7 +1595,7 @@ class NotesApp {
 
     async downloadAllNotes() {
         try {
-            const response = await authFetch('/api/download-all-notes');
+            const response = await authFetch('api/download-all-notes');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
@@ -1660,7 +1660,7 @@ class NotesApp {
     async deleteSelectedAudio() {
         if (!this.audioFileToDelete) return;
         try {
-            const resp = await authFetch('/api/delete-audio', {
+            const resp = await authFetch('api/delete-audio', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ filename: this.audioFileToDelete })
@@ -1918,7 +1918,7 @@ class NotesApp {
             payload.port = this.config.ollamaPort;
         }
 
-        const response = await authFetch('/api/improve-text', {
+        const response = await authFetch('api/improve-text', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -2124,7 +2124,7 @@ class NotesApp {
     async uploadNoteFile(file) {
         const formData = new FormData();
         formData.append('note', file, file.name);
-        const response = await authFetch('/api/upload-note', { method: 'POST', body: formData });
+        const response = await authFetch('api/upload-note', { method: 'POST', body: formData });
         if (!response.ok) {
             throw new Error('Upload failed');
         }
@@ -2384,7 +2384,7 @@ class NotesApp {
                     reject(new Error('Upload timeout - file too large or connection too slow'));
                 });
                 
-                xhr.open('POST', '/api/upload-model');
+                xhr.open('POST', 'api/upload-model');
                 if (authToken) xhr.setRequestHeader('Authorization', authToken);
                 xhr.send(formData);
             });
@@ -2404,7 +2404,7 @@ class NotesApp {
         const timeoutId = setTimeout(() => controller.abort(), 30 * 60 * 1000); // 30 minutes timeout
         
         try {
-            const response = await authFetch('/api/upload-model', {
+            const response = await authFetch('api/upload-model', {
                 method: 'POST',
                 body: formData,
                 signal: controller.signal
@@ -3296,7 +3296,7 @@ class NotesApp {
             formData.append('detect_events', document.getElementById('detect-events')?.checked ?? true);
             formData.append('use_itn', document.getElementById('use-itn')?.checked ?? true);
 
-            const response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });
+            const response = await authFetch('api/upload-audio', { method: 'POST', body: formData });
             const result = await response.json();
             if (response.ok) {
                 if (result.transcription) {
@@ -3338,7 +3338,7 @@ class NotesApp {
             formData.append('audio', audioBlob, filename);
             formData.append('note_id', this.currentNote.id);
 
-            const response = await authFetch('/api/save-audio', { method: 'POST', body: formData });
+            const response = await authFetch('api/save-audio', { method: 'POST', body: formData });
             const result = await response.json();
             if (response.ok) {
                 await this.loadAudioFiles(this.currentNote.id);
@@ -3356,7 +3356,7 @@ class NotesApp {
 
     async loadAudioFiles(noteId) {
         try {
-            const response = await authFetch(`/api/list-audios?note_id=${noteId}`);
+            const response = await authFetch(`api/list-audios?note_id=${noteId}`);
             if (!response.ok) return;
             const data = await response.json();
             this.renderAudioFiles(data.audios, data.title);
@@ -3377,7 +3377,7 @@ class NotesApp {
             dl.className = 'btn btn--outline btn--sm';
             dl.innerHTML = '<i class="fas fa-download"></i>';
             dl.addEventListener('click', () => {
-                window.open(`/api/download-audio?filename=${encodeURIComponent(fname)}`);
+                window.open(`api/download-audio?filename=${encodeURIComponent(fname)}`);
             });
 
             const del = document.createElement('button');
@@ -3402,7 +3402,7 @@ class NotesApp {
         select.innerHTML = '';
         if (!noteId) return;
         try {
-            const response = await authFetch(`/api/list-audios?note_id=${noteId}`);
+            const response = await authFetch(`api/list-audios?note_id=${noteId}`);
             if (!response.ok) return;
             const data = await response.json();
             (data.audios || []).forEach(fname => {
@@ -3420,7 +3420,7 @@ class NotesApp {
         const select = document.getElementById('audio-select');
         const player = document.getElementById('note-audio-player');
         if (!select || !player || !select.value) return;
-        player.src = `/api/get-audio?filename=${encodeURIComponent(select.value)}`;
+        player.src = `api/get-audio?filename=${encodeURIComponent(select.value)}`;
         player.style.display = 'block';
         player.play().catch(err => console.error('Audio play error', err));
     }
@@ -5108,7 +5108,7 @@ class NotesApp {
             payload.port = this.config.ollamaPort;
         }
 
-        const response = await authFetch('/api/improve-text', {
+        const response = await authFetch('api/improve-text', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -5178,7 +5178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const logoutBtn = document.getElementById('logout-btn');
 
     try {
-        const resp = await fetch('/api/app-config');
+        const resp = await fetch('api/app-config');
         if (resp.ok) {
             const cfg = await resp.json();
             multiUser = cfg.multi_user;
@@ -5189,7 +5189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     async function loadDefaultProviderConfig() {
         try {
-            const resp = await authFetch('/api/default-provider-config');
+            const resp = await authFetch('api/default-provider-config');
             if (resp.ok) {
                 defaultProviderConfig = await resp.json();
             }
@@ -5204,7 +5204,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const session = JSON.parse(saved);
             authToken = session.token;
-            const resp = await authFetch('/api/session-info');
+            const resp = await authFetch('api/session-info');
             if (!resp.ok) {
                 localStorage.removeItem('notes-app-session');
                 authToken = '';
@@ -5265,14 +5265,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (multiUser) {
         const restored = await restoreSession();
         if (!restored) {
-            window.location.href = '/login.html';
+            window.location.href = 'login.html';
             return;
         }
     } else {
         currentUser = 'admin';
         isAdmin = true;
         try {
-            const resp = await fetch('/api/session-info');
+            const resp = await fetch('api/session-info');
             if (resp.ok) {
                 const data = await resp.json();
                 allowedTranscriptionProviders = data.transcription_providers || [];
@@ -5295,7 +5295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.notesApp.destroy();
         }
 
-        await authFetch('/api/logout', { method: 'POST' });
+        await authFetch('api/logout', { method: 'POST' });
         
         // Clear user-specific localStorage data
         const userStorageKey = `notes-app-data-${currentUser}`;
@@ -5339,7 +5339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (noteTitle) noteTitle.value = '';
         document.querySelector('.editor-container')?.classList.add('hidden');
         if (multiUser) {
-            window.location.href = '/login.html';
+            window.location.href = 'login.html';
         } else {
             // Force a full page reload to ensure all state is cleared
             window.location.reload(true);
@@ -5347,7 +5347,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     async function refreshUserList() {
-        const listResp = await authFetch('/api/list-users');
+        const listResp = await authFetch('api/list-users');
         if (listResp.ok) {
             const data = await listResp.json();
             const list = document.getElementById('users-list');
@@ -5399,7 +5399,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 saveBtn.addEventListener('click', async () => {
                     const tProviders = Array.from(li.querySelectorAll('.edit-transcription:checked')).map(c => c.value);
                     const ppProviders = Array.from(li.querySelectorAll('.edit-postprocess:checked')).map(c => c.value);
-                    const resp2 = await authFetch('/api/update-user-providers', {
+                    const resp2 = await authFetch('api/update-user-providers', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -5421,7 +5421,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 delBtn.style.marginLeft = '6px';
                 delBtn.addEventListener('click', async () => {
                     if (!confirm('Delete user ' + u.username + '?')) return;
-                    const resp3 = await authFetch('/api/delete-user', {
+                    const resp3 = await authFetch('api/delete-user', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ username: u.username })
@@ -5470,7 +5470,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             alert('Passwords do not match');
             return;
         }
-        const resp = await authFetch('/api/change-password', {
+        const resp = await authFetch('api/change-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ current_password: current, new_password: newPass })
@@ -5494,7 +5494,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         createUserBtn.disabled = true;
         const tProviders = Array.from(document.querySelectorAll('.create-transcription-provider:checked')).map(cb => cb.value);
         const ppProviders = Array.from(document.querySelectorAll('.create-postprocess-provider:checked')).map(cb => cb.value);
-        const resp = await authFetch('/api/create-user', {
+        const resp = await authFetch('api/create-user', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

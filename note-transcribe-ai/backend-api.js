@@ -1,5 +1,5 @@
 // Configuración del backend - usa rutas relativas ya que nginx hace el proxy
-const BACKEND_URL = '';
+const BACKEND_URL = '.';
 
 // Clase para manejar las llamadas al backend
 class BackendAPI {

@@ -4,7 +4,7 @@
 async function testSenseVoiceDownload() {
     try {
         // Test the downloadAdvancedModelStream function from backend-api.js
-        const response = await fetch('/api/download-sensevoice', {
+        const response = await fetch('api/download-sensevoice', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
