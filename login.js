@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!multiUser) {
-        window.location.href = 'index.html';
+        window.location.href = '/index.html';
         return;
     }
 
@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const session = JSON.parse(saved);
             const resp = await fetch('/api/session-info', { headers: { 'Authorization': session.token } });
             if (resp.ok) {
-                window.location.href = 'index.html';
+                window.location.href = '/index.html';
                 return true;
             }
         } catch {}
@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (resp.ok) {
                 const data = await resp.json();
                 localStorage.setItem('notes-app-session', JSON.stringify({ token: data.token }));
-                window.location.href = 'index.html';
+                window.location.href = '/index.html';
             } else {
                 alert('Login failed');
             }
