@@ -65,8 +65,10 @@ RUN rm -f /etc/nginx/sites-enabled/default && \
 # Copiar archivos estáticos al directorio que nginx puede servir
 RUN mkdir -p /usr/share/nginx/html && \
     cp index.html /usr/share/nginx/html/ && \
+    cp login.html /usr/share/nginx/html/ && \
     cp style.css /usr/share/nginx/html/ && \
     cp app.js /usr/share/nginx/html/ && \
+    cp login.js /usr/share/nginx/html/ && \
     cp backend-api.js /usr/share/nginx/html/ && \
     cp -r note-transcribe-ai /usr/share/nginx/html/ || true && \
     cp -r logos /usr/share/nginx/html/ || true

@@ -5265,7 +5265,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (multiUser) {
         const restored = await restoreSession();
         if (!restored) {
-            window.location.href = 'login.html';
+            window.location.href = '/login.html';
             return;
         }
     } else {
@@ -5339,7 +5339,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (noteTitle) noteTitle.value = '';
         document.querySelector('.editor-container')?.classList.add('hidden');
         if (multiUser) {
-            window.location.href = 'login.html';
+            window.location.href = '/login.html';
         } else {
             // Force a full page reload to ensure all state is cleared
             window.location.reload(true);
