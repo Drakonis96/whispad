@@ -1,18 +1,19 @@
-flask
-flask-cors
-requests
-python-dotenv
-pydub
-librosa
-soundfile
+# Base dependencies
+flask==3.1.1
+flask-cors==6.0.1
+requests==2.32.4
+python-dotenv==1.1.1
+pydub==0.25.1
+librosa==0.11.0
+soundfile==0.13.1
 # Optional dependencies for SenseVoice (installed on-demand)
 torch>=2.0.0
-funasr
-soundfile
-huggingface_hub
-psycopg[binary]
-psycopg-pool
-argon2-cffi
-mermaid-py
-markdownify
-beautifulsoup4
+funasr==1.2.6
+soundfile==0.13.1
+huggingface_hub==0.33.4
+psycopg[binary]==3.2.9
+psycopg-pool==3.2.6
+argon2-cffi==25.1.0
+mermaid-py==0.8.0
+markdownify==1.1.0
+beautifulsoup4==4.13.4
