@@ -390,6 +390,14 @@ class NotesApp {
             });
         }
 
+        const reprocessBtn = document.getElementById('reprocess-audio-btn');
+        if (reprocessBtn) {
+            reprocessBtn.addEventListener('click', () => {
+                this.captureInsertionRange();
+                this.reprocessSelectedAudio();
+            });
+        }
+
         const refreshBtn = document.getElementById('refresh-audio-btn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
@@ -3431,6 +3439,20 @@ class NotesApp {
             await player.play();
         } catch (err) {
             console.error('Audio play error', err);
+        }
+    }
+
+    async reprocessSelectedAudio() {
+        const select = document.getElementById('audio-select');
+        if (!select || !select.value) return;
+
+        try {
+            const resp = await authFetch(`/api/get-audio?filename=${encodeURIComponent(select.value)}`);
+            if (!resp.ok) throw new Error('Failed to fetch audio');
+            const blob = await resp.blob();
+            await this.transcribeAudio(blob);
+        } catch (err) {
+            console.error('Error retranscribing audio', err);
         }
     }
     
