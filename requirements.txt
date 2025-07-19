@@ -10,6 +10,7 @@ torch>=2.0.0
 funasr
 soundfile
 huggingface_hub
+pyannote.audio
 psycopg[binary]
 psycopg-pool
 argon2-cffi

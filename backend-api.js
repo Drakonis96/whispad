@@ -89,7 +89,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true) {
+    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, diarizeSpeakers = false, useItn = true) {
         try {
             const formData = new FormData();
             
@@ -111,18 +111,20 @@ class BackendAPI {
             formData.append('provider', 'sensevoice');
             formData.append('detect_emotion', detectEmotion.toString());
             formData.append('detect_events', detectEvents.toString());
+            formData.append('diarize_speakers', diarizeSpeakers.toString());
             formData.append('use_itn', useItn.toString());
             
             if (language && language !== 'auto') {
                 formData.append('language', language);
             }
 
-            console.log('Sending SenseVoice transcription request:', { 
-                language, 
-                detectEmotion, 
-                detectEvents, 
-                useItn, 
-                filename 
+            console.log('Sending SenseVoice transcription request:', {
+                language,
+                detectEmotion,
+                detectEvents,
+                diarizeSpeakers,
+                useItn,
+                filename
             });
 
             const response = await authFetch(`${this.baseUrl}/api/transcribe`, {

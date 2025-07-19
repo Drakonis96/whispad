@@ -529,6 +529,7 @@ def transcribe_audio():
             # Obtener opciones adicionales
             detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
             detect_events = request.form.get('detect_events', 'true').lower() == 'true'
+            diarize_speakers = request.form.get('diarize_speakers', 'false').lower() == 'true'
             use_itn = request.form.get('use_itn', 'true').lower() == 'true'
             
             result = sensevoice_wrapper.transcribe_audio_from_bytes(
@@ -537,6 +538,7 @@ def transcribe_audio():
                 language,
                 detect_emotion=detect_emotion,
                 detect_events=detect_events,
+                diarize_speakers=diarize_speakers,
                 use_itn=use_itn
             )
             
@@ -3191,6 +3193,7 @@ def upload_audio():
 
         detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
         detect_events = request.form.get('detect_events', 'true').lower() == 'true'
+        diarize_speakers = request.form.get('diarize_speakers', 'false').lower() == 'true'
         use_itn = request.form.get('use_itn', 'true').lower() == 'true'
 
         audio_bytes = audio_file.read()
@@ -3217,6 +3220,7 @@ def upload_audio():
                 language,
                 detect_emotion,
                 detect_events,
+                diarize_speakers,
                 use_itn
             )
             if result.get('success'):

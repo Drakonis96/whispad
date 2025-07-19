@@ -173,6 +173,7 @@ class NotesApp {
             ollamaHost: '127.0.0.1',
             ollamaPort: '11434',
             ollamaModels: '',
+            diarizeSpeakers: false,
             translationEnabled: false,
             translationLanguage: 'en'
         };
@@ -908,6 +909,7 @@ class NotesApp {
         // SenseVoice options
         const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
         const detectEvents = document.getElementById('detect-events')?.checked ?? true;
+        const diarizeSpeakers = document.getElementById('diarize-speakers')?.checked ?? false;
         const useItn = document.getElementById('use-itn')?.checked ?? true;
         
         // Configuración avanzada
@@ -934,6 +936,7 @@ class NotesApp {
             transcriptionPrompt,
             detectEmotion,
             detectEvents,
+            diarizeSpeakers,
             useItn,
             temperature,
             maxTokens,
@@ -1017,6 +1020,9 @@ class NotesApp {
         }
         if (document.getElementById('detect-events')) {
             document.getElementById('detect-events').checked = this.config.detectEvents !== false;
+        }
+        if (document.getElementById('diarize-speakers')) {
+            document.getElementById('diarize-speakers').checked = this.config.diarizeSpeakers === true;
         }
         if (document.getElementById('use-itn')) {
             document.getElementById('use-itn').checked = this.config.useItn !== false;
@@ -3113,6 +3119,7 @@ class NotesApp {
             // Get SenseVoice-specific options
             const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
             const detectEvents = document.getElementById('detect-events')?.checked ?? true;
+            const diarizeSpeakers = document.getElementById('diarize-speakers')?.checked ?? false;
             const useItn = document.getElementById('use-itn')?.checked ?? true;
             
             const result = await backendAPI.transcribeAudioSenseVoice(
@@ -3120,6 +3127,7 @@ class NotesApp {
                 this.config.transcriptionLanguage,
                 detectEmotion,
                 detectEvents,
+                diarizeSpeakers,
                 useItn
             );
             
@@ -3294,6 +3302,7 @@ class NotesApp {
             formData.append('model', this.config.transcriptionModel);
             formData.append('detect_emotion', document.getElementById('detect-emotion')?.checked ?? true);
             formData.append('detect_events', document.getElementById('detect-events')?.checked ?? true);
+            formData.append('diarize_speakers', document.getElementById('diarize-speakers')?.checked ?? false);
             formData.append('use_itn', document.getElementById('use-itn')?.checked ?? true);
 
             const response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });

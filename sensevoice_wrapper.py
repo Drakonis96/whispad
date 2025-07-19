@@ -197,7 +197,7 @@ class SenseVoiceWrapper:
                 subprocess.check_call([sys.executable, "-m", "pip", "install", "funasr"])
                 
             # Install additional dependencies
-            required_packages = ["soundfile", "huggingface_hub"]
+            required_packages = ["soundfile", "huggingface_hub", "pyannote.audio"]
             for package in required_packages:
                 try:
                     __import__(package.replace("-", "_"))
@@ -295,10 +295,11 @@ class SenseVoiceWrapper:
             traceback.print_exc()
             return False
     
-    def transcribe_audio_from_bytes(self, audio_bytes: bytes, filename: str, 
-                                  language: Optional[str] = None, 
+    def transcribe_audio_from_bytes(self, audio_bytes: bytes, filename: str,
+                                  language: Optional[str] = None,
                                   detect_emotion: bool = True,
                                   detect_events: bool = True,
+                                  diarize_speakers: bool = False,
                                   use_itn: bool = True) -> Dict:
         """
         Transcribe audio from bytes with SenseVoice
@@ -308,7 +309,8 @@ class SenseVoiceWrapper:
             filename: Original filename
             language: Language code (auto, zh, yue, en, ja, ko, nospeech)
             detect_emotion: Whether to detect emotions
-            detect_events: Whether to detect audio events  
+            detect_events: Whether to detect audio events
+            diarize_speakers: Whether to perform speaker diarization
             use_itn: Whether to use inverse text normalization
             
         Returns:
@@ -342,8 +344,9 @@ class SenseVoiceWrapper:
                     language=language,
                     use_itn=use_itn,
                     batch_size_s=60,
-                    merge_vad=False,  # Don't merge VAD segments for better detection
-                    merge_length_s=0,  # Don't merge short segments
+                    merge_vad=False,
+                    merge_length_s=0,
+                    output_timestamp=diarize_speakers,
                 )
                 
                 if not res or len(res) == 0:
@@ -358,6 +361,7 @@ class SenseVoiceWrapper:
                 # Get raw and processed text
                 raw_text = result.get("text", "")
                 processed_text = self.rich_transcription_postprocess(raw_text)
+                timestamps = result.get("timestamp", []) if diarize_speakers else []
                 
                 # Extract emotion and event information if available
                 emotion = None
@@ -369,10 +373,16 @@ class SenseVoiceWrapper:
                 
                 # Clean text for final output (remove special tokens)
                 clean_text = self._clean_transcription_text(processed_text)
+
+                if diarize_speakers and timestamps:
+                    speaker_segments = self._diarize_audio(temp_audio_path)
+                    transcription_text = self._apply_speaker_labels(timestamps, speaker_segments)
+                else:
+                    transcription_text = clean_text
                 
                 return {
                     'success': True,
-                    'transcription': clean_text,
+                    'transcription': transcription_text,
                     'raw_text': raw_text,
                     'processed_text': processed_text,
                     'language_detected': result.get("language", language),
@@ -436,6 +446,53 @@ class SenseVoiceWrapper:
             return clean_text
         except:
             return text
+
+    def _diarize_audio(self, audio_path: str) -> list:
+        """Run speaker diarization on audio and return segments"""
+        try:
+            from pyannote.audio import Pipeline
+
+            hf_token = os.getenv('HUGGINGFACE_TOKEN')
+            pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization", use_auth_token=hf_token)
+            diarization = pipeline(audio_path)
+            segments = []
+            for turn, _, speaker in diarization.itertracks(yield_label=True):
+                segments.append({'start': turn.start, 'end': turn.end, 'speaker': speaker})
+            return segments
+        except Exception as e:
+            print(f"Speaker diarization error: {e}")
+            return []
+
+    def _apply_speaker_labels(self, tokens: list, segments: list) -> str:
+        """Merge word tokens with speaker labels"""
+        speaker_map = {}
+        speaker_index = 1
+        output_segments = []
+        current_speaker = None
+        current_words = []
+
+        def find_speaker(time):
+            for seg in segments:
+                if seg['start'] <= time <= seg['end']:
+                    return seg['speaker']
+            return None
+
+        for token, start, _ in tokens:
+            spk = find_speaker(start)
+            if spk != current_speaker:
+                if current_words:
+                    label = speaker_map.setdefault(current_speaker, len(speaker_map) + 1)
+                    output_segments.append(f"[SPEAKER {label}]: " + ' '.join(current_words))
+                current_speaker = spk
+                current_words = [token]
+            else:
+                current_words.append(token)
+
+        if current_words:
+            label = speaker_map.setdefault(current_speaker, len(speaker_map) + 1)
+            output_segments.append(f"[SPEAKER {label}]: " + ' '.join(current_words))
+
+        return '\n'.join(output_segments)
     
     def get_model_info(self) -> Dict:
         """Get information about the SenseVoice model"""
@@ -447,7 +504,8 @@ class SenseVoiceWrapper:
             'features': [
                 'Multilingual ASR (50+ languages)',
                 'Speech emotion recognition',
-                'Audio event detection', 
+                'Audio event detection',
+                'Optional speaker diarization',
                 'High efficiency (15x faster than Whisper-Large)',
                 'Support for Chinese, Cantonese, English, Japanese, Korean'
             ],
