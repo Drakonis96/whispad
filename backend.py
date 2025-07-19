@@ -3189,6 +3189,8 @@ def upload_audio():
         provider = request.form.get('provider', 'openai')
         model = request.form.get('model')
 
+        skip_save = request.form.get('skip_save', 'false').lower() == 'true'
+
         detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
         detect_events = request.form.get('detect_events', 'true').lower() == 'true'
         use_itn = request.form.get('use_itn', 'true').lower() == 'true'
@@ -3238,6 +3240,9 @@ def upload_audio():
                 transcription = response.json().get('text', '')
             else:
                 return jsonify({"error": "Error en la transcripción"}), response.status_code
+
+        if skip_save:
+            return jsonify({"success": True, "transcription": transcription})
 
         # Convert and save WAV file
         with tempfile.NamedTemporaryFile(suffix=f".{audio_file.filename.split('.')[-1]}", delete=False) as tmp:

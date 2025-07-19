@@ -390,6 +390,14 @@ class NotesApp {
             });
         }
 
+        const reprocessBtn = document.getElementById('reprocess-audio-btn');
+        if (reprocessBtn) {
+            reprocessBtn.addEventListener('click', async () => {
+                this.captureInsertionRange();
+                await this.reprocessSelectedAudio();
+            });
+        }
+
         const refreshBtn = document.getElementById('refresh-audio-btn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => {
@@ -3279,12 +3287,12 @@ class NotesApp {
         console.log('Transcription inserted successfully');
     }
 
-    async uploadAudioFile(file) {
+    async uploadAudioFile(file, skipSave = false) {
         if (!this.currentNote) {
             this.showNotification('Please select a note first', 'error');
             return;
         }
-        this.showProcessingOverlay('Uploading audio...');
+        this.showProcessingOverlay(skipSave ? 'Processing audio...' : 'Uploading audio...');
         try {
             const formData = new FormData();
             formData.append('audio', file);
@@ -3295,6 +3303,7 @@ class NotesApp {
             formData.append('detect_emotion', document.getElementById('detect-emotion')?.checked ?? true);
             formData.append('detect_events', document.getElementById('detect-events')?.checked ?? true);
             formData.append('use_itn', document.getElementById('use-itn')?.checked ?? true);
+            formData.append('skip_save', skipSave ? 'true' : 'false');
 
             const response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });
             const result = await response.json();
@@ -3302,8 +3311,10 @@ class NotesApp {
                 if (result.transcription) {
                     this.insertTranscription(result.transcription);
                 }
-                await this.loadAudioFiles(this.currentNote.id);
-                this.showNotification('Audio uploaded');
+                if (!skipSave) {
+                    await this.loadAudioFiles(this.currentNote.id);
+                }
+                this.showNotification(skipSave ? 'Audio processed' : 'Audio uploaded');
             } else {
                 this.showNotification(result.error || 'Upload failed', 'error');
             }
@@ -3431,6 +3442,22 @@ class NotesApp {
             await player.play();
         } catch (err) {
             console.error('Audio play error', err);
+        }
+    }
+
+    async reprocessSelectedAudio() {
+        const select = document.getElementById('audio-select');
+        if (!select || !select.value) return;
+
+        try {
+            const resp = await authFetch(`/api/get-audio?filename=${encodeURIComponent(select.value)}`);
+            if (!resp.ok) throw new Error('Failed to fetch audio');
+            const blob = await resp.blob();
+            const file = new File([blob], select.value, { type: blob.type || 'audio/wav' });
+            await this.uploadAudioFile(file, true);
+        } catch (err) {
+            console.error('Audio reprocess error', err);
+            this.showNotification('Error reprocessing audio', 'error');
         }
     }
     
