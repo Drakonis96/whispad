@@ -16,3 +16,7 @@ argon2-cffi
 mermaid-py
 markdownify
 beautifulsoup4
+# Dependencies for speaker diarization
+pyannote.audio
+torchaudio
+numpy

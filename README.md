@@ -16,9 +16,10 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 4. [Installing with Docker Desktop](#installing-with-docker-desktop)
 5. [Installing from the Terminal](#installing-from-the-terminal)
 6. [API Key Configuration](#api-key-configuration)
-7. [Usage Guide](#usage-guide)
-8. [Screenshots](#screenshots)
-9. [Contributors](#contributors)
+7. [Speaker Diarization Setup](#speaker-diarization-setup)
+8. [Usage Guide](#usage-guide)
+9. [Screenshots](#screenshots)
+10. [Contributors](#contributors)
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
@@ -28,6 +29,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - A blue marker indicating where the transcription will be inserted.
 - Compatible with multiple providers: OpenAI, SenseVoice and local whisper.cpp. No model is bundled, but you can download tiny, small, base, medium or large versions from the interface.
 - **NEW: SenseVoice Integration** - Advanced multilingual speech recognition with emotion detection and audio event recognition for 50+ languages.
+- **NEW: Speaker Diarization Support** - Automatically identify different speakers in audio recordings for both Whisper Local and SenseVoice (see [Speaker Diarization Guide](SPEAKER_DIARIZATION.md)).
 - Download or upload local (.bin) whisper.cpp models directly from the interface.
 - Upload audio files which are automatically transcribed and stored alongside your notes.
 - Export all notes in a ZIP file with one click.
@@ -111,6 +113,53 @@ Use `WORKFLOW_WEBHOOK_USER` to choose which user's notes are sent. The webhook p
 Set the database credentials in your `.env` file using `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB`.
 `DATABASE_URL` should point to `postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}`.
 Set `ADMIN_PASSWORD` to define the initial admin user's password.
+
+## Speaker Diarization Setup
+
+WhisPad supports speaker diarization to automatically identify different speakers in audio recordings. This feature uses [pyannote-audio](https://github.com/pyannote/pyannote-audio) and requires a HuggingFace token with access to gated models.
+
+### Step-by-Step HuggingFace Token Setup
+
+1. **Create a HuggingFace Account**
+   - Go to [huggingface.co](https://huggingface.co) and create a free account
+
+2. **Generate an Access Token**
+   - Navigate to [HuggingFace Settings > Access Tokens](https://huggingface.co/settings/tokens)
+   - Click "New token"
+   - Choose "Read" permissions (sufficient for model access)
+   - Copy the generated token
+
+3. **Request Access to Gated Models**
+   You need to accept the terms and conditions for these specific models:
+   
+   - **pyannote/speaker-diarization-3.1**: [Accept terms here](https://huggingface.co/pyannote/speaker-diarization-3.1)
+   - **pyannote/segmentation-3.0**: [Accept terms here](https://huggingface.co/pyannote/segmentation-3.0)
+   - **speechbrain/spkrec-ecapa-voxceleb**: [Accept terms here](https://huggingface.co/speechbrain/spkrec-ecapa-voxceleb)
+   
+   **Important**: Click "Accept" on each model page. Access is usually granted immediately, but may take a few minutes.
+
+4. **Add Token to Environment**
+   Add your HuggingFace token to your `.env` file:
+   ```bash
+   HUGGINGFACE_TOKEN=your_token_here
+   ```
+
+5. **Enable Speaker Diarization**
+   - Restart WhisPad after adding the token
+   - In the transcription interface, check the "Enable Speaker Diarization" option
+   - Works with both Whisper Local and SenseVoice providers
+
+### Features
+- **Automatic Speaker Detection**: Identifies different speakers in audio
+- **Speaker Labels**: Adds `[SPEAKER 1]`, `[SPEAKER 2]` labels to transcriptions
+- **Multi-Provider Support**: Works with both local Whisper and SenseVoice
+- **Format Compatibility**: Automatically converts WebM recordings to WAV for processing
+- **Clear Line Separation**: Each speaker segment is placed on a separate line for easy reading
+
+### Troubleshooting
+- **Token Issues**: Ensure you've accepted terms for all required models
+- **Performance**: Speaker diarization adds processing time, especially on CPU
+- **Quality**: Works best with clear audio and distinct speakers
 
 ## Usage Guide
 1. Press the microphone button to record audio and get real-time transcription.

@@ -917,6 +917,10 @@ class NotesApp {
         const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
         const detectEvents = document.getElementById('detect-events')?.checked ?? true;
         const useItn = document.getElementById('use-itn')?.checked ?? true;
+        const enableSpeakerDiarization = document.getElementById('enable-speaker-diarization')?.checked ?? false;
+        
+        // Local Whisper options
+        const localEnableSpeakerDiarization = document.getElementById('local-enable-speaker-diarization')?.checked ?? false;
         
         // Configuración avanzada
         const temperature = parseFloat(document.getElementById('temperature-range').value);
@@ -943,6 +947,8 @@ class NotesApp {
             detectEmotion,
             detectEvents,
             useItn,
+            enableSpeakerDiarization,
+            localEnableSpeakerDiarization,
             temperature,
             maxTokens,
             topP,
@@ -1028,6 +1034,14 @@ class NotesApp {
         }
         if (document.getElementById('use-itn')) {
             document.getElementById('use-itn').checked = this.config.useItn !== false;
+        }
+        if (document.getElementById('enable-speaker-diarization')) {
+            document.getElementById('enable-speaker-diarization').checked = this.config.enableSpeakerDiarization === true;
+        }
+        
+        // Local Whisper options
+        if (document.getElementById('local-enable-speaker-diarization')) {
+            document.getElementById('local-enable-speaker-diarization').checked = this.config.localEnableSpeakerDiarization === true;
         }
         
         // Configuración avanzada
@@ -3090,11 +3104,14 @@ class NotesApp {
             console.log('🎯 Using local whisper.cpp transcription');
             console.log('Language:', this.config.transcriptionLanguage);
             
+            const enableSpeakerDiarization = this.config.localEnableSpeakerDiarization || false;
+            
             const result = await backendAPI.transcribeAudio(
                 audioBlob,
                 this.config.transcriptionLanguage,
                 this.config.transcriptionModel,
-                'local'
+                'local',
+                enableSpeakerDiarization
             );
             
             console.log('Local transcription result:', result);
@@ -3122,13 +3139,15 @@ class NotesApp {
             const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
             const detectEvents = document.getElementById('detect-events')?.checked ?? true;
             const useItn = document.getElementById('use-itn')?.checked ?? true;
+            const enableSpeakerDiarization = document.getElementById('enable-speaker-diarization')?.checked ?? false;
             
             const result = await backendAPI.transcribeAudioSenseVoice(
                 audioBlob,
                 this.config.transcriptionLanguage,
                 detectEmotion,
                 detectEvents,
-                useItn
+                useItn,
+                enableSpeakerDiarization
             );
             
             console.log('SenseVoice transcription result:', result);
@@ -3268,11 +3287,28 @@ class NotesApp {
             range.collapse(false);
         }
         
-        // Insertar texto
-        const textNode = document.createTextNode(transcription + ' ');
-        range.insertNode(textNode);
-        range.setStartAfter(textNode);
-        range.setEndAfter(textNode);
+        // Convert newlines to HTML breaks for proper rendering
+        // This ensures speaker diarization line breaks are visible immediately
+        const formattedText = transcription.replace(/\n\n/g, '<br><br>').replace(/\n/g, '<br>');
+        
+        // Create a temporary container to convert HTML to DOM nodes
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = formattedText;
+        
+        // Insert each node from the temporary container
+        while (tempDiv.firstChild) {
+            const node = tempDiv.removeChild(tempDiv.firstChild);
+            range.insertNode(node);
+            range.setStartAfter(node);
+            range.setEndAfter(node);
+        }
+        
+        // Add a space after the transcription
+        const spaceNode = document.createTextNode(' ');
+        range.insertNode(spaceNode);
+        range.setStartAfter(spaceNode);
+        range.setEndAfter(spaceNode);
+        
         selection.removeAllRanges();
         selection.addRange(range);
         this.insertionRange = range.cloneRange();
@@ -3284,7 +3320,7 @@ class NotesApp {
         // Disparar evento de cambio
         this.handleEditorChange();
         
-        console.log('Transcription inserted successfully');
+        console.log('Transcription inserted successfully with proper line breaks');
     }
 
     async uploadAudioFile(file, skipSave = false) {
@@ -3303,6 +3339,14 @@ class NotesApp {
             formData.append('detect_emotion', document.getElementById('detect-emotion')?.checked ?? true);
             formData.append('detect_events', document.getElementById('detect-events')?.checked ?? true);
             formData.append('use_itn', document.getElementById('use-itn')?.checked ?? true);
+            
+            // Speaker diarization settings
+            if (this.config.transcriptionProvider === 'sensevoice') {
+                formData.append('enable_speaker_diarization', document.getElementById('enable-speaker-diarization')?.checked ?? false);
+            } else if (this.config.transcriptionProvider === 'local') {
+                formData.append('enable_speaker_diarization', document.getElementById('local-enable-speaker-diarization')?.checked ?? false);
+            }
+            
             formData.append('skip_save', skipSave ? 'true' : 'false');
 
             const response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });
@@ -4857,9 +4901,14 @@ class NotesApp {
     toggleSenseVoiceOptions() {
         const provider = document.getElementById('transcription-provider').value;
         const sensevoiceOptions = document.getElementById('sensevoice-options');
+        const localWhisperOptions = document.getElementById('local-whisper-options');
         
         if (sensevoiceOptions) {
             sensevoiceOptions.style.display = provider === 'sensevoice' ? 'block' : 'none';
+        }
+        
+        if (localWhisperOptions) {
+            localWhisperOptions.style.display = provider === 'local' ? 'block' : 'none';
         }
         
         // Update language options for SenseVoice

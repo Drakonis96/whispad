@@ -30,7 +30,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai') {
+    async transcribeAudio(audioBlob, language = 'auto', model = 'whisper-1', provider = 'openai', enableSpeakerDiarization = false) {
         try {
             const formData = new FormData();
             
@@ -51,12 +51,13 @@ class BackendAPI {
             formData.append('audio', audioBlob, filename);
             formData.append('model', model);
             formData.append('provider', provider);
+            formData.append('enable_speaker_diarization', enableSpeakerDiarization.toString());
             
             if (language && language !== 'auto') {
                 formData.append('language', language);
             }
 
-            console.log('Sending transcription request:', { model, provider, language, filename });
+            console.log('Sending transcription request:', { model, provider, language, filename, enableSpeakerDiarization });
 
             const response = await authFetch(`${this.baseUrl}/api/transcribe`, {
                 method: 'POST',
@@ -89,7 +90,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true) {
+    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true, enableSpeakerDiarization = false) {
         try {
             const formData = new FormData();
             
@@ -112,6 +113,7 @@ class BackendAPI {
             formData.append('detect_emotion', detectEmotion.toString());
             formData.append('detect_events', detectEvents.toString());
             formData.append('use_itn', useItn.toString());
+            formData.append('enable_speaker_diarization', enableSpeakerDiarization.toString());
             
             if (language && language !== 'auto') {
                 formData.append('language', language);
@@ -122,6 +124,7 @@ class BackendAPI {
                 detectEmotion, 
                 detectEvents, 
                 useItn, 
+                enableSpeakerDiarization,
                 filename 
             });
 

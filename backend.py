@@ -16,6 +16,7 @@ import shutil
 from markdownify import markdownify
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
+from speaker_diarization import get_speaker_diarization_wrapper
 from mermaid import Mermaid
 import ast
 import string
@@ -479,6 +480,7 @@ def transcribe_audio():
         # Obtener parámetros del request
         language = request.form.get('language', None)  # None = detección automática
         provider = request.form.get('provider', 'openai')  # openai o local
+        enable_speaker_diarization = request.form.get('enable_speaker_diarization', 'false').lower() == 'true'
 
         tp, _ = get_user_providers(username)
         if tp and provider not in tp:
@@ -509,8 +511,25 @@ def transcribe_audio():
             )
             
             if result.get('success'):
+                transcription = result.get('transcription', '')
+                
+                # Apply speaker diarization if enabled
+                if enable_speaker_diarization and transcription:
+                    try:
+                        diarization_wrapper = get_speaker_diarization_wrapper()
+                        if diarization_wrapper.is_available() or diarization_wrapper.initialize():
+                            segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, audio_file.filename)
+                            if segments:
+                                transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
+                                print(f"Applied speaker diarization: {len(segments)} segments found")
+                        else:
+                            print("Speaker diarization not available, continuing without it")
+                    except Exception as e:
+                        print(f"Error applying speaker diarization: {e}")
+                        # Continue without diarization
+                
                 return jsonify({
-                    "transcription": result.get('transcription', ''),
+                    "transcription": transcription,
                     "provider": "local",
                     "model": result.get('model')
                 })
@@ -541,8 +560,25 @@ def transcribe_audio():
             )
             
             if result.get('success'):
+                transcription = result.get('transcription', '')
+                
+                # Apply speaker diarization if enabled
+                if enable_speaker_diarization and transcription:
+                    try:
+                        diarization_wrapper = get_speaker_diarization_wrapper()
+                        if diarization_wrapper.is_available() or diarization_wrapper.initialize():
+                            segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, audio_file.filename)
+                            if segments:
+                                transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
+                                print(f"Applied speaker diarization: {len(segments)} segments found")
+                        else:
+                            print("Speaker diarization not available, continuing without it")
+                    except Exception as e:
+                        print(f"Error applying speaker diarization: {e}")
+                        # Continue without diarization
+                
                 response_data = {
-                    "transcription": result.get('transcription', ''),
+                    "transcription": transcription,
                     "provider": "sensevoice",
                     "model": result.get('model', 'SenseVoiceSmall'),
                     "language_detected": result.get('language_detected'),
@@ -3194,6 +3230,7 @@ def upload_audio():
         detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
         detect_events = request.form.get('detect_events', 'true').lower() == 'true'
         use_itn = request.form.get('use_itn', 'true').lower() == 'true'
+        enable_speaker_diarization = request.form.get('enable_speaker_diarization', 'false').lower() == 'true'
 
         audio_bytes = audio_file.read()
 
@@ -3210,6 +3247,18 @@ def upload_audio():
             result = whisper_wrapper.transcribe_audio_from_bytes(audio_bytes, audio_file.filename, language, model_path)
             if result.get('success'):
                 transcription = result.get('transcription', '')
+                
+                # Apply speaker diarization if enabled
+                if enable_speaker_diarization and transcription:
+                    try:
+                        diarization_wrapper = get_speaker_diarization_wrapper()
+                        if diarization_wrapper.is_available() or diarization_wrapper.initialize():
+                            segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, audio_file.filename)
+                            if segments:
+                                transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
+                    except Exception as e:
+                        print(f"Error applying speaker diarization: {e}")
+                        
         elif provider == 'sensevoice':
             if not sensevoice_wrapper or not sensevoice_wrapper.is_available():
                 return jsonify({"error": "SenseVoice no está disponible"}), 500
@@ -3223,6 +3272,18 @@ def upload_audio():
             )
             if result.get('success'):
                 transcription = result.get('transcription', '')
+                
+                # Apply speaker diarization if enabled
+                if enable_speaker_diarization and transcription:
+                    try:
+                        diarization_wrapper = get_speaker_diarization_wrapper()
+                        if diarization_wrapper.is_available() or diarization_wrapper.initialize():
+                            segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, audio_file.filename)
+                            if segments:
+                                transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
+                    except Exception as e:
+                        print(f"Error applying speaker diarization: {e}")
+                        
         else:
             if not OPENAI_API_KEY:
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
