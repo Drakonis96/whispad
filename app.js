@@ -3416,13 +3416,22 @@ class NotesApp {
         }
     }
 
-    playSelectedAudio() {
+    async playSelectedAudio() {
         const select = document.getElementById('audio-select');
         const player = document.getElementById('note-audio-player');
         if (!select || !player || !select.value) return;
-        player.src = `/api/get-audio?filename=${encodeURIComponent(select.value)}`;
-        player.style.display = 'block';
-        player.play().catch(err => console.error('Audio play error', err));
+
+        try {
+            const resp = await authFetch(`/api/get-audio?filename=${encodeURIComponent(select.value)}`);
+            if (!resp.ok) throw new Error('Failed to fetch audio');
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            player.src = url;
+            player.style.display = 'block';
+            await player.play();
+        } catch (err) {
+            console.error('Audio play error', err);
+        }
     }
     
     // Mejora con IA
