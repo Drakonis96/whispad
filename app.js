@@ -383,10 +383,17 @@ class NotesApp {
             });
         }
 
-        const playBtn = document.getElementById('play-audio-btn');
-        if (playBtn) {
-            playBtn.addEventListener('click', () => {
-                this.playSelectedAudio();
+       const playBtn = document.getElementById('play-audio-btn');
+       if (playBtn) {
+           playBtn.addEventListener('click', () => {
+               this.playSelectedAudio();
+           });
+       }
+
+        const reprocessBtn = document.getElementById('reprocess-audio-btn');
+        if (reprocessBtn) {
+            reprocessBtn.addEventListener('click', () => {
+                this.reprocessSelectedAudio();
             });
         }
 
@@ -3431,6 +3438,22 @@ class NotesApp {
             await player.play();
         } catch (err) {
             console.error('Audio play error', err);
+        }
+    }
+
+    async reprocessSelectedAudio() {
+        const select = document.getElementById('audio-select');
+        if (!select || !select.value) return;
+
+        this.captureInsertionRange();
+
+        try {
+            const resp = await authFetch(`/api/get-audio?filename=${encodeURIComponent(select.value)}`);
+            if (!resp.ok) throw new Error('Failed to fetch audio');
+            const blob = await resp.blob();
+            await this.transcribeAudio(blob);
+        } catch (err) {
+            console.error('Audio reprocess error', err);
         }
     }
     
