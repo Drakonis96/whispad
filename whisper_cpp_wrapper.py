@@ -268,11 +268,18 @@ class WhisperCppWrapper:
             os.unlink(original_temp_path)
             if wav_temp_path != original_temp_path:
                 os.unlink(wav_temp_path)
-            
+
             return result
             
         except Exception as e:
             logger.error(f"Error transcribing from bytes: {e}")
+            try:
+                if 'original_temp_path' in locals() and os.path.exists(original_temp_path):
+                    os.unlink(original_temp_path)
+                if 'wav_temp_path' in locals() and os.path.exists(wav_temp_path) and wav_temp_path != original_temp_path:
+                    os.unlink(wav_temp_path)
+            except Exception:
+                pass
             return {
                 "success": False,
                 "error": str(e),
@@ -299,8 +306,20 @@ class WhisperCppWrapper:
                 wav_path = wav_file.name
             
             # Use FFmpeg to convert to WAV with whisper.cpp compatible settings
-            ffmpeg_cmd = [
-                'ffmpeg',
+            # Try to hint the input format to FFmpeg based on the original file
+            input_ext = Path(original_filename).suffix.lower()
+            input_fmt = None
+            if input_ext == '.webm':
+                input_fmt = 'webm'
+            elif input_ext == '.ogg':
+                input_fmt = 'ogg'
+            elif input_ext in {'.mp4', '.m4a'}:
+                input_fmt = 'mp4'
+
+            ffmpeg_cmd = ['ffmpeg']
+            if input_fmt:
+                ffmpeg_cmd.extend(['-f', input_fmt])
+            ffmpeg_cmd.extend([
                 '-i', input_path,
                 '-ar', '16000',  # Sample rate 16kHz (whisper.cpp standard)
                 '-ac', '1',      # Mono audio
@@ -308,7 +327,7 @@ class WhisperCppWrapper:
                 '-f', 'wav',     # Force WAV format
                 '-y',            # Overwrite output file
                 wav_path
-            ]
+            ])
             
             logger.info(f"Running FFmpeg command: {' '.join(ffmpeg_cmd)}")
             
@@ -378,15 +397,12 @@ class WhisperCppWrapper:
             
         except Exception as e:
             logger.error(f"Error converting audio to WAV: {e}")
-            # Clean up failed WAV file
             if 'wav_path' in locals() and os.path.exists(wav_path):
                 try:
                     os.unlink(wav_path)
-                except:
+                except Exception:
                     pass
-            # Return original path as last resort
-            logger.warning("Using original file as-is (may not work with whisper.cpp)")
-            return input_path
+            raise
     
     def get_available_models(self) -> list:
         """Get list of available models in the models directory"""

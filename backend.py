@@ -3284,8 +3284,10 @@ def _save_audio_file(audio_bytes, orig_filename, note_id, username):
     with tempfile.NamedTemporaryFile(suffix=f".{orig_filename.split('.')[-1]}", delete=False) as tmp:
         tmp.write(audio_bytes)
         orig_path = tmp.name
-    wav_path = whisper_wrapper._convert_to_wav(orig_path, orig_filename)
-    os.unlink(orig_path)
+    try:
+        wav_path = whisper_wrapper._convert_to_wav(orig_path, orig_filename)
+    finally:
+        os.unlink(orig_path)
     audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
     os.makedirs(audio_dir, exist_ok=True)
     base = sanitize_filename(f"{note_id}-audio")
@@ -3352,8 +3354,10 @@ def upload_audio():
             tmp.write(audio_bytes)
             orig_path = tmp.name
 
-        wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
-        os.unlink(orig_path)
+        try:
+            wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
+        finally:
+            os.unlink(orig_path)
 
         audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
         os.makedirs(audio_dir, exist_ok=True)
@@ -3453,8 +3457,10 @@ def save_audio():
             tmp.write(audio_bytes)
             orig_path = tmp.name
 
-        wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
-        os.unlink(orig_path)
+        try:
+            wav_path = whisper_wrapper._convert_to_wav(orig_path, audio_file.filename)
+        finally:
+            os.unlink(orig_path)
 
         audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
         os.makedirs(audio_dir, exist_ok=True)
