@@ -100,6 +100,13 @@ const configuracionMejoras = {
         prompt: "Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:",
         visible: true
     },
+    remove_emoji: {
+        nombre: "Remove emoji",
+        descripcion: "Remove all emojis from the text",
+        icono: "🫠",
+        prompt: "Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:",
+        visible: false
+    },
     diarization_fix: {
         nombre: "Fix Speaker Tags",
         descripcion: "Corrects speaker diarization tags",
@@ -4668,6 +4675,9 @@ class NotesApp {
             },
             expand: (texto) => {
                 return texto + ' [Se han añadido detalles adicionales y contexto relevante para enriquecer el contenido y proporcionar una comprensión más completa del tema tratado.]';
+            },
+            remove_emoji: (texto) => {
+                return texto.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').trim();
             },
             diarization_fix: (texto) => {
                 return this.formatDiarizationTags(texto);
