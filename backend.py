@@ -780,7 +780,7 @@ def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -838,7 +838,7 @@ def improve_text_google(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -888,7 +888,7 @@ def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -976,7 +976,7 @@ def improve_text_google_stream(text, improvement_type, model, custom_prompt=None
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -1059,7 +1059,7 @@ def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -1136,7 +1136,7 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -1228,7 +1228,7 @@ def improve_text_groq(text, improvement_type, model, custom_prompt=None):
         return jsonify({"error": "Model not specified"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1284,7 +1284,7 @@ def improve_text_groq_stream(text, improvement_type, model, custom_prompt=None):
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1352,7 +1352,7 @@ def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prom
         return jsonify({"error": "LM Studio host, port and model required"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1417,7 +1417,7 @@ def improve_text_lmstudio_stream(text, improvement_type, model, host, port, cust
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1480,7 +1480,7 @@ def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt
         return jsonify({"error": "Ollama host, port and model required"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1525,7 +1525,7 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}",
+        prompt = f"{custom_prompt}\n\n{text}"
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -2947,6 +2947,66 @@ def update_provider_config():
     OLLAMA_PORT = data.get('ollama_port', OLLAMA_PORT)
     save_server_config()
     return jsonify({"success": True})
+
+
+@app.route('/api/user-styles', methods=['GET', 'POST'])
+def user_styles():
+    """Load or save custom AI styles for the current user."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    os.makedirs(user_dir, exist_ok=True)
+    styles_file = os.path.join(user_dir, 'styles.json')
+
+    if request.method == 'GET':
+        if os.path.exists(styles_file):
+            try:
+                with open(styles_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return jsonify({"styles": data})
+            except Exception as e:
+                return jsonify({"error": f"Error reading styles: {str(e)}"}), 500
+        return jsonify({"styles": {}})
+
+    data = request.get_json() or {}
+    try:
+        with open(styles_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": f"Error saving styles: {str(e)}"}), 500
+
+
+@app.route('/api/user-config', methods=['GET', 'POST'])
+def user_config():
+    """Load or save config settings for the current user."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    os.makedirs(user_dir, exist_ok=True)
+    config_file = os.path.join(user_dir, 'config.json')
+
+    if request.method == 'GET':
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return jsonify({"config": data})
+            except Exception as e:
+                return jsonify({"error": f"Error reading config: {str(e)}"}), 500
+        return jsonify({"config": {}})
+
+    data = request.get_json() or {}
+    try:
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": f"Error saving config: {str(e)}"}), 500
 
 @app.route('/api/list-saved-notes', methods=['GET'])
 def list_saved_notes():
