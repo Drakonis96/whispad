@@ -20,6 +20,7 @@ from speaker_diarization import get_speaker_diarization_wrapper
 from mermaid import Mermaid
 import ast
 import string
+from pydub import AudioSegment
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -3202,6 +3203,91 @@ def upload_note():
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
 
+def _transcribe_bytes(audio_bytes, filename, language, provider, model=None,
+                      detect_emotion=True, detect_events=True, use_itn=True,
+                      enable_speaker_diarization=False):
+    transcription = ''
+    if provider == 'local':
+        if not WHISPER_CPP_AVAILABLE:
+            raise RuntimeError('Whisper.cpp local no disponible')
+        models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
+        model_filename = sanitize_filename(model or '')
+        model_path = os.path.join(models_dir, model_filename)
+        if not is_path_within_directory(models_dir, model_path):
+            raise RuntimeError('Invalid model path')
+        result = whisper_wrapper.transcribe_audio_from_bytes(audio_bytes, filename, language, model_path)
+        if result.get('success'):
+            transcription = result.get('transcription', '')
+            if enable_speaker_diarization and transcription:
+                try:
+                    diarization_wrapper = get_speaker_diarization_wrapper()
+                    if diarization_wrapper.is_available() or diarization_wrapper.initialize():
+                        segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, filename)
+                        if segments:
+                            transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
+                except Exception:
+                    pass
+    elif provider == 'sensevoice':
+        if not sensevoice_wrapper or not sensevoice_wrapper.is_available():
+            raise RuntimeError('SenseVoice no disponible')
+        result = sensevoice_wrapper.transcribe_audio_from_bytes(
+            audio_bytes,
+            filename,
+            language,
+            detect_emotion,
+            detect_events,
+            use_itn
+        )
+        if result.get('success'):
+            transcription = result.get('transcription', '')
+            if enable_speaker_diarization and transcription:
+                try:
+                    diarization_wrapper = get_speaker_diarization_wrapper()
+                    if diarization_wrapper.is_available() or diarization_wrapper.initialize():
+                        segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, filename)
+                        if segments:
+                            transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
+                except Exception:
+                    pass
+    else:
+        if not OPENAI_API_KEY:
+            raise RuntimeError('API key de OpenAI no configurada')
+        if not model:
+            raise RuntimeError('Model not specified')
+        files = {
+            'file': (filename, io.BytesIO(audio_bytes), 'application/octet-stream'),
+            'model': (None, model)
+        }
+        if language and language != 'auto':
+            files['language'] = (None, language)
+        headers = {'Authorization': f'Bearer {OPENAI_API_KEY}'}
+        resp = requests.post('https://api.openai.com/v1/audio/transcriptions', files=files, headers=headers)
+        if resp.status_code == 200:
+            transcription = resp.json().get('text', '')
+        else:
+            raise RuntimeError('Error en la transcripción')
+    return transcription
+
+def _save_audio_file(audio_bytes, orig_filename, note_id, username):
+    with tempfile.NamedTemporaryFile(suffix=f".{orig_filename.split('.')[-1]}", delete=False) as tmp:
+        tmp.write(audio_bytes)
+        orig_path = tmp.name
+    wav_path = whisper_wrapper._convert_to_wav(orig_path, orig_filename)
+    os.unlink(orig_path)
+    audio_dir = os.path.join(os.getcwd(), 'saved_audios', username)
+    os.makedirs(audio_dir, exist_ok=True)
+    base = sanitize_filename(f"{note_id}-audio")
+    counter = 1
+    filename = f"{base}{counter}.wav"
+    while os.path.exists(os.path.join(audio_dir, filename)):
+        counter += 1
+        filename = f"{base}{counter}.wav"
+    final_path = os.path.join(audio_dir, filename)
+    if not is_path_within_directory(audio_dir, final_path):
+        raise RuntimeError('Invalid file path')
+    shutil.move(wav_path, final_path)
+    return filename
+
 @app.route('/api/upload-audio', methods=['POST'])
 def upload_audio():
     """Transcribe and store an uploaded audio file linked to a note"""
@@ -3234,73 +3320,17 @@ def upload_audio():
 
         audio_bytes = audio_file.read()
 
-        transcription = ''
-
-        if provider == 'local':
-            if not WHISPER_CPP_AVAILABLE:
-                return jsonify({"error": "Whisper.cpp local no está disponible"}), 500
-            models_dir = os.path.join(os.getcwd(), 'whisper-cpp-models')
-            model_filename = sanitize_filename(model or '')
-            model_path = os.path.join(models_dir, model_filename)
-            if not is_path_within_directory(models_dir, model_path):
-                return jsonify({"error": "Invalid model path"}), 400
-            result = whisper_wrapper.transcribe_audio_from_bytes(audio_bytes, audio_file.filename, language, model_path)
-            if result.get('success'):
-                transcription = result.get('transcription', '')
-                
-                # Apply speaker diarization if enabled
-                if enable_speaker_diarization and transcription:
-                    try:
-                        diarization_wrapper = get_speaker_diarization_wrapper()
-                        if diarization_wrapper.is_available() or diarization_wrapper.initialize():
-                            segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, audio_file.filename)
-                            if segments:
-                                transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
-                    except Exception as e:
-                        print(f"Error applying speaker diarization: {e}")
-                        
-        elif provider == 'sensevoice':
-            if not sensevoice_wrapper or not sensevoice_wrapper.is_available():
-                return jsonify({"error": "SenseVoice no está disponible"}), 500
-            result = sensevoice_wrapper.transcribe_audio_from_bytes(
-                audio_bytes,
-                audio_file.filename,
-                language,
-                detect_emotion,
-                detect_events,
-                use_itn
-            )
-            if result.get('success'):
-                transcription = result.get('transcription', '')
-                
-                # Apply speaker diarization if enabled
-                if enable_speaker_diarization and transcription:
-                    try:
-                        diarization_wrapper = get_speaker_diarization_wrapper()
-                        if diarization_wrapper.is_available() or diarization_wrapper.initialize():
-                            segments = diarization_wrapper.diarize_audio_bytes(audio_bytes, audio_file.filename)
-                            if segments:
-                                transcription = diarization_wrapper.apply_diarization_to_transcription(transcription, segments)
-                    except Exception as e:
-                        print(f"Error applying speaker diarization: {e}")
-                        
-        else:
-            if not OPENAI_API_KEY:
-                return jsonify({"error": "API key de OpenAI no configurada"}), 500
-            if not model:
-                return jsonify({"error": "Model not specified"}), 400
-            files = {
-                'file': (audio_file.filename, io.BytesIO(audio_bytes), audio_file.content_type),
-                'model': (None, model)
-            }
-            if language and language != 'auto':
-                files['language'] = (None, language)
-            headers = {'Authorization': f'Bearer {OPENAI_API_KEY}'}
-            response = requests.post('https://api.openai.com/v1/audio/transcriptions', files=files, headers=headers)
-            if response.status_code == 200:
-                transcription = response.json().get('text', '')
-            else:
-                return jsonify({"error": "Error en la transcripción"}), response.status_code
+        transcription = _transcribe_bytes(
+            audio_bytes,
+            audio_file.filename,
+            language,
+            provider,
+            model,
+            detect_emotion,
+            detect_events,
+            use_itn,
+            enable_speaker_diarization
+        )
 
         if skip_save:
             return jsonify({"success": True, "transcription": transcription})
@@ -3328,6 +3358,61 @@ def upload_audio():
         shutil.move(wav_path, final_path)
 
         return jsonify({"success": True, "transcription": transcription, "filename": filename})
+    except Exception as e:
+        return jsonify({"error": f"Error al procesar audio: {str(e)}"}), 500
+
+@app.route('/api/upload-audio-stream', methods=['POST'])
+def upload_audio_stream():
+    """Transcribe an uploaded audio file in chunks and optionally save it"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if 'audio' not in request.files:
+            return jsonify({"error": "No se encontró archivo de audio"}), 400
+
+        note_id = request.form.get('note_id')
+        if not note_id:
+            return jsonify({"error": "note_id requerido"}), 400
+
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({"error": "Archivo de audio vacío"}), 400
+
+        language = request.form.get('language') or None
+        provider = request.form.get('provider', 'openai')
+        model = request.form.get('model')
+
+        skip_save = request.form.get('skip_save', 'false').lower() == 'true'
+        chunk_duration = int(request.form.get('chunk_duration', '30'))
+
+        detect_emotion = request.form.get('detect_emotion', 'true').lower() == 'true'
+        detect_events = request.form.get('detect_events', 'true').lower() == 'true'
+        use_itn = request.form.get('use_itn', 'true').lower() == 'true'
+        enable_speaker_diarization = request.form.get('enable_speaker_diarization', 'false').lower() == 'true'
+
+        audio_bytes = audio_file.read()
+
+        audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+
+        def generate():
+            for start_ms in range(0, len(audio), chunk_duration * 1000):
+                chunk = audio[start_ms:start_ms + chunk_duration * 1000]
+                buf = io.BytesIO()
+                chunk.export(buf, format='wav')
+                text = _transcribe_bytes(buf.getvalue(), audio_file.filename, language, provider, model,
+                                         detect_emotion, detect_events, use_itn, enable_speaker_diarization)
+                yield f"data: {json.dumps({'transcription': text})}\n\n"
+
+            filename = None
+            if not skip_save:
+                filename = _save_audio_file(audio_bytes, audio_file.filename, note_id, username)
+                yield f"data: {json.dumps({'done': True, 'filename': filename})}\n\n"
+            else:
+                yield "data: {\"done\": true}\n\n"
+
+        return Response(generate(), mimetype='text/event-stream')
     except Exception as e:
         return jsonify({"error": f"Error al procesar audio: {str(e)}"}), 500
 

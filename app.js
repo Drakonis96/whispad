@@ -161,6 +161,9 @@ class NotesApp {
             // Nuevas opciones para GPT-4o transcription
             streamingEnabled: true,
             transcriptionPrompt: '',
+            chunkDuration: 30,
+            sensevoiceEnableStreaming: false,
+            localEnableStreaming: false,
             // Configuración avanzada de post-procesamiento
             temperature: 0.3,
             maxTokens: 1000,
@@ -912,15 +915,18 @@ class NotesApp {
         // Nuevas opciones para GPT-4o
         const streamingEnabled = document.getElementById('streaming-enabled').checked;
         const transcriptionPrompt = document.getElementById('transcription-prompt').value.trim();
-        
+        const chunkDuration = parseInt(document.getElementById('chunk-duration').value);
+
         // SenseVoice options
         const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
         const detectEvents = document.getElementById('detect-events')?.checked ?? true;
         const useItn = document.getElementById('use-itn')?.checked ?? true;
         const enableSpeakerDiarization = document.getElementById('enable-speaker-diarization')?.checked ?? false;
-        
+        const sensevoiceEnableStreaming = document.getElementById('sensevoice-enable-streaming')?.checked ?? false;
+
         // Local Whisper options
         const localEnableSpeakerDiarization = document.getElementById('local-enable-speaker-diarization')?.checked ?? false;
+        const localEnableStreaming = document.getElementById('local-enable-streaming')?.checked ?? false;
         
         // Configuración avanzada
         const temperature = parseFloat(document.getElementById('temperature-range').value);
@@ -944,11 +950,14 @@ class NotesApp {
             transcriptionLanguage,
             streamingEnabled,
             transcriptionPrompt,
+            chunkDuration,
             detectEmotion,
             detectEvents,
             useItn,
             enableSpeakerDiarization,
+            sensevoiceEnableStreaming,
             localEnableSpeakerDiarization,
+            localEnableStreaming,
             temperature,
             maxTokens,
             topP,
@@ -1024,6 +1033,7 @@ class NotesApp {
         // Nuevas opciones para GPT-4o
         document.getElementById('streaming-enabled').checked = this.config.streamingEnabled !== false; // true por defecto
         document.getElementById('transcription-prompt').value = this.config.transcriptionPrompt || '';
+        document.getElementById('chunk-duration').value = this.config.chunkDuration || 30;
         
         // SenseVoice options
         if (document.getElementById('detect-emotion')) {
@@ -1038,10 +1048,16 @@ class NotesApp {
         if (document.getElementById('enable-speaker-diarization')) {
             document.getElementById('enable-speaker-diarization').checked = this.config.enableSpeakerDiarization === true;
         }
-        
+        if (document.getElementById('sensevoice-enable-streaming')) {
+            document.getElementById('sensevoice-enable-streaming').checked = this.config.sensevoiceEnableStreaming === true;
+        }
+
         // Local Whisper options
         if (document.getElementById('local-enable-speaker-diarization')) {
             document.getElementById('local-enable-speaker-diarization').checked = this.config.localEnableSpeakerDiarization === true;
+        }
+        if (document.getElementById('local-enable-streaming')) {
+            document.getElementById('local-enable-streaming').checked = this.config.localEnableStreaming === true;
         }
         
         // Configuración avanzada
@@ -2980,24 +2996,48 @@ class NotesApp {
                 mimeType = 'audio/ogg;codecs=opus';
             }
             
-            console.log('Using MediaRecorder with MIME type:', mimeType);
-            this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-            this.audioChunks = [];
+           console.log('Using MediaRecorder with MIME type:', mimeType);
+           this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+           this.audioChunks = [];
+            const chunkDuration = parseInt(this.config.chunkDuration || 0);
+            const useChunkStreaming = chunkDuration > 0 && (
+                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+            );
+
+            this.chunkQueue = [];
+            this.processingChunk = false;
 
             this.mediaRecorder.ondataavailable = (event) => {
-                this.audioChunks.push(event.data);
+                if (event.data && event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                    if (useChunkStreaming) {
+                        this.chunkQueue.push(event.data);
+                        if (!this.processingChunk) {
+                            this.processNextChunk();
+                        }
+                    }
+                }
             };
 
             this.mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-                await this.transcribeAudio(audioBlob);
+                if (useChunkStreaming) {
+                    await this.waitForChunkQueue();
+                } else {
+                    await this.transcribeAudio(audioBlob);
+                }
                 await this.saveRecordedAudio(audioBlob);
 
                 // Stop stream
                 stream.getTracks().forEach(track => track.stop());
             };
 
-            this.mediaRecorder.start();
+            if (useChunkStreaming) {
+                this.mediaRecorder.start(this.config.chunkDuration * 1000);
+            } else {
+                this.mediaRecorder.start();
+            }
             this.isRecording = true;
             
             const recordBtn = document.getElementById('record-btn');
@@ -3349,19 +3389,57 @@ class NotesApp {
             
             formData.append('skip_save', skipSave ? 'true' : 'false');
 
-            const response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (response.ok) {
-                if (result.transcription) {
-                    this.insertTranscription(result.transcription);
+            const chunkDuration = parseInt(this.config.chunkDuration || 0);
+            const useChunkStreaming = chunkDuration > 0 && (
+                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+            );
+            let response;
+            if (useChunkStreaming) {
+                formData.append('chunk_duration', chunkDuration.toString());
+                response = await authFetch('/api/upload-audio-stream', { method: 'POST', body: formData });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText);
                 }
-                if (!skipSave) {
-                    await this.loadAudioFiles(this.currentNote.id);
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let done = false;
+                while (!done) {
+                    const { value, done: readerDone } = await reader.read();
+                    if (readerDone) break;
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.transcription) {
+                                this.insertTranscription(data.transcription);
+                            }
+                            if (data.done) {
+                                done = true;
+                                if (!skipSave && data.filename) {
+                                    await this.loadAudioFiles(this.currentNote.id);
+                                }
+                            }
+                        }
+                    }
                 }
-                this.showNotification(skipSave ? 'Audio processed' : 'Audio uploaded');
             } else {
-                this.showNotification(result.error || 'Upload failed', 'error');
+                response = await authFetch('/api/upload-audio', { method: 'POST', body: formData });
+                const result = await response.json();
+                if (response.ok) {
+                    if (result.transcription) {
+                        this.insertTranscription(result.transcription);
+                    }
+                    if (!skipSave) {
+                        await this.loadAudioFiles(this.currentNote.id);
+                    }
+                } else {
+                    this.showNotification(result.error || 'Upload failed', 'error');
+                }
             }
+            this.showNotification(skipSave ? 'Audio processed' : 'Audio uploaded');
         } catch (error) {
             console.error('Upload error:', error);
             this.showNotification('Error uploading audio', 'error');
@@ -3502,6 +3580,46 @@ class NotesApp {
         } catch (err) {
             console.error('Audio reprocess error', err);
             this.showNotification('Error reprocessing audio', 'error');
+        }
+    }
+
+    async processNextChunk() {
+        if (this.chunkQueue.length === 0) {
+            this.processingChunk = false;
+            return;
+        }
+        this.processingChunk = true;
+        const chunk = this.chunkQueue.shift();
+        try {
+            await this.transcribeChunk(chunk);
+        } catch (e) {
+            console.error('Chunk transcription error', e);
+        }
+        this.processingChunk = false;
+        this.processNextChunk();
+    }
+
+    async waitForChunkQueue() {
+        while (this.processingChunk || this.chunkQueue.length > 0) {
+            await new Promise(r => setTimeout(r, 200));
+        }
+    }
+
+    async transcribeChunk(audioBlob) {
+        try {
+            let transcription = '';
+            if (this.config.transcriptionProvider === 'openai') {
+                transcription = await this.transcribeWithOpenAI(audioBlob);
+            } else if (this.config.transcriptionProvider === 'local') {
+                transcription = await this.transcribeWithLocal(audioBlob);
+            } else if (this.config.transcriptionProvider === 'sensevoice') {
+                transcription = await this.transcribeWithSenseVoice(audioBlob);
+            }
+            if (transcription) {
+                this.insertTranscription(transcription);
+            }
+        } catch (error) {
+            console.error('Chunk transcription error:', error);
         }
     }
     
