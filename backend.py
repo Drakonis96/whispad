@@ -2936,6 +2936,66 @@ def update_provider_config():
     save_server_config()
     return jsonify({"success": True})
 
+
+@app.route('/api/user-styles', methods=['GET', 'POST'])
+def user_styles():
+    """Load or save custom AI styles for the current user."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    os.makedirs(user_dir, exist_ok=True)
+    styles_file = os.path.join(user_dir, 'styles.json')
+
+    if request.method == 'GET':
+        if os.path.exists(styles_file):
+            try:
+                with open(styles_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return jsonify({"styles": data})
+            except Exception as e:
+                return jsonify({"error": f"Error reading styles: {str(e)}"}), 500
+        return jsonify({"styles": {}})
+
+    data = request.get_json() or {}
+    try:
+        with open(styles_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": f"Error saving styles: {str(e)}"}), 500
+
+
+@app.route('/api/user-config', methods=['GET', 'POST'])
+def user_config():
+    """Load or save config settings for the current user."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    os.makedirs(user_dir, exist_ok=True)
+    config_file = os.path.join(user_dir, 'config.json')
+
+    if request.method == 'GET':
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return jsonify({"config": data})
+            except Exception as e:
+                return jsonify({"error": f"Error reading config: {str(e)}"}), 500
+        return jsonify({"config": {}})
+
+    data = request.get_json() or {}
+    try:
+        with open(config_file, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": f"Error saving config: {str(e)}"}), 500
+
 @app.route('/api/list-saved-notes', methods=['GET'])
 def list_saved_notes():
     """Endpoint para listar las notas guardadas en el servidor"""

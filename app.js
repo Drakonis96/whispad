@@ -205,7 +205,7 @@ class NotesApp {
     }
     
     async init() {
-        this.loadConfig();
+        await this.loadConfig();
         this.loadStylesConfig();
         this.updateTranslationStyle();
         this.storeDefaultLanguageOptions();
@@ -908,11 +908,24 @@ class NotesApp {
     }
 
     // Configuración
-    loadConfig() {
+    async loadConfig() {
         const storageKey = `notes-app-config-${currentUser}`;
         const saved = localStorage.getItem(storageKey);
         if (saved) {
             this.config = { ...this.config, ...JSON.parse(saved) };
+        }
+
+        try {
+            const resp = await authFetch('/api/user-config');
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data && data.config) {
+                    this.config = { ...this.config, ...data.config };
+                    localStorage.setItem(storageKey, JSON.stringify(this.config));
+                }
+            }
+        } catch (err) {
+            console.error('Error loading config from server:', err);
         }
     }
 
@@ -985,6 +998,15 @@ class NotesApp {
         const storageKey = `notes-app-config-${currentUser}`;
         localStorage.setItem(storageKey, JSON.stringify(this.config));
 
+        // Guardar configuración en el servidor
+        authFetch('/api/user-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.config)
+        }).catch(err => {
+            console.error('Error saving config on server:', err);
+        });
+
         if (isAdmin) {
             authFetch('/api/update-provider-config', {
                 method: 'POST',
@@ -1002,8 +1024,8 @@ class NotesApp {
         this.showNotification('Configuration saved');
     }
 
-    showConfigModal() {
-        this.loadConfig();
+    async showConfigModal() {
+        await this.loadConfig();
         const tpSelect = document.getElementById('transcription-provider');
         const ppSelect = document.getElementById('postprocess-provider');
 
@@ -1178,6 +1200,15 @@ class NotesApp {
         this.config.translationLanguage = language;
         const storageKey = `notes-app-config-${currentUser}`;
         localStorage.setItem(storageKey, JSON.stringify(this.config));
+
+        // Guardar configuración en el servidor
+        authFetch('/api/user-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.config)
+        }).catch(err => {
+            console.error('Error saving config on server:', err);
+        });
         this.updateTranslationStyle();
         this.updateAIButtons();
         this.hideTranslationModal();
@@ -1235,6 +1266,15 @@ class NotesApp {
         // Guardar configuración en localStorage
         const storageKey = `notes-app-styles-config-${currentUser}`;
         localStorage.setItem(storageKey, JSON.stringify(this.stylesConfig));
+
+        // Guardar configuración en el servidor
+        authFetch('/api/user-styles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.stylesConfig)
+        }).catch(err => {
+            console.error('Error saving styles on server:', err);
+        });
         
         // Actualizar botones de IA
         this.updateAIButtons();
@@ -1265,6 +1305,20 @@ class NotesApp {
                 }
             });
         }
+
+        // Cargar estilos desde el servidor
+        authFetch('/api/user-styles')
+            .then(resp => resp.ok ? resp.json() : null)
+            .then(data => {
+                if (data && data.styles) {
+                    Object.keys(data.styles).forEach(key => {
+                        this.stylesConfig[key] = data.styles[key];
+                    });
+                }
+            })
+            .catch(err => {
+                console.error('Error loading styles from server:', err);
+            });
     }
 
     addNewStyle() {
