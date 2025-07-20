@@ -780,7 +780,7 @@ def improve_text_openai(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -791,7 +791,8 @@ def improve_text_openai(text, improvement_type, model, custom_prompt=None):
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -836,7 +837,7 @@ def improve_text_google(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -847,7 +848,8 @@ def improve_text_google(text, improvement_type, model, custom_prompt=None):
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -884,7 +886,7 @@ def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -895,7 +897,8 @@ def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -970,7 +973,7 @@ def improve_text_google_stream(text, improvement_type, model, custom_prompt=None
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -981,7 +984,8 @@ def improve_text_google_stream(text, improvement_type, model, custom_prompt=None
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1051,7 +1055,7 @@ def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -1062,7 +1066,8 @@ def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1126,7 +1131,7 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
     
     # Si se proporciona un prompt personalizado, usarlo directamente
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         # Definir prompts según el tipo de mejora (solo para estilos predeterminados)
         prompts = {
@@ -1137,7 +1142,8 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1216,7 +1222,7 @@ def improve_text_groq(text, improvement_type, model, custom_prompt=None):
         return jsonify({"error": "Model not specified"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1226,7 +1232,8 @@ def improve_text_groq(text, improvement_type, model, custom_prompt=None):
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1270,7 +1277,7 @@ def improve_text_groq_stream(text, improvement_type, model, custom_prompt=None):
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1280,7 +1287,8 @@ def improve_text_groq_stream(text, improvement_type, model, custom_prompt=None):
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1336,7 +1344,7 @@ def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prom
         return jsonify({"error": "LM Studio host, port and model required"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1346,7 +1354,8 @@ def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prom
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1399,7 +1408,7 @@ def improve_text_lmstudio_stream(text, improvement_type, model, host, port, cust
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1409,7 +1418,8 @@ def improve_text_lmstudio_stream(text, improvement_type, model, host, port, cust
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1460,7 +1470,7 @@ def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt
         return jsonify({"error": "Ollama host, port and model required"}), 400
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1470,7 +1480,8 @@ def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1503,7 +1514,7 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
         return Response(generate_error(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
     if custom_prompt:
-        prompt = f"{custom_prompt}\n\n{text}"
+        prompt = f"{custom_prompt}\n\n{text}",
     else:
         prompts = {
             'clarity': f"Rewrite the following text in a clearer and more readable way. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
@@ -1513,7 +1524,8 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
             'narrative': f"Improve the following narrative text or novel dialogue, preserving the literary style and narrative voice. Enhance flow, description and literary quality while keeping the essence of the text. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'academic_v2': f"Improve the following academic text by making minimal changes to preserve the author's words. Use more precise wording when necessary, improve the structure and remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Keep the original style and vocabulary as much as possible. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'summarize': f"Create a concise summary of the following text. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the summary, without additional explanations:\n\n{text}",
-            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}"
+            'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
+            'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")

@@ -100,6 +100,13 @@ const configuracionMejoras = {
         prompt: "Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:",
         visible: true
     },
+    diarization_fix: {
+        nombre: "Fix Speaker Tags",
+        descripcion: "Corrects speaker diarization tags",
+        icono: "👥",
+        prompt: "Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:",
+        visible: true
+    },
     translation: {
         nombre: "Translation",
         descripcion: "Translate text into another language",
@@ -3886,8 +3893,13 @@ class NotesApp {
                             }
                             if (data.done) {
                                 console.log('Stream marked as done');
-                                const finalText = this.cleanAIResponse(state.improvedText);
-                                tempElement.textContent = finalText;
+                                let finalText = this.cleanAIResponse(state.improvedText);
+                                if (action === 'diarization_fix') {
+                                    finalText = this.formatDiarizationTags(finalText);
+                                    tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else {
+                                    tempElement.textContent = finalText;
+                                }
                                 console.log('Final text set:', finalText);
 
                                 tempElement.className = 'ai-generated-text';
@@ -3909,7 +3921,10 @@ class NotesApp {
                 }
             }
             
-            const finalResult = this.cleanAIResponse(state.improvedText);
+            let finalResult = this.cleanAIResponse(state.improvedText);
+            if (action === 'diarization_fix') {
+                finalResult = this.formatDiarizationTags(finalResult);
+            }
             console.log('Returning final result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -3977,8 +3992,13 @@ class NotesApp {
                             if (data.done) {
                                 console.log('Gemini stream marked as done');
                                 // Asegurar que el texto final esté limpio
-                                const finalText = this.cleanAIResponse(state.improvedText);
-                                tempElement.textContent = finalText;
+                                let finalText = this.cleanAIResponse(state.improvedText);
+                                if (action === 'diarization_fix') {
+                                    finalText = this.formatDiarizationTags(finalText);
+                                    tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else {
+                                    tempElement.textContent = finalText;
+                                }
                                 console.log('Final Gemini text set:', finalText);
                                 
                                 // Cambiar a clase de texto completado
@@ -4004,7 +4024,10 @@ class NotesApp {
                 }
             }
             
-            const finalResult = this.cleanAIResponse(state.improvedText);
+            let finalResult = this.cleanAIResponse(state.improvedText);
+            if (action === 'diarization_fix') {
+                finalResult = this.formatDiarizationTags(finalResult);
+            }
             console.log('Returning final Gemini result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -4115,8 +4138,13 @@ class NotesApp {
                             if (data.done) {
                                 console.log('OpenRouter stream marked as done');
                                 // Asegurar que el texto final esté limpio
-                                const finalText = this.cleanAIResponse(state.improvedText);
-                                tempElement.textContent = finalText;
+                                let finalText = this.cleanAIResponse(state.improvedText);
+                                if (action === 'diarization_fix') {
+                                    finalText = this.formatDiarizationTags(finalText);
+                                    tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else {
+                                    tempElement.textContent = finalText;
+                                }
                                 console.log('Final OpenRouter text set:', finalText);
                                 
                                 // Cambiar a clase de texto completado
@@ -4142,7 +4170,10 @@ class NotesApp {
                 }
             }
             
-            const finalResult = this.cleanAIResponse(state.improvedText);
+            let finalResult = this.cleanAIResponse(state.improvedText);
+            if (action === 'diarization_fix') {
+                finalResult = this.formatDiarizationTags(finalResult);
+            }
             console.log('Returning final OpenRouter result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -4198,8 +4229,13 @@ class NotesApp {
                             }
                             if (data.done) {
                                 console.log('Groq stream marked as done');
-                                const finalText = this.cleanAIResponse(state.improvedText);
-                                tempElement.textContent = finalText;
+                                let finalText = this.cleanAIResponse(state.improvedText);
+                                if (action === 'diarization_fix') {
+                                    finalText = this.formatDiarizationTags(finalText);
+                                    tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else {
+                                    tempElement.textContent = finalText;
+                                }
                                 tempElement.className = 'ai-generated-text';
                                 setTimeout(() => { tempElement.className = ''; }, 1000);
                                 return finalText;
@@ -4216,7 +4252,10 @@ class NotesApp {
                 }
             }
 
-            const finalResult = this.cleanAIResponse(state.improvedText);
+            let finalResult = this.cleanAIResponse(state.improvedText);
+            if (action === 'diarization_fix') {
+                finalResult = this.formatDiarizationTags(finalResult);
+            }
             console.log('Returning final Groq result:', finalResult);
             return finalResult;
         } catch (error) {
@@ -4263,8 +4302,13 @@ class NotesApp {
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
-                                const finalText = this.cleanAIResponse(state.improvedText);
-                                tempElement.textContent = finalText;
+                                let finalText = this.cleanAIResponse(state.improvedText);
+                                if (action === 'diarization_fix') {
+                                    finalText = this.formatDiarizationTags(finalText);
+                                    tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else {
+                                    tempElement.textContent = finalText;
+                                }
                                 tempElement.className = 'ai-generated-text';
                                 setTimeout(() => { tempElement.className = ''; }, 1000);
                                 return finalText;
@@ -4279,7 +4323,10 @@ class NotesApp {
                 }
             }
 
-            const finalResult = this.cleanAIResponse(state.improvedText);
+            let finalResult = this.cleanAIResponse(state.improvedText);
+            if (action === 'diarization_fix') {
+                finalResult = this.formatDiarizationTags(finalResult);
+            }
             return finalResult;
         } catch (error) {
             console.error('Error in improveWithLmStudioStream:', error);
@@ -4325,8 +4372,13 @@ class NotesApp {
                                 tempElement.className = 'ai-generating-text';
                             }
                             if (data.done) {
-                                const finalText = this.cleanAIResponse(state.improvedText);
-                                tempElement.textContent = finalText;
+                                let finalText = this.cleanAIResponse(state.improvedText);
+                                if (action === 'diarization_fix') {
+                                    finalText = this.formatDiarizationTags(finalText);
+                                    tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else {
+                                    tempElement.textContent = finalText;
+                                }
                                 tempElement.className = 'ai-generated-text';
                                 setTimeout(() => { tempElement.className = ''; }, 1000);
                                 return finalText;
@@ -4341,7 +4393,10 @@ class NotesApp {
                 }
             }
 
-            const finalResult = this.cleanAIResponse(state.improvedText);
+            let finalResult = this.cleanAIResponse(state.improvedText);
+            if (action === 'diarization_fix') {
+                finalResult = this.formatDiarizationTags(finalResult);
+            }
             return finalResult;
         } catch (error) {
             console.error('Error in improveWithOllamaStream:', error);
@@ -4389,6 +4444,29 @@ class NotesApp {
         console.log('cleanAIResponse output:', cleaned.substring(0, 100) + '...');
 
         return cleaned;
+    }
+
+    // Format speaker tags: place each [SPEAKER X] on a new line and remove
+    // duplicate tags for the same speaker within a single line
+    formatDiarizationTags(text) {
+        if (!text) return '';
+        let normalized = text.replace(/\[speaker\s*(\d+)\]/gi, '[SPEAKER $1]');
+        const parts = normalized.split(/(\[SPEAKER\s*\d+\])/i).filter(p => p);
+        let result = '';
+        let current = null;
+        for (const part of parts) {
+            if (/^\[SPEAKER\s*\d+\]$/i.test(part)) {
+                const tag = part.toUpperCase();
+                if (tag !== current) {
+                    if (result) result += '\n\n';
+                    result += tag;
+                    current = tag;
+                }
+            } else {
+                result += ' ' + part.trim();
+            }
+        }
+        return result.trim();
     }
 
     // Handle streaming chunks that may contain <think>...</think> segments
@@ -4543,6 +4621,9 @@ class NotesApp {
             },
             expand: (texto) => {
                 return texto + ' [Se han añadido detalles adicionales y contexto relevante para enriquecer el contenido y proporcionar una comprensión más completa del tema tratado.]';
+            },
+            diarization_fix: (texto) => {
+                return this.formatDiarizationTags(texto);
             }
         };
         
