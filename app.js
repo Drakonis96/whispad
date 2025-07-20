@@ -162,6 +162,8 @@ class NotesApp {
             streamingEnabled: true,
             transcriptionPrompt: '',
             chunkDuration: 30,
+            sensevoiceEnableStreaming: false,
+            localEnableStreaming: false,
             // Configuración avanzada de post-procesamiento
             temperature: 0.3,
             maxTokens: 1000,
@@ -914,15 +916,17 @@ class NotesApp {
         const streamingEnabled = document.getElementById('streaming-enabled').checked;
         const transcriptionPrompt = document.getElementById('transcription-prompt').value.trim();
         const chunkDuration = parseInt(document.getElementById('chunk-duration').value);
-        
+
         // SenseVoice options
         const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
         const detectEvents = document.getElementById('detect-events')?.checked ?? true;
         const useItn = document.getElementById('use-itn')?.checked ?? true;
         const enableSpeakerDiarization = document.getElementById('enable-speaker-diarization')?.checked ?? false;
-        
+        const sensevoiceEnableStreaming = document.getElementById('sensevoice-enable-streaming')?.checked ?? false;
+
         // Local Whisper options
         const localEnableSpeakerDiarization = document.getElementById('local-enable-speaker-diarization')?.checked ?? false;
+        const localEnableStreaming = document.getElementById('local-enable-streaming')?.checked ?? false;
         
         // Configuración avanzada
         const temperature = parseFloat(document.getElementById('temperature-range').value);
@@ -951,7 +955,9 @@ class NotesApp {
             detectEvents,
             useItn,
             enableSpeakerDiarization,
+            sensevoiceEnableStreaming,
             localEnableSpeakerDiarization,
+            localEnableStreaming,
             temperature,
             maxTokens,
             topP,
@@ -1042,10 +1048,16 @@ class NotesApp {
         if (document.getElementById('enable-speaker-diarization')) {
             document.getElementById('enable-speaker-diarization').checked = this.config.enableSpeakerDiarization === true;
         }
-        
+        if (document.getElementById('sensevoice-enable-streaming')) {
+            document.getElementById('sensevoice-enable-streaming').checked = this.config.sensevoiceEnableStreaming === true;
+        }
+
         // Local Whisper options
         if (document.getElementById('local-enable-speaker-diarization')) {
             document.getElementById('local-enable-speaker-diarization').checked = this.config.localEnableSpeakerDiarization === true;
+        }
+        if (document.getElementById('local-enable-streaming')) {
+            document.getElementById('local-enable-streaming').checked = this.config.localEnableStreaming === true;
         }
         
         // Configuración avanzada
@@ -2984,32 +2996,48 @@ class NotesApp {
                 mimeType = 'audio/ogg;codecs=opus';
             }
             
-            console.log('Using MediaRecorder with MIME type:', mimeType);
-            this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-            this.audioChunks = [];
+           console.log('Using MediaRecorder with MIME type:', mimeType);
+           this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+           this.audioChunks = [];
+            const chunkDuration = parseInt(this.config.chunkDuration || 0);
+            const useChunkStreaming = chunkDuration > 0 && (
+                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+            );
+
             this.chunkQueue = [];
             this.processingChunk = false;
 
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) {
                     this.audioChunks.push(event.data);
-                    this.chunkQueue.push(event.data);
-                    if (!this.processingChunk) {
-                        this.processNextChunk();
+                    if (useChunkStreaming) {
+                        this.chunkQueue.push(event.data);
+                        if (!this.processingChunk) {
+                            this.processNextChunk();
+                        }
                     }
                 }
             };
 
             this.mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-                await this.waitForChunkQueue();
+                if (useChunkStreaming) {
+                    await this.waitForChunkQueue();
+                } else {
+                    await this.transcribeAudio(audioBlob);
+                }
                 await this.saveRecordedAudio(audioBlob);
 
                 // Stop stream
                 stream.getTracks().forEach(track => track.stop());
             };
 
-            this.mediaRecorder.start(this.config.chunkDuration * 1000);
+            if (useChunkStreaming) {
+                this.mediaRecorder.start(this.config.chunkDuration * 1000);
+            } else {
+                this.mediaRecorder.start();
+            }
             this.isRecording = true;
             
             const recordBtn = document.getElementById('record-btn');
@@ -3362,8 +3390,12 @@ class NotesApp {
             formData.append('skip_save', skipSave ? 'true' : 'false');
 
             const chunkDuration = parseInt(this.config.chunkDuration || 0);
+            const useChunkStreaming = chunkDuration > 0 && (
+                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+            );
             let response;
-            if (chunkDuration > 0) {
+            if (useChunkStreaming) {
                 formData.append('chunk_duration', chunkDuration.toString());
                 response = await authFetch('/api/upload-audio-stream', { method: 'POST', body: formData });
                 if (!response.ok) {
