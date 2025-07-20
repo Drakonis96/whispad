@@ -56,6 +56,12 @@ const configuracionMejoras = {
         descripcion: "Añade más detalles y contexto",
         icono: "✚",
         visible: true
+    },
+    remove_emoji: {
+        nombre: "Eliminar Emojis",
+        descripcion: "Elimina emojis del texto",
+        icono: "🫠",
+        visible: false
     }
 };
 
@@ -984,6 +990,9 @@ class NotesApp {
             },
             expand: (texto) => {
                 return texto + ' [Se han añadido detalles adicionales y contexto relevante para enriquecer el contenido y proporcionar una comprensión más completa del tema tratado.]';
+            },
+            remove_emoji: (texto) => {
+                return texto.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '').trim();
             }
         };
         
