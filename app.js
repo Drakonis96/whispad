@@ -3021,9 +3021,16 @@ class NotesApp {
 
             this.mediaRecorder.ondataavailable = (event) => {
                 if (event.data && event.data.size > 0) {
-                    this.audioChunks.push(event.data);
+                    // Some browsers provide empty type for subsequent chunks.
+                    // Ensure each chunk has a valid MIME type so backend
+                    // conversion succeeds.
+                    const chunk = event.data.type
+                        ? event.data
+                        : new Blob([event.data], { type: mimeType });
+
+                    this.audioChunks.push(chunk);
                     if (useChunkStreaming) {
-                        this.chunkQueue.push(event.data);
+                        this.chunkQueue.push(chunk);
                         if (!this.processingChunk) {
                             this.processNextChunk();
                         }
