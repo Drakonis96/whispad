@@ -1298,6 +1298,11 @@ select.form-control {
     min-height: 300px;
 }
 
+.editor.read-only {
+    background-color: var(--color-surface);
+    cursor: default;
+}
+
 @media (max-width: 768px) {
     .editor {
         font-size: 16px;
