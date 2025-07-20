@@ -135,6 +135,10 @@ class NotesApp {
         this.mediaRecorder = null;
         this.audioChunks = [];
         this.audioFileToDelete = null;
+        this.recordingStream = null;
+        this.useChunkStreaming = false;
+        this.chunkDuration = 0;
+        this.chunkTimeout = null;
         
         // History to undo AI changes
         this.aiHistory = [];
@@ -2967,6 +2971,7 @@ class NotesApp {
     }
 
     async startRecording() {
+        let stream;
         if (!this.currentNote) {
             this.showNotification('Please create or open a note before recording', 'warning');
             return;
@@ -2991,7 +2996,7 @@ class NotesApp {
                 return;
             }
 
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
             // Try to use a compatible audio format for MediaRecorder
             let mimeType = 'audio/wav';
@@ -3011,6 +3016,10 @@ class NotesApp {
                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
            );
+
+           this.recordingStream = stream;
+           this.useChunkStreaming = useChunkStreaming;
+           this.chunkDuration = chunkDuration;
 
            if (useChunkStreaming) {
                this.setEditorReadOnly(true);
@@ -3032,6 +3041,17 @@ class NotesApp {
             };
 
            this.mediaRecorder.onstop = async () => {
+               if (useChunkStreaming && this.isRecording) {
+                   // restart recording for next chunk
+                   this.mediaRecorder.start();
+                   this.chunkTimeout = setTimeout(() => {
+                       if (this.mediaRecorder.state === 'recording') {
+                           this.mediaRecorder.stop();
+                       }
+                   }, this.chunkDuration * 1000);
+                   return;
+               }
+
                const audioBlob = new Blob(this.audioChunks, { type: mimeType });
                if (useChunkStreaming) {
                    await this.waitForChunkQueue();
@@ -3049,7 +3069,12 @@ class NotesApp {
            };
 
             if (useChunkStreaming) {
-                this.mediaRecorder.start(this.config.chunkDuration * 1000);
+                this.mediaRecorder.start();
+                this.chunkTimeout = setTimeout(() => {
+                    if (this.mediaRecorder.state === 'recording') {
+                        this.mediaRecorder.stop();
+                    }
+                }, this.chunkDuration * 1000);
             } else {
                 this.mediaRecorder.start();
             }
@@ -3080,8 +3105,14 @@ class NotesApp {
 
     stopRecording() {
         if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
+            if (this.chunkTimeout) {
+                clearTimeout(this.chunkTimeout);
+                this.chunkTimeout = null;
+            }
             this.isRecording = false;
+            if (this.mediaRecorder.state === 'recording') {
+                this.mediaRecorder.stop();
+            }
             
             const recordBtn = document.getElementById('record-btn');
             const recordIcon = document.getElementById('record-icon');
