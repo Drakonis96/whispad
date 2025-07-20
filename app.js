@@ -2993,25 +2993,33 @@ class NotesApp {
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             
+            const chunkDuration = parseInt(this.config.chunkDuration || 0);
+            const useChunkStreaming = chunkDuration > 0 && (
+                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+            );
+
             // Try to use a compatible audio format for MediaRecorder
-            let mimeType = 'audio/wav';
+            let mimeType = '';
             if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
                 mimeType = 'audio/webm;codecs=opus';
             } else if (MediaRecorder.isTypeSupported('audio/webm')) {
                 mimeType = 'audio/webm';
             } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
                 mimeType = 'audio/ogg;codecs=opus';
+            } else if (!useChunkStreaming && MediaRecorder.isTypeSupported('audio/wav')) {
+                // Only fall back to WAV when not streaming in chunks
+                mimeType = 'audio/wav';
+            } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                mimeType = 'audio/ogg';
+            } else {
+                this.showNotification('Your browser does not support audio recording', 'error');
+                return;
             }
             
            console.log('Using MediaRecorder with MIME type:', mimeType);
            this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
            this.audioChunks = [];
-           const chunkDuration = parseInt(this.config.chunkDuration || 0);
-           const useChunkStreaming = chunkDuration > 0 && (
-               (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
-               (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
-           );
-
            if (useChunkStreaming) {
                this.setEditorReadOnly(true);
            }
