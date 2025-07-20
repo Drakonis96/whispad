@@ -3006,11 +3006,15 @@ class NotesApp {
            console.log('Using MediaRecorder with MIME type:', mimeType);
            this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
            this.audioChunks = [];
-            const chunkDuration = parseInt(this.config.chunkDuration || 0);
-            const useChunkStreaming = chunkDuration > 0 && (
-                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
-                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
-            );
+           const chunkDuration = parseInt(this.config.chunkDuration || 0);
+           const useChunkStreaming = chunkDuration > 0 && (
+               (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+               (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+           );
+
+           if (useChunkStreaming) {
+               this.setEditorReadOnly(true);
+           }
 
             this.chunkQueue = [];
             this.processingChunk = false;
@@ -3027,18 +3031,22 @@ class NotesApp {
                 }
             };
 
-            this.mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(this.audioChunks, { type: mimeType });
-                if (useChunkStreaming) {
-                    await this.waitForChunkQueue();
-                } else {
-                    await this.transcribeAudio(audioBlob);
-                }
-                await this.saveRecordedAudio(audioBlob);
+           this.mediaRecorder.onstop = async () => {
+               const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+               if (useChunkStreaming) {
+                   await this.waitForChunkQueue();
+               } else {
+                   await this.transcribeAudio(audioBlob);
+               }
+               await this.saveRecordedAudio(audioBlob);
 
-                // Stop stream
-                stream.getTracks().forEach(track => track.stop());
-            };
+               if (useChunkStreaming) {
+                   this.setEditorReadOnly(false);
+               }
+
+               // Stop stream
+               stream.getTracks().forEach(track => track.stop());
+           };
 
             if (useChunkStreaming) {
                 this.mediaRecorder.start(this.config.chunkDuration * 1000);
@@ -3375,7 +3383,17 @@ class NotesApp {
             this.showNotification('Please select a note first', 'error');
             return;
         }
-        this.showProcessingOverlay(skipSave ? 'Processing audio...' : 'Uploading audio...');
+        const chunkDuration = parseInt(this.config.chunkDuration || 0);
+        const useChunkStreaming = chunkDuration > 0 && (
+            (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
+            (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+        );
+
+        if (!useChunkStreaming) {
+            this.showProcessingOverlay(skipSave ? 'Processing audio...' : 'Uploading audio...');
+        } else {
+            this.setEditorReadOnly(true);
+        }
         try {
             const formData = new FormData();
             formData.append('audio', file);
@@ -3395,12 +3413,6 @@ class NotesApp {
             }
             
             formData.append('skip_save', skipSave ? 'true' : 'false');
-
-            const chunkDuration = parseInt(this.config.chunkDuration || 0);
-            const useChunkStreaming = chunkDuration > 0 && (
-                (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
-                (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
-            );
             let response;
             if (useChunkStreaming) {
                 formData.append('chunk_duration', chunkDuration.toString());
@@ -3451,7 +3463,11 @@ class NotesApp {
             console.error('Upload error:', error);
             this.showNotification('Error uploading audio', 'error');
         } finally {
-            this.hideProcessingOverlay();
+            if (!useChunkStreaming) {
+                this.hideProcessingOverlay();
+            } else {
+                this.setEditorReadOnly(false);
+            }
         }
     }
 
@@ -5440,6 +5456,13 @@ class NotesApp {
         }
         bubble.textContent = assistantMsg.content;
         container.scrollTop = container.scrollHeight;
+    }
+
+    setEditorReadOnly(readOnly) {
+        const editor = document.getElementById('editor');
+        if (!editor) return;
+        editor.contentEditable = readOnly ? 'false' : 'true';
+        editor.classList.toggle('read-only', readOnly);
     }
 
     destroy() {
