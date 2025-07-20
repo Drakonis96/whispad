@@ -463,6 +463,18 @@
                         </select>
                         <small>Select the language you will speak to improve accuracy</small>
                     </div>
+                    <div class="model-config">
+                        <label class="form-label">Chunk Duration</label>
+                        <select class="form-control" id="audio-chunk-seconds">
+                            <option value="10">10 seconds</option>
+                            <option value="15">15 seconds</option>
+                            <option value="30" selected>30 seconds</option>
+                            <option value="60">60 seconds</option>
+                            <option value="90">90 seconds</option>
+                            <option value="120">120 seconds</option>
+                        </select>
+                        <small>Audio will be processed in segments</small>
+                    </div>
                     <div class="model-config restricted-option" id="sensevoice-options" style="display: none;">
                         <label class="form-label">SenseVoice Features</label>
                         <div class="checkbox-group">
