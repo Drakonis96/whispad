@@ -168,6 +168,9 @@ class NotesApp {
         this.graphPanning = false;
         this.graphPanStartX = 0;
         this.graphPanStartY = 0;
+
+        // Node graph data
+        this.nodeGraphData = null;
         
         // Provider configuration
         this.config = {
@@ -743,6 +746,16 @@ class NotesApp {
             regenerateGraphBtn.addEventListener('click', () => {
                 this.showGraphModal();
             });
+        }
+
+        // Node graph button
+        const nodeGraphBtn = document.getElementById('node-graph-btn');
+        const nodeGraphClose = document.getElementById('close-node-graph-modal');
+        if (nodeGraphBtn) {
+            nodeGraphBtn.addEventListener('click', () => { this.showNodeGraphModal(); });
+        }
+        if (nodeGraphClose) {
+            nodeGraphClose.addEventListener('click', () => { this.hideNodeGraphModal(); });
         }
 
         // Auto-guardado cada 30 segundos
@@ -2087,6 +2100,109 @@ class NotesApp {
     zoomOutGraph() {
         this.graphZoom = Math.max(this.graphZoom / 1.2, 0.2);
         this.applyGraphTransform();
+    }
+
+    async showNodeGraphModal() {
+        const noteText = this.getCurrentMarkdown();
+        this.showProcessingOverlay('Generating node graph...');
+        try {
+            const data = await backendAPI.generateNodeGraph(noteText);
+            this.nodeGraphData = data;
+            this.renderNodeGraph(data);
+            const insights = document.getElementById('map-insights');
+            if (insights) insights.textContent = data.insights || '';
+            const modal = document.getElementById('node-graph-modal');
+            modal.classList.add('active');
+            this.hideMobileFab();
+        } catch (err) {
+            this.showNotification(err.message || 'Node graph request failed', 'error');
+        } finally {
+            this.hideProcessingOverlay();
+        }
+    }
+
+    hideNodeGraphModal() {
+        const modal = document.getElementById('node-graph-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    renderNodeGraph(data) {
+        const container = document.getElementById('node-graph-container');
+        container.innerHTML = '';
+        const width = container.clientWidth || 600;
+        const height = container.clientHeight || 400;
+        const svg = d3.select(container).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+        const link = svg.append('g').selectAll('line')
+            .data(data.edges)
+            .enter().append('line')
+            .attr('stroke', '#999');
+        const node = svg.append('g').selectAll('g')
+            .data(data.nodes)
+            .enter().append('g').call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+        node.append('circle')
+            .attr('r', d => 4 + Math.sqrt(d.size || 1))
+            .attr('fill', d => color(d.group));
+        node.append('text')
+            .text(d => d.label)
+            .attr('x', 6)
+            .attr('y', 3);
+        const simulation = d3.forceSimulation(data.nodes)
+            .force('link', d3.forceLink(data.edges).id(d => d.id).distance(80))
+            .force('charge', d3.forceManyBody().strength(-150))
+            .force('center', d3.forceCenter(width / 2, height / 2));
+
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+
+        simulation.on('tick', () => {
+            link.attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+        const adjacency = {};
+        data.edges.forEach(e => {
+            adjacency[`${e.source}-${e.target}`] = true;
+            adjacency[`${e.target}-${e.source}`] = true;
+        });
+
+        function isConnected(a, b) {
+            return a.id === b.id || adjacency[`${a.id}-${b.id}`];
+        }
+
+        function resetHighlight() {
+            node.selectAll('circle').attr('fill', d => color(d.group));
+            link.attr('stroke', '#999');
+        }
+
+        node.on('click', function(event, d) {
+            event.stopPropagation();
+            node.selectAll('circle').attr('fill', n => isConnected(d, n) ? color(n.group) : '#ccc');
+            link.attr('stroke', l => l.source.id === d.id || l.target.id === d.id ? '#f66' : '#ccc');
+        });
+
+        svg.on('click', resetHighlight);
     }
 
     setupGraphPanZoom() {

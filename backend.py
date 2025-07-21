@@ -21,6 +21,7 @@ from mermaid import Mermaid
 import ast
 import string
 from pydub import AudioSegment
+import networkx as nx
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -2332,6 +2333,42 @@ def diagram_json_to_mermaid(diagram_type, data):
         return pie_json_to_mermaid(data)
     raise ValueError("Unsupported diagram type")
 
+def generate_node_graph_data(text: str):
+    """Generate a simple co-occurrence node graph from text."""
+    words = re.findall(r"[A-Za-z']+", text.lower())
+    freq = {}
+    for w in words:
+        freq[w] = freq.get(w, 0) + 1
+    sentences = re.split(r"[.!?\n]+", text.lower())
+    edges = {}
+    for sent in sentences:
+        tokens = list(set(re.findall(r"[A-Za-z']+", sent)))
+        for i in range(len(tokens)):
+            for j in range(i + 1, len(tokens)):
+                pair = tuple(sorted((tokens[i], tokens[j])))
+                edges[pair] = edges.get(pair, 0) + 1
+    nodes = [{"id": w, "label": w, "size": c} for w, c in freq.items()]
+    edge_list = [{"source": a, "target": b, "weight": w} for (a, b), w in edges.items()]
+    G = nx.Graph()
+    G.add_nodes_from([(n["id"], {"size": n["size"]}) for n in nodes])
+    G.add_weighted_edges_from([(e["source"], e["target"], e["weight"]) for e in edge_list])
+    communities = list(nx.algorithms.community.greedy_modularity_communities(G))
+    for idx, comm in enumerate(communities):
+        for n in nodes:
+            if n["id"] in comm:
+                n["group"] = idx
+    bc = nx.betweenness_centrality(G)
+    top_nodes = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:5]
+    bridging = sorted(bc.items(), key=lambda x: x[1], reverse=True)[:5]
+    low_degree = [n for n, d in G.degree() if d <= 1][:5]
+    insights = (
+        f"Nodes: {len(nodes)}, Connections: {len(edge_list)}, Clusters: {len(communities)}.\n"
+        f"Main topics: {', '.join([w for w, _ in top_nodes])}.\n"
+        f"Bridging concepts: {', '.join([w for w, _ in bridging])}.\n"
+        f"Knowledge gaps: {', '.join(low_degree)}."
+    )
+    return {"nodes": nodes, "edges": edge_list, "insights": insights}
+
 def generate_mindmap_openai(note_md, topic, model):
     if not OPENAI_API_KEY:
         return None, 'API key de OpenAI no configurada'
@@ -2910,6 +2947,22 @@ def generate_diagram():
         script = "\n".join(lines)
         svg = Mermaid(script).svg_response.text
         return jsonify({"svg": svg, "tree": tree})
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+@app.route('/api/node-graph', methods=['POST'])
+def node_graph():
+    """Generate a co-occurrence node graph from note markdown."""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        note = data.get('note', '')
+        result = generate_node_graph_data(note)
+        return jsonify(result)
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
