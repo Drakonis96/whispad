@@ -2876,6 +2876,24 @@ select.form-control {
     max-width: 1000px;
 }
 
+/* Concept graph */
+.concept-graph-container {
+    width: 100%;
+    height: 60vh;
+}
+
+.map-insights {
+    max-height: 20vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-12);
+    margin-top: var(--space-12);
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
 /* Smaller dropdown for graph type */
 #graph-type-select {
     width: 150px;

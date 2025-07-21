@@ -713,6 +713,8 @@ class NotesApp {
         const graphZoomOut = document.getElementById('zoom-out-graph-btn');
         const graphTypeSelect = document.getElementById('graph-type-select');
         const regenerateGraphBtn = document.getElementById('regenerate-graph-btn');
+        const conceptGraphBtn = document.getElementById('concept-graph-btn');
+        const conceptGraphClose = document.getElementById('close-concept-graph-modal');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -743,6 +745,12 @@ class NotesApp {
             regenerateGraphBtn.addEventListener('click', () => {
                 this.showGraphModal();
             });
+        }
+        if (conceptGraphBtn) {
+            conceptGraphBtn.addEventListener('click', () => { this.showConceptGraphModal(); });
+        }
+        if (conceptGraphClose) {
+            conceptGraphClose.addEventListener('click', () => { this.hideConceptGraphModal(); });
         }
 
         // Auto-guardado cada 30 segundos
@@ -2087,6 +2095,127 @@ class NotesApp {
     zoomOutGraph() {
         this.graphZoom = Math.max(this.graphZoom / 1.2, 0.2);
         this.applyGraphTransform();
+    }
+
+    async showConceptGraphModal() {
+        const noteText = this.getCurrentMarkdown();
+        const modal = document.getElementById('concept-graph-modal');
+        const container = document.getElementById('concept-graph-container');
+        const insightsEl = document.getElementById('map-insights');
+        if (!modal || !container) return;
+        container.innerHTML = '';
+        insightsEl.textContent = '';
+        this.showProcessingOverlay('Generating concept map...');
+        try {
+            const resp = await authFetch('/api/concept-graph', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note: noteText })
+            });
+            if (!resp.ok) throw new Error('Request failed');
+            const data = await resp.json();
+            this.renderConceptGraph(data.graph);
+            insightsEl.textContent = `Nodes: ${data.insights.total_nodes}, Links: ${data.insights.total_links}, Clusters: ${data.insights.total_clusters}\nDominant: ${data.insights.dominant_topics.join(', ')}\nBridging: ${data.insights.bridging_concepts.join(', ')}\nGaps: ${data.insights.knowledge_gaps.join(', ')}`;
+            modal.classList.add('active');
+            this.hideMobileFab();
+        } catch (e) {
+            this.showNotification(e.message || 'Concept map failed', 'error');
+        } finally {
+            this.hideProcessingOverlay();
+        }
+    }
+
+    hideConceptGraphModal() {
+        const modal = document.getElementById('concept-graph-modal');
+        if (modal) modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    renderConceptGraph(graph) {
+        const container = document.getElementById('concept-graph-container');
+        if (!container) return;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const svg = d3.select(container).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        const link = svg.append('g')
+            .attr('stroke', '#999')
+            .attr('stroke-opacity', 0.6)
+            .selectAll('line')
+            .data(graph.links)
+            .enter().append('line')
+            .attr('stroke-width', d => Math.sqrt(d.weight));
+        const node = svg.append('g')
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 1.5)
+            .selectAll('circle')
+            .data(graph.nodes)
+            .enter().append('circle')
+            .attr('r', 5)
+            .attr('fill', '#1f77b4')
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+        const label = svg.append('g')
+            .selectAll('text')
+            .data(graph.nodes)
+            .enter().append('text')
+            .attr('font-size', 10)
+            .attr('dx', 8)
+            .attr('dy', '0.35em')
+            .text(d => d.label);
+
+        const simulation = d3.forceSimulation(graph.nodes)
+            .force('link', d3.forceLink(graph.links).id(d => d.id).distance(50))
+            .force('charge', d3.forceManyBody().strength(-200))
+            .force('center', d3.forceCenter(width / 2, height / 2));
+
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            node
+                .attr('cx', d => d.x)
+                .attr('cy', d => d.y);
+            label
+                .attr('x', d => d.x)
+                .attr('y', d => d.y);
+        });
+
+        node.on('click', (_, d) => {
+            node.attr('fill', n => n === d || graph.links.some(l => (l.source === d && l.target === n) || (l.target === d && l.source === n)) ? '#d62728' : '#ccc');
+            link.attr('stroke', l => l.source === d || l.target === d ? '#d62728' : '#ccc');
+            label.attr('fill', n => n === d || graph.links.some(l => (l.source === d && l.target === n) || (l.target === d && l.source === n)) ? '#d62728' : '#ccc');
+        });
+
+        svg.on('click', (event) => {
+            if (event.target === svg.node()) {
+                node.attr('fill', '#1f77b4');
+                link.attr('stroke', '#999');
+                label.attr('fill', '#000');
+            }
+        });
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
     }
 
     setupGraphPanZoom() {

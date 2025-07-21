@@ -18,6 +18,7 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 from speaker_diarization import get_speaker_diarization_wrapper
 from mermaid import Mermaid
+from concept_graph import build_concept_graph
 import ast
 import string
 from pydub import AudioSegment
@@ -2912,6 +2913,21 @@ def generate_diagram():
         return jsonify({"svg": svg, "tree": tree})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph', methods=['POST'])
+def concept_graph():
+    """Generate a concept co-occurrence graph from note markdown."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    data = request.get_json() or {}
+    note = data.get('note', '')
+    try:
+        result = build_concept_graph(note)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": f"Error generating graph: {str(e)}"}), 500
 
 
 @app.route('/api/app-config', methods=['GET'])
