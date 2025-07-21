@@ -693,6 +693,24 @@ class BackendAPI {
             throw error;
         }
     }
+
+    async generateNodeGraph(note) {
+        try {
+            const response = await authFetch(`${this.baseUrl}/api/node-graph`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ note })
+            });
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.error || `HTTP ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error generating node graph:', error);
+            throw error;
+        }
+    }
 }
 
 // Instancia global del API backend

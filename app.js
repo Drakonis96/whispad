@@ -713,6 +713,8 @@ class NotesApp {
         const graphZoomOut = document.getElementById('zoom-out-graph-btn');
         const graphTypeSelect = document.getElementById('graph-type-select');
         const regenerateGraphBtn = document.getElementById('regenerate-graph-btn');
+        const nodeGraphBtn = document.getElementById('node-graph-btn');
+        const closeNodeGraphBtn = document.getElementById('close-node-graph-modal');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -743,6 +745,12 @@ class NotesApp {
             regenerateGraphBtn.addEventListener('click', () => {
                 this.showGraphModal();
             });
+        }
+        if (nodeGraphBtn) {
+            nodeGraphBtn.addEventListener('click', () => { this.showNodeGraphModal(); });
+        }
+        if (closeNodeGraphBtn) {
+            closeNodeGraphBtn.addEventListener('click', () => { this.hideNodeGraphModal(); });
         }
 
         // Auto-guardado cada 30 segundos
@@ -1904,6 +1912,141 @@ class NotesApp {
             output.textContent = '';
             output.classList.add('hidden');
         }
+    }
+
+    showNodeGraphModal() {
+        const noteText = this.getCurrentMarkdown();
+        const modal = document.getElementById('node-graph-modal');
+        const container = document.getElementById('node-graph-container');
+        const insightsDiv = document.getElementById('map-insights');
+        if (!modal || !container || !insightsDiv) return;
+        container.innerHTML = '';
+        insightsDiv.textContent = '';
+        this.showProcessingOverlay('Generating node graph...');
+        backendAPI.generateNodeGraph(noteText)
+            .then(data => {
+                this.renderNodeGraph(data);
+                this.renderMapInsights(data.insights);
+                this.hideMobileFab();
+                modal.classList.add('active');
+            })
+            .catch(err => this.showNotification(err.message || 'Node graph request failed', 'error'))
+            .finally(() => this.hideProcessingOverlay());
+    }
+
+    hideNodeGraphModal() {
+        const modal = document.getElementById('node-graph-modal');
+        if (modal) modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    renderMapInsights(info) {
+        const insightsDiv = document.getElementById('map-insights');
+        if (!insightsDiv || !info) return;
+        insightsDiv.innerHTML = `
+            <p><strong>Nodes:</strong> ${info.nodes} &nbsp; <strong>Connections:</strong> ${info.connections} &nbsp; <strong>Clusters:</strong> ${info.clusters}</p>
+            <p><strong>Main topics:</strong> ${info.main_topics.join(', ')}</p>
+            <p><strong>Bridging concepts:</strong> ${info.bridging_concepts.join(', ')}</p>
+            <p><strong>Knowledge gaps:</strong> ${info.knowledge_gaps.join(', ')}</p>
+        `;
+    }
+
+    renderNodeGraph(data) {
+        const container = document.getElementById('node-graph-container');
+        if (!container) return;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const svg = d3.select(container).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+        const links = data.links.map(d => Object.create(d));
+        const nodes = data.nodes.map(d => Object.create(d));
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        const simulation = d3.forceSimulation(nodes)
+            .force('link', d3.forceLink(links).id(d => d.id).distance(80))
+            .force('charge', d3.forceManyBody().strength(-200))
+            .force('center', d3.forceCenter(width / 2, height / 2));
+
+        const link = svg.append('g')
+            .attr('class', 'links')
+            .selectAll('line')
+            .data(links)
+            .join('line')
+            .attr('class', 'node-link')
+            .attr('stroke-width', d => Math.sqrt(d.weight));
+
+        const node = svg.append('g')
+            .attr('class', 'nodes')
+            .selectAll('circle')
+            .data(nodes)
+            .join('circle')
+            .attr('r', d => 5 + Math.log(d.weight + 1))
+            .attr('fill', d => color(d.cluster))
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        const label = svg.append('g')
+            .attr('class', 'labels')
+            .selectAll('text')
+            .data(nodes)
+            .join('text')
+            .text(d => d.id)
+            .attr('font-size', 12)
+            .attr('dy', 3);
+
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node
+                .attr('cx', d => d.x)
+                .attr('cy', d => d.y);
+
+            label
+                .attr('x', d => d.x + 8)
+                .attr('y', d => d.y);
+        });
+
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+
+        let selected = null;
+        function isConnected(a, b) {
+            return links.some(l => (l.source.id === a.id && l.target.id === b.id) || (l.source.id === b.id && l.target.id === a.id));
+        }
+
+        node.on('click', (event, d) => {
+            event.stopPropagation();
+            selected = d;
+            node.classed('dimmed', n => selected && !isConnected(d, n) && n !== d);
+            link.classed('dimmed', l => selected && l.source.id !== d.id && l.target.id !== d.id);
+        });
+
+        svg.on('click', () => {
+            selected = null;
+            node.classed('dimmed', false);
+            link.classed('dimmed', false);
+        });
     }
 
     downloadMindmap() {

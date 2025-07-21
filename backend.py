@@ -21,6 +21,9 @@ from mermaid import Mermaid
 import ast
 import string
 from pydub import AudioSegment
+import itertools
+import networkx as nx
+from collections import Counter
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -2332,6 +2335,84 @@ def diagram_json_to_mermaid(diagram_type, data):
         return pie_json_to_mermaid(data)
     raise ValueError("Unsupported diagram type")
 
+STOPWORDS = {
+    'the','and','for','that','with','this','from','you','are','was','were','your',
+    'have','has','had','but','not','into','about','http','https','com','www','she',
+    'him','her','his','its','they','them','their','there','what','when','where',
+    'which','while','shall','would','could','should','may','might','can','cant',
+    'will','just','than','then','such','other','more','some','each','many','any',
+    'been','being','also','because','between','over','under','these'
+}
+
+def generate_node_graph_data(text):
+    """Analyze text and return node/edge data for term co-occurrence."""
+    text = text.lower()
+    sentences = re.split(r'[.!?\n]+', text)
+    token_re = re.compile(r'[a-z]{3,}')
+
+    node_counts = Counter()
+    edge_counts = Counter()
+
+    for sent in sentences:
+        tokens = token_re.findall(sent)
+        tokens = [t for t in tokens if t not in STOPWORDS]
+        unique = sorted(set(tokens))
+        for w in unique:
+            node_counts[w] += 1
+        for a, b in itertools.combinations(unique, 2):
+            edge_counts[(a, b)] += 1
+
+    G = nx.Graph()
+    for (a, b), w in edge_counts.items():
+        G.add_edge(a, b, weight=w)
+    for w, c in node_counts.items():
+        if not G.has_node(w):
+            G.add_node(w, weight=c)
+        else:
+            G.nodes[w]['weight'] = c
+
+    if G.number_of_nodes() > 0:
+        communities = list(nx.algorithms.community.greedy_modularity_communities(G))
+    else:
+        communities = []
+
+    cluster_map = {}
+    for idx, comm in enumerate(communities):
+        for node in comm:
+            cluster_map[node] = idx
+
+    nodes = [
+        {
+            'id': n,
+            'weight': G.nodes[n].get('weight', 1),
+            'cluster': cluster_map.get(n, -1)
+        }
+        for n in G.nodes
+    ]
+
+    links = [
+        {
+            'source': u,
+            'target': v,
+            'weight': d.get('weight', 1)
+        }
+        for u, v, d in G.edges(data=True)
+    ]
+
+    main_topics = [n for n, _ in node_counts.most_common(5)]
+    bridge_nodes = [n for n, _ in sorted(nx.betweenness_centrality(G).items(), key=lambda x: -x[1])[:3]] if G.number_of_nodes() > 0 else []
+    gaps = [n for n in node_counts if G.degree(n) <= 1][:3]
+
+    insights = {
+        'nodes': G.number_of_nodes(),
+        'connections': G.number_of_edges(),
+        'clusters': len(communities),
+        'main_topics': main_topics,
+        'bridging_concepts': bridge_nodes,
+        'knowledge_gaps': gaps,
+    }
+    return nodes, links, insights
+
 def generate_mindmap_openai(note_md, topic, model):
     if not OPENAI_API_KEY:
         return None, 'API key de OpenAI no configurada'
@@ -2910,6 +2991,23 @@ def generate_diagram():
         script = "\n".join(lines)
         svg = Mermaid(script).svg_response.text
         return jsonify({"svg": svg, "tree": tree})
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+@app.route('/api/node-graph', methods=['POST'])
+def node_graph():
+    """Generate a term co-occurrence node graph."""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        note = data.get('note', '')
+
+        nodes, links, insights = generate_node_graph_data(note)
+        return jsonify({"nodes": nodes, "links": links, "insights": insights})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 

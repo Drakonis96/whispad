@@ -20,3 +20,4 @@ beautifulsoup4
 pyannote.audio
 torchaudio
 numpy
+networkx
