@@ -5,7 +5,11 @@ This module provides speaker diarization functionality to identify different spe
 
 import os
 import tempfile
-import torch
+try:
+    import torch
+except ImportError as e:
+    print(f"Warning: PyTorch not available: {e}")
+    torch = None
 import numpy as np
 from typing import List, Tuple, Dict, Optional
 import logging

@@ -153,6 +153,9 @@
                         <button class="btn btn--outline btn--sm" id="graph-btn" title="Graph view">
                             <i class="fas fa-project-diagram"></i>&nbsp;Graph
                         </button>
+                        <button class="btn btn--outline btn--sm" id="network-btn" title="Idea map">
+                            <i class="fas fa-share-alt"></i>&nbsp;Ideas
+                        </button>
                         <button class="btn btn--outline btn--sm" id="files-btn" title="Files">
                             <i class="fas fa-folder"></i>&nbsp;Files
                         </button>
@@ -351,6 +354,18 @@
                 </button>
                 <button class="btn btn--outline btn--sm" id="download-graph-btn">Download</button>
                 <button class="btn btn--outline btn--sm" id="close-graph-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network modal -->
+    <div class="modal" id="network-modal">
+        <div class="modal-content modal-content--wide">
+            <div class="modal-body">
+                <div class="network-container" id="network-container"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline btn--sm" id="close-network-modal">Close</button>
             </div>
         </div>
     </div>
@@ -869,12 +884,16 @@
         <button class="mobile-tool-btn" data-target="graph-btn" aria-label="Graph">
             <i class="fas fa-project-diagram"></i>
         </button>
+        <button class="mobile-tool-btn" data-target="network-btn" aria-label="Ideas">
+            <i class="fas fa-share-alt"></i>
+        </button>
         <button class="mobile-tool-btn" data-target="files-btn" aria-label="Files">
             <i class="fas fa-folder"></i>
         </button>
     </div>
     </div> <!-- end app-content -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
     <script src="/backend-api.js"></script>
     <script src="/app.js"></script>
 </body>

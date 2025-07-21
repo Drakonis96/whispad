@@ -745,6 +745,16 @@ class NotesApp {
             });
         }
 
+        // Network graph button
+        const networkBtn = document.getElementById('network-btn');
+        const networkClose = document.getElementById('close-network-modal');
+        if (networkBtn) {
+            networkBtn.addEventListener('click', () => { this.showNetworkModal(); });
+        }
+        if (networkClose) {
+            networkClose.addEventListener('click', () => { this.hideNetworkModal(); });
+        }
+
         // Auto-guardado cada 30 segundos
         this.autoSaveInterval = setInterval(() => {
             if (this.currentNote) {
@@ -1903,6 +1913,98 @@ class NotesApp {
         if (output) {
             output.textContent = '';
             output.classList.add('hidden');
+        }
+    }
+
+    showNetworkModal() {
+        const noteText = this.getCurrentMarkdown();
+        this.showProcessingOverlay('Generating network...');
+        authFetch('/api/text-network', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: noteText })
+        })
+        .then(resp => resp.json())
+        .then(data => {
+            this.renderNetworkGraph(data);
+            this.hideMobileFab();
+            document.getElementById('network-modal').classList.add('active');
+        })
+        .catch(err => this.showNotification(err.message || 'Network request failed', 'error'))
+        .finally(() => this.hideProcessingOverlay());
+    }
+
+    hideNetworkModal() {
+        const modal = document.getElementById('network-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+        const container = document.getElementById('network-container');
+        if (container) container.innerHTML = '';
+    }
+
+    renderNetworkGraph(data) {
+        const container = document.getElementById('network-container');
+        container.innerHTML = '';
+        const width = container.clientWidth || 600;
+        const height = container.clientHeight || 400;
+        const svg = d3.select(container).append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+        const link = svg.append('g')
+            .selectAll('line')
+            .data(data.links)
+            .enter().append('line')
+            .attr('stroke', '#999')
+            .attr('stroke-opacity', 0.6)
+            .attr('stroke-width', d => Math.sqrt(d.weight));
+
+        const node = svg.append('g')
+            .selectAll('circle')
+            .data(data.nodes)
+            .enter().append('circle')
+            .attr('r', 5)
+            .attr('fill', d => color(d.community))
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        node.append('title').text(d => d.label);
+
+        const simulation = d3.forceSimulation(data.nodes)
+            .force('link', d3.forceLink(data.links).id(d => d.id).distance(50))
+            .force('charge', d3.forceManyBody().strength(-200))
+            .force('center', d3.forceCenter(width / 2, height / 2));
+
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            node
+                .attr('cx', d => d.x)
+                .attr('cy', d => d.y);
+        });
+
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
         }
     }
 

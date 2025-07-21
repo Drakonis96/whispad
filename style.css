@@ -2840,6 +2840,11 @@ select.form-control {
     position: relative;
 }
 
+.network-container {
+    width: 100%;
+    height: 60vh;
+}
+
 #graph-pan-zoom {
     transform-origin: 0 0;
     cursor: grab;

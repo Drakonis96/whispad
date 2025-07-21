@@ -10,7 +10,6 @@ import time
 from dotenv import load_dotenv
 import tempfile
 import base64
-import re
 from datetime import datetime
 import shutil
 from markdownify import markdownify
@@ -21,6 +20,10 @@ from mermaid import Mermaid
 import ast
 import string
 from pydub import AudioSegment
+import networkx as nx
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem.snowball import SnowballStemmer
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -2910,6 +2913,94 @@ def generate_diagram():
         script = "\n".join(lines)
         svg = Mermaid(script).svg_response.text
         return jsonify({"svg": svg, "tree": tree})
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+@app.route('/api/text-network', methods=['POST'])
+def text_network():
+    """Generate a simple co-occurrence network from note text."""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        text = data.get('text', '')
+        if not text:
+            return jsonify({"error": "text requerido"}), 400
+
+        lang = data.get('language', 'spanish').lower()
+
+        try:
+            stop_en = set(stopwords.words('english'))
+            stop_es = set(stopwords.words('spanish'))
+        except LookupError:
+            nltk.download('stopwords')
+            stop_en = set(stopwords.words('english'))
+            stop_es = set(stopwords.words('spanish'))
+
+        stem_en = SnowballStemmer('english')
+        stem_es = SnowballStemmer('spanish')
+
+        tokens = re.findall(r'\b\w+\b', text.lower())
+        cleaned = []
+        for t in tokens:
+            if lang.startswith('es'):
+                if t in stop_es:
+                    continue
+                cleaned.append(stem_es.stem(t))
+            else:
+                if t in stop_en:
+                    continue
+                cleaned.append(stem_en.stem(t))
+
+        window = 3
+        G = nx.Graph()
+        for i, tok in enumerate(cleaned):
+            for j in range(i + 1, min(i + window, len(cleaned))):
+                u = tok
+                v = cleaned[j]
+                if u == v:
+                    continue
+                if G.has_edge(u, v):
+                    G[u][v]['weight'] += 1
+                else:
+                    G.add_edge(u, v, weight=1)
+
+        bc = nx.betweenness_centrality(G) if len(G) > 0 else {}
+        deg = dict(G.degree())
+        try:
+            from networkx.algorithms.community import louvain_communities
+            communities = louvain_communities(G) if len(G) > 0 else []
+        except Exception:
+            communities = []
+
+        comm_map = {}
+        for idx, comm in enumerate(communities):
+            for node in comm:
+                comm_map[node] = idx
+
+        nodes = [
+            {
+                'id': n,
+                'label': n,
+                'degree': deg.get(n, 0),
+                'bc': bc.get(n, 0.0),
+                'community': comm_map.get(n, 0)
+            }
+            for n in G.nodes()
+        ]
+        links = [
+            {
+                'source': u,
+                'target': v,
+                'weight': d.get('weight', 1)
+            }
+            for u, v, d in G.edges(data=True)
+        ]
+
+        return jsonify({'nodes': nodes, 'links': links})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
