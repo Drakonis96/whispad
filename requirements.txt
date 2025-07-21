@@ -16,6 +16,9 @@ argon2-cffi
 mermaid-py
 markdownify
 beautifulsoup4
+# Graph analysis dependencies
+spacy
+networkx
 # Dependencies for speaker diarization
 pyannote.audio
 torchaudio

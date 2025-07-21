@@ -713,11 +713,19 @@ class NotesApp {
         const graphZoomOut = document.getElementById('zoom-out-graph-btn');
         const graphTypeSelect = document.getElementById('graph-type-select');
         const regenerateGraphBtn = document.getElementById('regenerate-graph-btn');
+        const conceptGraphBtn = document.getElementById('concept-graph-btn');
+        const conceptGraphClose = document.getElementById('close-concept-graph-modal');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
         if (graphClose) {
             graphClose.addEventListener('click', () => { this.hideGraphModal(); });
+        }
+        if (conceptGraphBtn) {
+            conceptGraphBtn.addEventListener('click', () => { this.showConceptGraphModal(); });
+        }
+        if (conceptGraphClose) {
+            conceptGraphClose.addEventListener('click', () => { this.hideConceptGraphModal(); });
         }
         if (graphDownload) {
             graphDownload.addEventListener('click', () => { this.downloadMindmap(); });
@@ -1986,6 +1994,128 @@ class NotesApp {
             return false;
         };
         search(this.mindMapTree);
+    }
+
+    showConceptGraphModal() {
+        const noteText = this.getCurrentMarkdown();
+        const modal = document.getElementById('concept-graph-modal');
+        const container = document.getElementById('concept-graph-container');
+        const insightsEl = document.getElementById('map-insights');
+        container.innerHTML = '';
+        insightsEl.textContent = '';
+        this.showProcessingOverlay('Generating concept map...');
+        backendAPI.generateConceptGraph(noteText)
+            .then(data => {
+                this.renderConceptGraph(data.nodes, data.links);
+                insightsEl.textContent =
+                    `Nodes: ${data.insights.total_nodes}\n` +
+                    `Links: ${data.insights.total_links}\n` +
+                    `Clusters: ${data.insights.clusters}\n` +
+                    `Dominant topics: ${data.insights.dominant_topics.join(', ')}\n` +
+                    `Bridging concepts: ${data.insights.bridging_concepts.join(', ')}\n` +
+                    `Knowledge gaps: ${data.insights.knowledge_gaps.join(', ')}`;
+                modal.classList.add('active');
+                this.hideMobileFab();
+            })
+            .catch(err => this.showNotification(err.message || 'Concept graph failed', 'error'))
+            .finally(() => this.hideProcessingOverlay());
+    }
+
+    hideConceptGraphModal() {
+        const modal = document.getElementById('concept-graph-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+        const container = document.getElementById('concept-graph-container');
+        if (container) container.innerHTML = '';
+        const insightsEl = document.getElementById('map-insights');
+        if (insightsEl) insightsEl.textContent = '';
+    }
+
+    renderConceptGraph(nodes, links) {
+        const container = document.getElementById('concept-graph-container');
+        const width = container.clientWidth || 800;
+        const height = 500;
+        container.innerHTML = '';
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height);
+
+        const color = d3.scaleOrdinal(d3.schemeCategory10);
+        const link = svg.append('g')
+            .attr('stroke', '#aaa')
+            .selectAll('line')
+            .data(links)
+            .join('line')
+            .attr('stroke-width', d => Math.sqrt(d.value));
+
+        const node = svg.append('g')
+            .selectAll('circle')
+            .data(nodes)
+            .join('circle')
+            .attr('r', 6)
+            .attr('fill', d => color(d.group));
+
+        const label = svg.append('g')
+            .selectAll('text')
+            .data(nodes)
+            .join('text')
+            .attr('dy', 4)
+            .attr('x', 8)
+            .text(d => d.id);
+
+        const simulation = d3.forceSimulation(nodes)
+            .force('link', d3.forceLink(links).id(d => d.id).distance(80))
+            .force('charge', d3.forceManyBody().strength(-200))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .on('tick', () => {
+                link.attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                node.attr('cx', d => d.x).attr('cy', d => d.y);
+                label.attr('x', d => d.x).attr('y', d => d.y);
+            });
+
+        function drag(sim) {
+            function start(event, d) {
+                if (!event.active) sim.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+            function drag(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+            function end(event, d) {
+                if (!event.active) sim.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+            return d3.drag().on('start', start).on('drag', drag).on('end', end);
+        }
+
+        node.call(drag(simulation));
+
+        const adj = {};
+        links.forEach(l => {
+            adj[`${l.source.id}-${l.target.id}`] = true;
+            adj[`${l.target.id}-${l.source.id}`] = true;
+        });
+
+        node.on('click', (e, d) => {
+            node.attr('fill', n => (adj[`${d.id}-${n.id}`] || n.id === d.id) ? color(n.group) : '#ccc');
+            label.attr('fill', n => (adj[`${d.id}-${n.id}`] || n.id === d.id) ? '#000' : '#ccc');
+            link.attr('stroke', l => (l.source.id === d.id || l.target.id === d.id) ? '#f00' : '#ccc');
+        });
+
+        svg.on('click', (e) => {
+            if (e.target.tagName === 'svg') {
+                node.attr('fill', n => color(n.group));
+                label.attr('fill', '#000');
+                link.attr('stroke', '#aaa');
+            }
+        });
     }
 
     setupGraphNodeListeners() {

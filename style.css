@@ -2859,6 +2859,22 @@ select.form-control {
     fill: var(--color-text);
 }
 
+.concept-graph-container {
+    width: 100%;
+    height: 60vh;
+    margin-bottom: var(--space-16);
+}
+
+.map-insights {
+    max-height: 20vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-12);
+    color: var(--color-text);
+}
+
 .graph-text-output {
     max-height: 40vh;
     overflow-y: auto;

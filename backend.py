@@ -21,6 +21,10 @@ from mermaid import Mermaid
 import ast
 import string
 from pydub import AudioSegment
+import itertools
+from collections import Counter
+import networkx as nx
+import spacy
 
 def extract_json(text: str):
     """Try to extract and parse a JSON object from raw text."""
@@ -67,6 +71,9 @@ def is_path_within_directory(base_dir: str, path: str) -> bool:
 
 # Cargar variables de entorno
 load_dotenv()
+
+# Load spaCy model once for concept graphs
+nlp = spacy.load('en_core_web_sm')
 
 app = Flask(__name__)
 # Allow uploads up to 4GB for large whisper.cpp models
@@ -2332,6 +2339,53 @@ def diagram_json_to_mermaid(diagram_type, data):
         return pie_json_to_mermaid(data)
     raise ValueError("Unsupported diagram type")
 
+# --- Concept graph generation ---
+def build_concept_graph(text):
+    """Create a co-occurrence graph from markdown text."""
+    doc = nlp(text)
+    sentences = []
+    for sent in doc.sents:
+        tokens = [t.lemma_.lower() for t in sent
+                  if not t.is_stop and not t.is_punct and t.pos_ in {"NOUN", "PROPN", "VERB", "ADJ"}]
+        if tokens:
+            sentences.append(tokens)
+
+    vocab = set(itertools.chain.from_iterable(sentences))
+    G = nx.Graph()
+    G.add_nodes_from(vocab)
+
+    cooccur = Counter()
+    for tokens in sentences:
+        for a, b in itertools.combinations(set(tokens), 2):
+            if a != b:
+                pair = tuple(sorted((a, b)))
+                cooccur[pair] += 1
+
+    for (a, b), w in cooccur.items():
+        G.add_edge(a, b, weight=w)
+
+    clusters = list(nx.algorithms.community.greedy_modularity_communities(G)) if G.number_of_edges() else []
+    cluster_map = {}
+    for idx, cluster in enumerate(clusters, start=1):
+        for node in cluster:
+            cluster_map[node] = idx
+
+    bc = nx.betweenness_centrality(G) if G.number_of_edges() else {}
+    bridging = sorted(bc, key=bc.get, reverse=True)[:5]
+    dominant = sorted(G.degree, key=lambda x: x[1], reverse=True)[:5]
+    gaps = [n for n, d in G.degree if d <= 1][:5]
+
+    insights = {
+        "total_nodes": G.number_of_nodes(),
+        "total_links": G.number_of_edges(),
+        "clusters": len(clusters),
+        "dominant_topics": [n for n, _ in dominant],
+        "bridging_concepts": bridging,
+        "knowledge_gaps": gaps,
+    }
+
+    return G, cluster_map, insights
+
 def generate_mindmap_openai(note_md, topic, model):
     if not OPENAI_API_KEY:
         return None, 'API key de OpenAI no configurada'
@@ -2910,6 +2964,25 @@ def generate_diagram():
         script = "\n".join(lines)
         svg = Mermaid(script).svg_response.text
         return jsonify({"svg": svg, "tree": tree})
+    except Exception as e:
+        return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph', methods=['POST'])
+def concept_graph():
+    """Return concept co-occurrence graph data."""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        note = data.get('note', '')
+
+        G, cluster_map, insights = build_concept_graph(note)
+        nodes = [{"id": n, "group": cluster_map.get(n, 0)} for n in G.nodes]
+        links = [{"source": u, "target": v, "value": d.get('weight', 1)} for u, v, d in G.edges(data=True)]
+        return jsonify({"nodes": nodes, "links": links, "insights": insights})
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
