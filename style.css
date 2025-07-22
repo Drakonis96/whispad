@@ -3701,7 +3701,6 @@ select.form-control {
     padding: var(--space-12);
     background: var(--color-background);
     border-radius: var(--radius-sm);
-    border-left: 3px solid var(--color-primary);
 }
 
 .insight-label {
@@ -3916,12 +3915,15 @@ select.form-control {
 .map-insights {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-left-width: 3px;
+    border-left-color: var(--color-primary);
     border-radius: var(--radius-sm);
     padding: var(--space-16);
     margin-top: var(--space-12);
     font-size: 0.95rem;
     color: var(--color-text);
     line-height: 1.6;
+    padding-bottom: var(--space-16);
 }
 
 /* Smaller dropdown for graph type */
