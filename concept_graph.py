@@ -1021,7 +1021,27 @@ def is_content_word(term, language='english'):
     
     if term in meta_terms:
         return False
-    
+
+    # Additional POS-based filtering to remove pronouns, prepositions,
+    # verbs and adjectives that offer little semantic value. Apply only
+    # to single-word terms to avoid breaking multi-word concepts.
+    if ' ' not in term and term.isalpha():
+        lang = language.lower()
+        if lang in ['english', 'en'] and NLTK_AVAILABLE:
+            try:
+                tokens = nltk.word_tokenize(term)
+                if tokens:
+                    tags = nltk.pos_tag(tokens)
+                    # Keep nouns and proper nouns only
+                    if not all(pos.startswith('NN') for _, pos in tags):
+                        return False
+            except Exception:
+                pass
+        elif lang in ['spanish', 'es', 'español']:
+            # Filter common verb/adverb endings in Spanish
+            if re.search(r'(?:ando|iendo|ado|ada|ados|adas|ido|ida|idos|idas|mente|\b(?:ar|er|ir))$', term):
+                return False
+
     return True
 
 def calculate_term_importance(terms, text, max_sentences=100):
