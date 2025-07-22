@@ -5,6 +5,29 @@ from collections import Counter
 import math
 import unicodedata
 
+# Optional spaCy support for Spanish lemmatization
+try:
+    import spacy
+    try:
+        SPACY_ES = spacy.load('es_core_news_sm')
+        SPACY_AVAILABLE = True
+    except Exception:
+        SPACY_ES = None
+        SPACY_AVAILABLE = False
+except Exception:
+    SPACY_ES = None
+    SPACY_AVAILABLE = False
+
+# Import Spanish helpers if available
+try:
+    from spanish_concept_graph import (
+        simple_spanish_lemmatizer,
+        SPANISH_STOPWORDS_COMPREHENSIVE,
+    )
+except Exception:
+    simple_spanish_lemmatizer = None
+    SPANISH_STOPWORDS_COMPREHENSIVE = set()
+
 # Import NLTK for lemmatization support
 try:
     import nltk
@@ -76,6 +99,7 @@ STOPWORDS = {
     'am','being','been','have','has','had','do','does','did','will','would','could','should','might','may',
     'can','must','shall','ought','need','dare','used','going','getting','making','taking','giving','coming',
     'looking','working','trying','saying','telling','knowing','thinking','feeling','seeming','becoming',
+    'consider','considered','occupy','occupied',
     
     # Generic nouns and adjectives
     'thing','things','stuff','something','anything','everything','nothing','someone','anyone','everyone',
@@ -124,6 +148,7 @@ STOPWORDS_SPANISH = {
     'recordar','olvidar','conocer','reconocer','entender','comprender','explicar','preguntar','responder',
     'ayudar','necesitar','usar','utilizar','servir','funcionar','cambiar','mejorar','empeorar','aumentar',
     'disminuir','subir','bajar','caer','levantar','mover','parar','continuar','terminar','acabar','comenzar',
+    'propuso','dicho','caracterizar','cruzar',
     
     # Prepositions and conjunctions
     'y','o','pero','sino','aunque','si','porque','ya','como','cuando','donde','mientras','hasta','desde',
@@ -171,6 +196,9 @@ STOPWORDS_SPANISH = {
     'por qué','para qué','ah','oh','uf','ay','vaya','caramba','dios mío','por dios'
 }
 
+# Extend Spanish stopwords with comprehensive list if available
+STOPWORDS_SPANISH.update(SPANISH_STOPWORDS_COMPREHENSIVE)
+
 # Build accent-insensitive stopword sets
 STOPWORDS_NORMALIZED = {normalize_word(w) for w in STOPWORDS}
 STOPWORDS_SPANISH_NORMALIZED = {normalize_word(w) for w in STOPWORDS_SPANISH}
@@ -199,21 +227,30 @@ def get_wordnet_pos(treebank_tag):
         return wordnet.NOUN  # Default
 
 def lemmatize_word(word, language='english', enable_lemmatization=True):
-    """
-    Lemmatize a word if lemmatization is enabled and NLTK is available.
-    Falls back to returning the original word if lemmatization fails.
-    """
-    if not enable_lemmatization or not NLTK_AVAILABLE:
+    """Lemmatize a single word for English or Spanish."""
+    if not enable_lemmatization:
         return word
-    
-    # Currently only support English lemmatization with NLTK
-    if language.lower() not in ['english', 'en']:
+
+    lang = language.lower()
+
+    if lang in ['spanish', 'es', 'español']:
+        if simple_spanish_lemmatizer:
+            lemma = simple_spanish_lemmatizer(word)
+            if lemma:
+                return lemma
+        if SPACY_AVAILABLE and SPACY_ES is not None:
+            try:
+                doc = SPACY_ES(word)
+                if doc and doc[0].lemma_:
+                    return doc[0].lemma_.lower()
+            except Exception:
+                pass
         return word
-    
-    try:
-        lemmatizer = WordNetLemmatizer()
-        # Get POS tag for better lemmatization
+
+    # English lemmatization
+    if NLTK_AVAILABLE:
         try:
+            lemmatizer = WordNetLemmatizer()
             tokens = nltk.word_tokenize(word)
             if tokens:
                 pos_tags = nltk.pos_tag(tokens)
@@ -221,14 +258,16 @@ def lemmatize_word(word, language='english', enable_lemmatization=True):
                     _, pos = pos_tags[0]
                     wordnet_pos = get_wordnet_pos(pos)
                     return lemmatizer.lemmatize(word.lower(), pos=wordnet_pos)
-        except:
-            # Fallback to simple noun lemmatization
+            return lemmatizer.lemmatize(word.lower())
+        except Exception:
             pass
-        
-        return lemmatizer.lemmatize(word.lower())
-    except Exception as e:
-        # If lemmatization fails for any reason, return original word
-        return word
+
+    # Fallback simple rules
+    if lang in ['english', 'en']:
+        for suf in ['ing', 'ed', 'es', 's']:
+            if word.lower().endswith(suf) and len(word) > len(suf)+2:
+                return word[:-len(suf)]
+    return word
 
 def lemmatize_terms(terms, language='english', enable_lemmatization=True):
     """

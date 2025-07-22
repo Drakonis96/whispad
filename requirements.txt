@@ -27,3 +27,6 @@ networkx
 nltk
 # For AI-enhanced concept graph
 aiohttp
+# Optional Spanish lemmatization
+spacy
+es_core_news_sm
