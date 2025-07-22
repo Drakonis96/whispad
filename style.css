@@ -553,6 +553,20 @@ pre code {
   background: var(--color-secondary-active);
 }
 
+.btn--purple {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+}
+
+.btn--purple:hover {
+  background: #7c3aed;
+}
+
+.btn--purple:active {
+  background: #6d28d9;
+}
+
 .btn--outline {
   background: transparent;
   border: 1px solid var(--color-border);
@@ -1534,25 +1548,62 @@ select.form-control {
     justify-content: flex-end;
 }
 
-/* Concept removal modal styles */
-.concept-exclusion-container {
-    margin-bottom: var(--space-16);
-}
-
-.concept-exclusion-container textarea {
-    min-height: 100px;
-    resize: vertical;
-    font-family: var(--font-body);
-}
-
-.concept-exclusion-stats {
-    padding: var(--space-12);
+/* Node filter modal styles */
+.filter-section {
+    margin-bottom: var(--space-20);
+    padding: var(--space-16);
     background-color: var(--color-surface);
     border-radius: var(--radius-base);
     border: 1px solid var(--color-border);
 }
 
-.exclusion-count {
+.filter-section h4 {
+    margin: 0 0 var(--space-12) 0;
+    color: var(--color-text);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+}
+
+.filter-section p {
+    margin: 0 0 var(--space-12) 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.concept-exclusion-container,
+.concept-inclusion-container {
+    margin-bottom: var(--space-16);
+}
+
+.concept-exclusion-container textarea,
+.concept-inclusion-container textarea {
+    min-height: 100px;
+    resize: vertical;
+    font-family: var(--font-body);
+    background-color: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-base);
+    padding: var(--space-12);
+    transition: border-color 0.2s ease;
+}
+
+.concept-exclusion-container textarea:focus,
+.concept-inclusion-container textarea:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.concept-exclusion-stats,
+.concept-inclusion-stats {
+    padding: var(--space-12);
+    background-color: var(--color-background);
+    border-radius: var(--radius-base);
+    border: 1px solid var(--color-border);
+}
+
+.exclusion-count,
+.inclusion-count {
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
 }

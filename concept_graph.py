@@ -9,16 +9,35 @@ import unicodedata
 try:
     import nltk
     from nltk.stem import WordNetLemmatizer
-    from nltk.corpus import wordnet
+    from nltk.corpus import wordnet, stopwords
     NLTK_AVAILABLE = True
 except ImportError:
     NLTK_AVAILABLE = False
+
+# Optional spaCy support for enhanced Spanish lemmatization
+# Install with: pip install spacy && python -m spacy download es_core_news_sm
+try:
+    import spacy
+    # Try to load Spanish model
+    try:
+        SPACY_ES = spacy.load("es_core_news_sm")
+        SPACY_ES_AVAILABLE = True
+    except OSError:
+        SPACY_ES = None
+        SPACY_ES_AVAILABLE = False
+        print("Info: Spanish spaCy model not found. Install with: python -m spacy download es_core_news_sm")
+    SPACY_AVAILABLE = True
+except ImportError:
+    SPACY_AVAILABLE = False
+    SPACY_ES_AVAILABLE = False
+    SPACY_ES = None
 
 # Initialize NLTK resources if available
 if NLTK_AVAILABLE:
     try:
         nltk.data.find('tokenizers/punkt')
         nltk.data.find('corpora/wordnet')
+        nltk.data.find('corpora/stopwords')
         nltk.data.find('taggers/averaged_perceptron_tagger')
     except LookupError:
         # Download required NLTK data
@@ -30,6 +49,7 @@ if NLTK_AVAILABLE:
         try:
             nltk.download('punkt', download_dir=nltk_data_dir, quiet=True)
             nltk.download('wordnet', download_dir=nltk_data_dir, quiet=True)
+            nltk.download('stopwords', download_dir=nltk_data_dir, quiet=True)
             nltk.download('averaged_perceptron_tagger', download_dir=nltk_data_dir, quiet=True)
             nltk.download('omw-1.4', download_dir=nltk_data_dir, quiet=True)
         except Exception as e:
@@ -41,6 +61,182 @@ def normalize_word(word: str) -> str:
     """Return a lowercase, accent-free version of the given word."""
     nfkd_form = unicodedata.normalize('NFD', word)
     return ''.join(c for c in nfkd_form if unicodedata.category(c) != 'Mn').lower()
+
+# Spanish language helpers
+def get_spanish_stopwords():
+    """Get comprehensive Spanish stopwords including common verbs and expressions."""
+    spanish_stopwords = {
+        # Articles
+        'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
+        
+        # Prepositions  
+        'a', 'ante', 'bajo', 'cabe', 'con', 'contra', 'de', 'del', 'desde', 'durante', 
+        'en', 'entre', 'hacia', 'hasta', 'mediante', 'para', 'por', 'según', 'sin', 
+        'so', 'sobre', 'tras', 'versus', 'vía',
+        
+        # Conjunctions
+        'y', 'e', 'ni', 'o', 'u', 'pero', 'mas', 'sino', 'que', 'porque', 'pues', 
+        'aunque', 'si', 'como', 'cuando', 'donde', 'mientras', 'ya',
+        
+        # Common verbs (including past tense and participles)
+        'ser', 'estar', 'haber', 'tener', 'hacer', 'ir', 'venir', 'dar', 'decir', 
+        'poder', 'deber', 'querer', 'saber', 'ver', 'poner', 'salir', 'llegar', 
+        'pasar', 'seguir', 'quedar', 'creer', 'llevar', 'dejar', 'sentir', 'volver',
+        'encontrar', 'parecer', 'trabajar', 'empezar', 'esperar', 'buscar', 'existir',
+        
+        # Past tense and participle forms
+        'fue', 'fue', 'era', 'había', 'tuvo', 'hizo', 'dijo', 'dijo', 'dicho', 
+        'propuso', 'propuesto', 'estableció', 'establecido', 'indicó', 'indicado',
+        'mostró', 'mostrado', 'demostró', 'demostrado', 'observó', 'observado',
+        'consideró', 'considerado', 'sugirió', 'sugerido', 'planteó', 'planteado',
+        
+        # Adverbs
+        'no', 'sí', 'también', 'tampoco', 'muy', 'más', 'menos', 'tan', 'tanto', 
+        'bastante', 'poco', 'mucho', 'demasiado', 'algo', 'nada', 'todo', 'siempre',
+        'nunca', 'jamás', 'quizás', 'acaso', 'bien', 'mal', 'mejor', 'peor', 'ahora',
+        'antes', 'después', 'luego', 'entonces', 'aquí', 'ahí', 'allí', 'allá',
+        
+        # Pronouns and determiners
+        'yo', 'tú', 'él', 'ella', 'nosotros', 'vosotros', 'ellos', 'ellas',
+        'me', 'te', 'se', 'nos', 'os', 'lo', 'la', 'le', 'les',
+        'mi', 'tu', 'su', 'nuestro', 'vuestro', 'este', 'esta', 'estos', 'estas',
+        'ese', 'esa', 'esos', 'esas', 'aquel', 'aquella', 'aquellos', 'aquellas',
+        
+        # Time and quantity
+        'hoy', 'ayer', 'mañana', 'tarde', 'temprano', 'pronto', 'vez', 'veces',
+        'primer', 'primero', 'primera', 'segundo', 'tercero', 'último', 'última',
+        
+        # Common adjectives and adverbs that add no meaning
+        'nuevo', 'nueva', 'viejo', 'vieja', 'grande', 'pequeño', 'pequeña',
+        'bueno', 'buena', 'malo', 'mala', 'mismo', 'misma', 'otro', 'otra',
+        'igual', 'diferente', 'similar', 'tal', 'cada', 'cualquier',
+        
+        # Generic terms that don't add semantic value
+        'cosa', 'cosas', 'algo', 'nada', 'todo', 'alguien', 'nadie', 'todos',
+        'lugar', 'lugares', 'sitio', 'sitios', 'parte', 'partes', 'lado', 'lados',
+        'tiempo', 'tiempos', 'momento', 'momentos', 'vez', 'veces', 'tipo', 'tipos',
+        'forma', 'formas', 'manera', 'maneras', 'modo', 'modos', 'caso', 'casos',
+    }
+    
+    return spanish_stopwords
+
+def lemmatize_spanish_word(word, use_spacy=True):
+    """
+    Lemmatize Spanish word using spaCy if available, otherwise use rule-based approach.
+    
+    Args:
+        word (str): Spanish word to lemmatize
+        use_spacy (bool): Whether to try spaCy first
+    
+    Returns:
+        str: Lemmatized word
+    """
+    word = word.lower().strip()
+    
+    # Try spaCy first if available and enabled
+    if use_spacy and SPACY_ES_AVAILABLE:
+        try:
+            doc = SPACY_ES(word)
+            if doc and len(doc) > 0:
+                return doc[0].lemma_
+        except Exception:
+            pass  # Fall back to rule-based approach
+    
+    # Rule-based Spanish lemmatization
+    # Common verb endings
+    verb_endings = {
+        # Present tense
+        'amos': 'ar', 'áis': 'ar', 'emos': 'er', 'éis': 'er', 'imos': 'ir', 'ís': 'ir',
+        # Past tense
+        'aste': 'ar', 'aron': 'ar', 'iste': 'er', 'ieron': 'er', 'iste': 'ir', 'ieron': 'ir',
+        # Imperfect
+        'aba': 'ar', 'abas': 'ar', 'aban': 'ar', 'ía': 'er', 'ías': 'er', 'ían': 'er',
+        # Participles
+        'ado': 'ar', 'idos': 'ir', 'idas': 'ir',
+        # Gerunds
+        'ando': 'ar', 'iendo': 'er', 'iendo': 'ir',
+    }
+    
+    # Try verb lemmatization
+    for ending, infinitive_ending in verb_endings.items():
+        if word.endswith(ending):
+            stem = word[:-len(ending)]
+            if len(stem) > 2:  # Ensure we have a meaningful stem
+                return stem + infinitive_ending
+    
+    # Noun/adjective plural to singular
+    if word.endswith('s') and len(word) > 3:
+        # Check if it's likely a plural
+        if word.endswith('es'):
+            # Remove 'es' ending
+            singular = word[:-2]
+        elif word.endswith('as') or word.endswith('os'):
+            # Remove 's' and change 'a'/'o' to 'o'/'a' pattern
+            singular = word[:-1]
+        else:
+            # Simple 's' removal
+            singular = word[:-1]
+        
+        # Validate that singular form makes sense
+        if len(singular) > 2:
+            return singular
+    
+    # Gender variations (feminine to masculine base form)
+    if word.endswith('a') and len(word) > 3:
+        # Try changing 'a' to 'o' for potential masculine form
+        masculine = word[:-1] + 'o'
+        # This is a simple heuristic - in real applications you'd want a dictionary
+        return word  # Keep original for now, but could be improved with word lists
+    
+    return word
+
+def get_stopwords(language='english'):
+    """
+    Get stopwords for the specified language.
+    
+    Args:
+        language (str): Language code ('english', 'spanish', 'es', 'español')
+    
+    Returns:
+        set: Set of stopwords for the language
+    """
+    if language.lower() in ['spanish', 'es', 'español']:
+        # Start with our comprehensive Spanish stopwords
+        spanish_stops = get_spanish_stopwords().copy()  # Make a copy to avoid modifying original
+        
+        # Add NLTK Spanish stopwords if available
+        if NLTK_AVAILABLE:
+            try:
+                nltk_spanish = set(stopwords.words('spanish'))
+                spanish_stops.update(nltk_spanish)
+            except Exception:
+                pass  # Use our custom set only
+        
+        return spanish_stops
+    else:
+        # English stopwords
+        english_stops = {
+            'the', 'and', 'a', 'an', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 
+            'from', 'up', 'about', 'into', 'over', 'after', 'under', 'above', 'below', 
+            'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 
+            'do', 'does', 'did', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 
+            'than', 'that', 'so', 'such', 'too', 'very', 'can', 'will', 'just', 'should',
+            'would', 'could', 'may', 'might', 'must', 'shall', 'ought', 'need', 'dare',
+            'used', 'ought', 'this', 'these', 'those', 'what', 'which', 'who', 'when',
+            'where', 'why', 'how', 'all', 'any', 'both', 'each', 'few', 'more', 'most',
+            'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so',
+            'than', 'too', 'very', 's', 't', 'can', 'will', 'just', 'don', 'should', 'now'
+        }
+        
+        # Add NLTK English stopwords if available
+        if NLTK_AVAILABLE:
+            try:
+                nltk_english = set(stopwords.words('english'))
+                english_stops.update(nltk_english)
+            except Exception:
+                pass  # Use our custom set only
+        
+        return english_stops
 
 # Extended stopwords including common academic and generic terms
 STOPWORDS = {
@@ -171,16 +367,9 @@ STOPWORDS_SPANISH = {
     'por qué','para qué','ah','oh','uf','ay','vaya','caramba','dios mío','por dios'
 }
 
-# Build accent-insensitive stopword sets
+# Build accent-insensitive stopword sets using our improved functions
 STOPWORDS_NORMALIZED = {normalize_word(w) for w in STOPWORDS}
-STOPWORDS_SPANISH_NORMALIZED = {normalize_word(w) for w in STOPWORDS_SPANISH}
-
-def get_stopwords(language='english'):
-    """Get stopwords for the specified language."""
-    if language.lower() in ['spanish', 'es', 'español']:
-        return STOPWORDS_SPANISH_NORMALIZED
-    else:
-        return STOPWORDS_NORMALIZED  # Default to English
+STOPWORDS_SPANISH_NORMALIZED = {normalize_word(w) for w in get_spanish_stopwords()}
 
 def get_wordnet_pos(treebank_tag):
     """Convert treebank POS tag to wordnet POS tag for lemmatization."""
@@ -198,16 +387,45 @@ def get_wordnet_pos(treebank_tag):
     else:
         return wordnet.NOUN  # Default
 
+def detect_language(text):
+    """Detect language of the text."""
+    # Simple heuristic based on common words
+    spanish_indicators = {
+        'el', 'la', 'de', 'que', 'y', 'en', 'un', 'es', 'se', 'no', 'te', 'lo', 'le', 
+        'da', 'su', 'por', 'son', 'con', 'para', 'al', 'del', 'los', 'las', 'pero',
+        'español', 'hablar', 'hacer', 'trabajo', 'tiempo', 'persona', 'año', 'gobierno',
+        'propuso', 'dicho', 'estableció', 'indicó', 'mostró', 'demostró', 'observó'
+    }
+    
+    words = text.lower().split()
+    spanish_count = sum(1 for word in words if normalize_word(word) in spanish_indicators)
+    
+    # If more than 10% of words are Spanish indicators, consider it Spanish
+    if len(words) > 0 and spanish_count / len(words) > 0.1:
+        return 'spanish'
+    return 'english'
+
 def lemmatize_word(word, language='english', enable_lemmatization=True):
     """
-    Lemmatize a word if lemmatization is enabled and NLTK is available.
-    Falls back to returning the original word if lemmatization fails.
+    Lemmatize a word based on detected language.
+    
+    Args:
+        word (str): Word to lemmatize
+        language (str): Language of the word ('english', 'spanish')
+        enable_lemmatization (bool): Whether to enable lemmatization
+    
+    Returns:
+        str: Lemmatized word
     """
-    if not enable_lemmatization or not NLTK_AVAILABLE:
+    if not enable_lemmatization:
         return word
     
-    # Currently only support English lemmatization with NLTK
-    if language.lower() not in ['english', 'en']:
+    # Spanish lemmatization
+    if language.lower() in ['spanish', 'es', 'español']:
+        return lemmatize_spanish_word(word, use_spacy=True)
+    
+    # English lemmatization using NLTK
+    if not NLTK_AVAILABLE:
         return word
     
     try:
@@ -354,7 +572,7 @@ def calculate_network_diversity(G, node):
     max_entropy = math.log2(len(neighbors)) if len(neighbors) > 1 else 1
     return entropy / max_entropy
 
-def extract_high_quality_terms(text, min_length=3, max_length=50, language='english', enable_lemmatization=True, max_text_length=200000, exclusions=None):
+def extract_high_quality_terms(text, min_length=3, max_length=50, language='english', enable_lemmatization=True, max_text_length=200000, exclusions=None, inclusions=None):
     """
     High-quality term extraction prioritizing compound terms and comprehensive coverage
     Target: 80-90% quality for concept graphs
@@ -364,29 +582,24 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
     
     if exclusions is None:
         exclusions = []
+    if inclusions is None:
+        inclusions = []
     
-    # Convert exclusions to lowercase for case-insensitive matching
+    # Convert exclusions and inclusions to lowercase for case-insensitive matching
     exclusions_lower = [exc.lower() for exc in exclusions]
+    inclusions_lower = [inc.lower() for inc in inclusions]
     
     # Initialize language detection variables
     spanish_count = 0
     english_count = 0
     
     # Detect language if not specified or auto
-    if language == 'auto' or language == 'english':  # Default to checking for Spanish indicators
-        spanish_indicators = ['el ', 'la ', 'los ', 'las ', 'de ', 'del ', 'en ', 'con ', 'por ', 'para ', 'es ', 'está ', 'son ', 'están ', 'y ', 'o ', 'que ', 'pero ', 'como ']
-        english_indicators = ['the ', 'and ', 'of ', 'to ', 'in ', 'for ', 'with ', 'on ', 'by ', 'from ', 'is ', 'are ', 'was ', 'were ', 'that ', 'this ']
-        
-        text_lower = text.lower()
-        spanish_count = sum(1 for indicator in spanish_indicators if indicator in text_lower)
-        english_count = sum(1 for indicator in english_indicators if indicator in text_lower)
-        
-        # If we detect Spanish indicators, process as Spanish
-        if spanish_count > 2:  # Lower threshold for detection
+    if language == 'auto':
+        language = detect_language(text)
+    elif language == 'english':  # Default to checking for Spanish indicators
+        detected_lang = detect_language(text)
+        if detected_lang == 'spanish':
             language = 'spanish'
-        elif english_count > spanish_count:
-            language = 'english'
-        # For mixed content, we'll process compound terms for both languages
     
     # More generous text length limit for quality
     if len(text) > max_text_length:
@@ -397,11 +610,11 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
         else:
             text = text[:max_text_length]
     
-    # Language-specific compound terms with mixed content support
+    # Language-specific compound terms
     compound_terms = {}
     
-    # For mixed content or when Spanish is detected, include Spanish terms
-    if language.lower() in ['spanish', 'es', 'español'] or spanish_count > 0:
+    # Add Spanish compound terms if Spanish is detected
+    if language.lower() in ['spanish', 'es', 'español']:
         spanish_compounds = {
             # Spanish compound terms for technology and business
             'inteligencia artificial': 'inteligencia_artificial',
@@ -456,8 +669,8 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
         }
         compound_terms.update(spanish_compounds)
     
-    # For mixed content or when English is detected, include English terms  
-    if language.lower() not in ['spanish', 'es', 'español'] or english_count > 0:
+    # Add English compound terms for English or mixed content
+    if language.lower() not in ['spanish', 'es', 'español']:
         english_compounds = {
             # AI/ML Core
             'artificial intelligence': 'artificial_intelligence',
@@ -703,10 +916,6 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
     # Method 3: Enhanced extraction with language-specific stopwords
     stopwords = get_stopwords(language)
     
-    # Add our enhanced Spanish stopwords if Spanish
-    if language.lower() in ['spanish', 'es', 'español']:
-        stopwords.update(spanish_stopwords)
-    
     if enable_lemmatization and NLTK_AVAILABLE:
         try:
             # Language-specific additional stopwords
@@ -788,15 +997,61 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
                 final_terms.append(term)
         filtered_terms = final_terms
     
+    # Apply user inclusions (prioritize included words/phrases)
+    if inclusions_lower:
+        inclusion_terms = []
+        regular_terms = []
+        
+        for term in filtered_terms:
+            term_lower = term.lower()
+            # Check if the term contains any inclusion words
+            is_included = False
+            for inclusion in inclusions_lower:
+                if (inclusion in term_lower or term_lower in inclusion or 
+                    # Check for word boundary matches
+                    any(word in inclusion.split() for word in term_lower.split()) or
+                    any(word in inclusions_lower for word in term_lower.split())):
+                    is_included = True
+                    break
+            
+            if is_included:
+                inclusion_terms.append(term)
+            else:
+                regular_terms.append(term)
+        
+        # Also add inclusion words directly if found in text
+        text_lower = text.lower()
+        for inclusion in inclusions_lower:
+            # Check if inclusion word exists in the text and not already in our terms
+            if inclusion in text_lower:
+                # Convert back to original case if possible
+                inclusion_words = inclusion.split()
+                for word in inclusion_words:
+                    if len(word) >= min_length and word not in [t.lower() for t in inclusion_terms]:
+                        # Try to find the original case version in text
+
+                        pattern = r'\b' + re.escape(word) + r'\b'
+                        matches = re.findall(pattern, text, re.IGNORECASE)
+                        if matches:
+                            original_case = matches[0]
+                            if original_case not in inclusion_terms:
+                                inclusion_terms.append(original_case)
+        
+        # Combine inclusion terms first (higher priority) then regular terms
+        filtered_terms = inclusion_terms + regular_terms
+    
     return filtered_terms
 
-def extract_key_terms(text, min_length=3, max_length=25, language='english', enable_lemmatization=True, max_text_length=50000, exclusions=None):
+def extract_key_terms(text, min_length=3, max_length=25, language='english', enable_lemmatization=True, max_text_length=50000, exclusions=None, inclusions=None):
     """Extract meaningful terms using advanced filtering techniques with performance optimizations."""
     if exclusions is None:
         exclusions = []
+    if inclusions is None:
+        inclusions = []
     
-    # Convert exclusions to lowercase for case-insensitive matching
+    # Convert exclusions and inclusions to lowercase for case-insensitive matching
     exclusions_lower = [exc.lower() for exc in exclusions]
+    inclusions_lower = [inc.lower() for inc in inclusions]
     
     stopwords = get_stopwords(language)
     
@@ -912,6 +1167,49 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
             if not excluded:
                 final_filtered_terms.append(term)
         filtered_terms = final_filtered_terms
+    
+    # Apply user inclusions (prioritize included words/phrases)
+    if inclusions_lower:
+        inclusion_terms = []
+        regular_terms = []
+        
+        for term in filtered_terms:
+            term_lower = term.lower()
+            # Check if the term contains any inclusion words
+            is_included = False
+            for inclusion in inclusions_lower:
+                if (inclusion in term_lower or term_lower in inclusion or 
+                    # Check for word boundary matches
+                    any(word in inclusion.split() for word in term_lower.split()) or
+                    any(word in inclusions_lower for word in term_lower.split())):
+                    is_included = True
+                    break
+            
+            if is_included:
+                inclusion_terms.append(term)
+            else:
+                regular_terms.append(term)
+        
+        # Also add inclusion words directly if found in text
+        text_lower = text.lower()
+        for inclusion in inclusions_lower:
+            # Check if inclusion word exists in the text and not already in our terms
+            if inclusion in text_lower:
+                # Convert back to original case if possible
+                inclusion_words = inclusion.split()
+                for word in inclusion_words:
+                    if len(word) >= min_length and word not in [t.lower() for t in inclusion_terms]:
+                        # Try to find the original case version in text
+
+                        pattern = r'\b' + re.escape(word) + r'\b'
+                        matches = re.findall(pattern, text, re.IGNORECASE)
+                        if matches:
+                            original_case = matches[0]
+                            if original_case not in inclusion_terms:
+                                inclusion_terms.append(original_case)
+        
+        # Combine inclusion terms first (higher priority) then regular terms
+        filtered_terms = inclusion_terms + regular_terms
     
     # Limit the total number of terms for performance
     return filtered_terms[:500]  # Cap at 500 terms
@@ -1151,6 +1449,324 @@ def calculate_semantic_bonus(term):
         return 1.1
     
     return 1.0
+
+async def filter_terms_with_ai(terms_list, text_sample, ai_provider=None, api_key=None, ai_model=None, host=None, port=None, language='english'):
+    """
+    Use AI to filter out non-important words (adjectives, pronouns, verbs, prepositions) 
+    from the extracted terms, keeping only semantically meaningful concepts for the graph.
+    Uses the same API structure as the "reprocess with AI" button.
+    """
+    if not ai_provider or not terms_list:
+        return terms_list  # Return original terms if no AI provider configured
+    
+    # Ensure ai_provider is a string (same as ai_reprocess.py)
+    if isinstance(ai_provider, dict):
+        ai_provider = ai_provider.get('provider') or ai_provider.get('name') or str(ai_provider)
+    ai_provider = str(ai_provider).strip()
+    
+    # Validate AI provider configuration (same as ai_reprocess.py)
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return terms_list
+    if ai_provider in ['lmstudio', 'ollama'] and (not host or not port):
+        return terms_list
+    
+    try:
+        # Limit terms for API efficiency
+        terms_to_filter = terms_list[:100] if len(terms_list) > 100 else terms_list
+        
+        # Language-specific prompts for filtering (matching ai_reprocess.py structure)
+        if language.lower() in ['spanish', 'es', 'español']:
+            prompt = f"""Eres un experto en análisis semántico y mapeo de conceptos. Dado el siguiente texto y lista de términos extraídos,
+por favor filtra y selecciona ÚNICAMENTE los conceptos semánticamente más importantes para un gráfico de conocimiento.
+
+CONTENIDO DEL TEXTO:
+{text_sample[:1000]}...
+
+TÉRMINOS EXTRAÍDOS:
+{', '.join(terms_to_filter)}
+
+TAREA:
+1. ELIMINAR: adjetivos, pronombres, verbos comunes, preposiciones, artículos, conjunciones, adverbios y palabras de función gramatical
+2. MANTENER: sustantivos conceptuales importantes, nombres propios, términos técnicos, entidades y conceptos clave
+3. Seleccionar solo los términos que añadan valor semántico al gráfico de conocimiento
+4. Priorizar términos específicos del dominio y conceptos centrales
+
+REGLAS:
+- Eliminar: pronombres (tú, su, ellos, etc.), palabras genéricas (cosa, manera, tiempo), verbos comunes (hacer, tener, ser)
+- Mantener: términos técnicos, nombres propios, conceptos específicos del dominio, temas clave
+- Enfocarse en conceptos que añadan valor semántico
+
+Responde SOLO con un array JSON de los términos importantes que deben mantenerse:
+["término1", "término2", "término3", ...]"""
+        else:
+            prompt = f"""You are an expert in semantic analysis and concept mapping. Given the following text and list of extracted terms,
+please filter and select ONLY the most semantically important concepts for a knowledge graph.
+
+TEXT CONTENT:
+{text_sample[:1000]}...
+
+EXTRACTED TERMS:
+{', '.join(terms_to_filter)}
+
+TASK:
+1. REMOVE: adjectives, pronouns, common verbs, prepositions, articles, conjunctions, adverbs, and grammatical function words
+2. KEEP: important conceptual nouns, proper names, technical terms, entities, and key concepts
+3. Select only terms that add semantic value to the knowledge graph
+4. Prioritize domain-specific terms and central concepts
+
+RULES:
+- Remove: pronouns (you, his, its, they, etc.), generic words (thing, way, time), common verbs (get, make, have)
+- Keep: technical terms, proper nouns, domain-specific concepts, key themes
+- Focus on concepts that add semantic value
+
+Respond with ONLY a JSON array of the important terms that should be kept:
+["term1", "term2", "term3", ...]"""
+        
+        # Use the same API calling methods as ai_reprocess.py
+        filtered_concepts = []
+        
+        if ai_provider.lower() == 'openai':
+            filtered_concepts = await _call_openai_filtering_api(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'openrouter':
+            filtered_concepts = await _call_openrouter_filtering_api(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'google':
+            filtered_concepts = await _call_google_filtering_api(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'groq':
+            filtered_concepts = await _call_groq_filtering_api(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'lmstudio':
+            filtered_concepts = await _call_lmstudio_filtering_api(prompt, ai_model, host, port)
+        elif ai_provider.lower() == 'ollama':
+            filtered_concepts = await _call_ollama_filtering_api(prompt, ai_model, host, port)
+        else:
+            return terms_list  # Unsupported provider
+        
+        # Validate that filtered terms are in original list (case-insensitive)
+        if filtered_concepts:
+            original_terms_lower = [term.lower() for term in terms_list]
+            validated_terms = []
+            for concept in filtered_concepts:
+                if isinstance(concept, str) and concept.lower() in original_terms_lower:
+                    # Find original case version
+                    for orig_term in terms_list:
+                        if orig_term.lower() == concept.lower():
+                            validated_terms.append(orig_term)
+                            break
+            
+            print(f"🤖 AI filtered {len(terms_list)} → {len(validated_terms)} terms")
+            return validated_terms if validated_terms else terms_list
+        else:
+            print("⚠️ AI filtering returned no results, using original terms")
+            return terms_list
+    
+    except Exception as e:
+        print(f"⚠️ AI filtering error: {e}, using original terms")
+        return terms_list
+
+# AI API calling functions for filtering (matching ai_reprocess.py structure)
+async def _call_openai_filtering_api(prompt, api_key, model=None):
+    """Call OpenAI API for term filtering."""
+    if not model:
+        model = "gpt-4o-mini"
+    
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 800,
+        "temperature": 0.1  # Low temperature for consistent filtering
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return _parse_filtering_response(content)
+    except Exception as e:
+        print(f"OpenAI API error: {e}")
+    return []
+
+async def _call_openrouter_filtering_api(prompt, api_key, model=None):
+    """Call OpenRouter API for term filtering."""
+    if not model:
+        model = "meta-llama/llama-3.1-8b-instruct:free"
+    
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://whispad.local",
+        "X-Title": "WhisPad AI"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 800,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return _parse_filtering_response(content)
+    except Exception as e:
+        print(f"OpenRouter API error: {e}")
+    return []
+
+async def _call_google_filtering_api(prompt, api_key, model=None):
+    """Call Google Gemini API for term filtering."""
+    if not model:
+        model = "gemini-2.0-flash"
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 800
+        }
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["candidates"][0]["content"]["parts"][0]["text"]
+                    return _parse_filtering_response(content)
+    except Exception as e:
+        print(f"Google API error: {e}")
+    return []
+
+async def _call_groq_filtering_api(prompt, api_key, model=None):
+    """Call Groq API for term filtering."""
+    if not model:
+        model = "llama-3.1-70b-versatile"
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 800,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return _parse_filtering_response(content)
+    except Exception as e:
+        print(f"Groq API error: {e}")
+    return []
+
+async def _call_lmstudio_filtering_api(prompt, model, host, port):
+    """Call LM Studio API for term filtering."""
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model or "local-model",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 800,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return _parse_filtering_response(content)
+    except Exception as e:
+        print(f"LMStudio API error: {e}")
+    return []
+
+async def _call_ollama_filtering_api(prompt, model, host, port):
+    """Call Ollama API for term filtering."""
+    url = f"http://{host}:{port}/api/chat"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model or "llama3",
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["message"]["content"]
+                    return _parse_filtering_response(content)
+    except Exception as e:
+        print(f"Ollama API error: {e}")
+    return []
+
+def _parse_filtering_response(content):
+    """Parse AI response and extract filtered terms list (same as ai_reprocess.py)."""
+    try:
+        import re
+        import json
+        
+        # Try to find JSON array in the response
+        json_match = re.search(r'\[.*?\]', content, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            concepts = json.loads(json_str)
+            if isinstance(concepts, list):
+                # Ensure all concepts are strings and non-empty
+                return [str(concept).strip() for concept in concepts if concept and str(concept).strip()]
+        
+        # Fallback: try to parse as JSON directly
+        concepts = json.loads(content)
+        if isinstance(concepts, list):
+            # Ensure all concepts are strings and non-empty
+            return [str(concept).strip() for concept in concepts if concept and str(concept).strip()]
+            
+    except (json.JSONDecodeError, AttributeError):
+        # Fallback: extract concepts from text manually
+        lines = content.strip().split('\n')
+        concepts = []
+        for line in lines:
+            line = line.strip()
+            if line.startswith('"') and line.endswith('"'):
+                concepts.append(line[1:-1])
+            elif line.startswith('- '):
+                concepts.append(line[2:])
+        # Ensure all concepts are strings and non-empty
+        return [str(concept).strip() for concept in concepts if concept and str(concept).strip()]
+    
+    return []
 
 async def enhance_terms_with_ai(terms, text, ai_provider=None, api_key=None, language='english'):
     """Use AI to enhance term selection and extract semantic relationships."""
@@ -1408,12 +2024,14 @@ def select_important_nodes_by_centrality(G, analysis_type='bridges', max_nodes_f
     
     return important_nodes, detailed_metrics
 
-def tokenize(text, analysis_type='bridges', max_terms=50, language='english', enable_lemmatization=True, exclusions=None):
+def tokenize(text, analysis_type='bridges', max_terms=50, language='english', enable_lemmatization=True, exclusions=None, inclusions=None):
     """Extract and rank the most important terms from text using centrality-based selection."""
     if exclusions is None:
         exclusions = []
+    if inclusions is None:
+        inclusions = []
     
-    terms = extract_high_quality_terms(text, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions)
+    terms = extract_high_quality_terms(text, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
     
     if not terms:
         return []
@@ -1633,17 +2251,19 @@ def build_enhanced_graph(text, important_terms, analysis_type='bridges', connect
     
     return G
 
-def build_graph(text, analysis_type='bridges', connection_threshold=0.5, language='english', enable_lemmatization=True, max_terms=25, exclusions=None):
+def build_graph(text, analysis_type='bridges', connection_threshold=0.5, language='english', enable_lemmatization=True, max_terms=25, exclusions=None, inclusions=None):
     """Build a more intelligent concept graph with centrality-based node selection and performance optimizations."""
     if exclusions is None:
         exclusions = []
+    if inclusions is None:
+        inclusions = []
     
     # Use improved tokenization with centrality analysis
-    important_terms = tokenize(text, analysis_type=analysis_type, max_terms=max_terms, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions)
+    important_terms = tokenize(text, analysis_type=analysis_type, max_terms=max_terms, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
     
     if len(important_terms) < 2:
         # Fallback to basic approach if no important terms found
-        all_terms = extract_high_quality_terms(text, language=language, enable_lemmatization=enable_lemmatization)
+        all_terms = extract_high_quality_terms(text, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
         important_terms = list(set(all_terms))[:max_terms]
     
     # Ensure we don't process too many terms for performance
@@ -1809,9 +2429,9 @@ def graph_to_data(G, analysis_type='bridges'):
     return {'nodes': nodes, 'links': links}
 
 
-def build_concept_graph(text, analysis_type='bridges', language='auto', exclusions=None):
+def build_concept_graph(text, analysis_type='bridges', language='auto', exclusions=None, inclusions=None, ai_provider=None, api_key=None, ai_model=None, host=None, port=None):
     """
-    Main function to build concept graph with centrality-based algorithms.
+    Main function to build concept graph with centrality-based algorithms and optional AI filtering.
     
     analysis_type options:
     - 'bridges': Focus on bridging concepts (betweenness centrality)
@@ -1823,9 +2443,17 @@ def build_concept_graph(text, analysis_type='bridges', language='auto', exclusio
     - 'auto': Detect language automatically
     - 'spanish' or 'es': Process as Spanish
     - 'english' or 'en': Process as English
+    
+    AI filtering options:
+    - ai_provider: 'openai', 'openrouter', 'google', 'groq', 'lmstudio', 'ollama'
+    - api_key: API key for cloud providers
+    - ai_model: Specific model to use
+    - host/port: For local providers
     """
     if exclusions is None:
         exclusions = []
+    if inclusions is None:
+        inclusions = []
         
     if not text or len(text.strip()) < 50:
         return {
@@ -1861,11 +2489,47 @@ def build_concept_graph(text, analysis_type='bridges', language='auto', exclusio
         else:
             language = 'english'
     
-    G = build_graph(text, analysis_type=analysis_type, language=language, exclusions=exclusions)
-    return {
-        'graph': graph_to_data(G, analysis_type=analysis_type),
-        'insights': graph_insights(G, analysis_type=analysis_type)
-    }
+    # Use the new AI-enabled function
+    import asyncio
+    
+    async def async_build():
+        return await build_concept_graph_with_ai_filtering(
+            text, analysis_type, max_text_length=100000, exclusions=exclusions, inclusions=inclusions,
+            ai_provider=ai_provider, api_key=api_key, ai_model=ai_model, 
+            host=host, port=port, language=language
+        )
+    
+    # Handle different event loop scenarios
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an async context, use fallback
+            result = build_graph(text, analysis_type=analysis_type, language=language, exclusions=exclusions)
+            return {
+                'graph': graph_to_data(result, analysis_type=analysis_type),
+                'insights': graph_insights(result, analysis_type=analysis_type)
+            }
+        else:
+            result = loop.run_until_complete(async_build())
+            return {
+                'graph': {'nodes': result['nodes'], 'links': result['links']},
+                'insights': result['insights']
+            }
+    except RuntimeError:
+        # No event loop, create a new one
+        try:
+            result = asyncio.run(async_build())
+            return {
+                'graph': {'nodes': result['nodes'], 'links': result['links']},
+                'insights': result['insights']
+            }
+        except Exception:
+            # Fallback to non-AI version
+            result = build_graph(text, analysis_type=analysis_type, language=language, exclusions=exclusions)
+            return {
+                'graph': graph_to_data(result, analysis_type=analysis_type),
+                'insights': graph_insights(result, analysis_type=analysis_type)
+            }
 
 async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_provider=None, api_key=None, language='english', enable_lemmatization=True, max_text_length=100000, exclusions=None):
     """Build concept graph with AI enhancement and improved term selection with performance optimizations."""
@@ -1889,14 +2553,7 @@ async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_pr
             }
         }
     
-    # Truncate very large texts for performance
-    if len(note_text) > max_text_length:
-        # Take first 70% and last 30% to preserve structure
-        first_part = note_text[:int(max_text_length * 0.7)]
-        last_part = note_text[-int(max_text_length * 0.3):]
-        note_text = first_part + "\n...\n" + last_part
-    
-    # Step 1: Extract terms with improved filtering
+    # Step 1: Extract terms with improved filtering (consistent processing for all text lengths)
     terms = extract_key_terms(note_text, language=language, enable_lemmatization=enable_lemmatization, max_text_length=max_text_length, exclusions=exclusions)
     if not terms:
         return {
@@ -1917,8 +2574,8 @@ async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_pr
     # Step 2: Calculate term importance
     term_importance = calculate_term_importance(terms, note_text, max_sentences=100)
     
-    # Step 3: AI Enhancement (if available and text is not too large)
-    if ai_provider and api_key and len(note_text) <= 50000:  # Skip AI for very large texts
+    # Step 3: AI Enhancement (if available)
+    if ai_provider and api_key:  # Remove text length restriction for consistent behavior
         try:
             enhanced_terms, ai_relationships = await enhance_terms_with_ai(
                 term_importance, note_text, ai_provider, api_key, language)
@@ -1929,21 +2586,13 @@ async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_pr
     # Step 4: Select top terms for graph construction
     sorted_terms = sorted(term_importance.items(), key=lambda x: x[1], reverse=True)
     
-    # Dynamic term selection based on text length
-    text_length = len(note_text)
-    if text_length > 50000:
-        max_terms = min(20, len(sorted_terms))
-    elif text_length > 20000:
-        max_terms = min(25, len(sorted_terms))
-    elif text_length > 10000:
-        max_terms = min(30, len(sorted_terms))
-    else:
-        max_terms = min(35, len(sorted_terms))
+    # Use consistent term selection regardless of text length (short text logic for all)
+    max_terms = min(35, len(sorted_terms))  # Always use the same limit
     
     important_terms = [term for term, score in sorted_terms[:max_terms]]
     
-    # Step 5: Build graph with improved connection logic
-    G = build_enhanced_graph(note_text, important_terms, analysis_type, max_sentences=min(200, len(note_text.split('.')) // 2))
+    # Step 5: Build graph with consistent connection logic
+    G = build_enhanced_graph(note_text, important_terms, analysis_type, max_sentences=200)
     
     if G.number_of_nodes() == 0:
         return {
@@ -1971,27 +2620,177 @@ async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_pr
         'insights': insights
     }
 
-def build_concept_graph(note_text, analysis_type='bridges', max_text_length=100000, exclusions=None):
-    """Synchronous wrapper for concept graph generation (backward compatibility) with performance optimizations."""
+def build_concept_graph(note_text, analysis_type='bridges', max_text_length=100000, exclusions=None, ai_provider=None, api_key=None, ai_model=None, host=None, port=None, language='auto'):
+    """
+    Synchronous wrapper for concept graph generation with optional AI filtering.
+    
+    Args:
+        note_text: Text to analyze
+        analysis_type: Type of analysis ('bridges', 'hubs', etc.)
+        max_text_length: Maximum text length to process
+        exclusions: List of terms to exclude
+        ai_provider: AI provider for term filtering ('openai', 'openrouter', 'google', 'groq', 'lmstudio', 'ollama')
+        api_key: API key for cloud providers
+        ai_model: Specific AI model to use
+        host: Host for local providers (lmstudio, ollama)
+        port: Port for local providers
+        language: Language for processing ('auto', 'english', 'spanish')
+    """
+    import asyncio
+    
+    # Auto-detect language if needed
+    if language == 'auto':
+        spanish_indicators = [
+            'la ', 'el ', 'de ', 'en ', 'que ', 'y ', 'del ', 'los ', 'las ',
+            'con ', 'por ', 'para ', 'son ', 'está ', 'están ', 'ser ', 'es '
+        ]
+        text_lower = note_text.lower()
+        spanish_count = sum(1 for indicator in spanish_indicators if indicator in text_lower)
+        language = 'spanish' if spanish_count > 3 else 'english'
+    
+    # Run the async version
+    async def async_build():
+        return await build_concept_graph_with_ai_filtering(
+            note_text, analysis_type, max_text_length, exclusions,
+            ai_provider, api_key, ai_model, host, port, language
+        )
+    
+    # Handle different event loop scenarios
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If we're already in an async context, we can't use run()
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, async_build())
+                return future.result()
+        else:
+            return loop.run_until_complete(async_build())
+    except RuntimeError:
+        # No event loop, create a new one
+        return asyncio.run(async_build())
+
+async def build_concept_graph_with_ai_filtering(note_text, analysis_type='bridges', max_text_length=100000, exclusions=None, inclusions=None, ai_provider=None, api_key=None, ai_model=None, host=None, port=None, language='english'):
+    """
+    Build concept graph with optional AI-powered term filtering step.
+    
+    This function adds an intermediate AI step that filters out non-important words 
+    (adjectives, pronouns, verbs, prepositions) before creating the graph.
+    """
+    if exclusions is None:
+        exclusions = []
+    if inclusions is None:
+        inclusions = []
+    
+    if not note_text or len(note_text.strip()) < 20:
+        return {
+            'nodes': [],
+            'links': [],
+            'insights': {
+                'total_nodes': 0,
+                'total_links': 0,
+                'total_clusters': 0,
+                'dominant_topics': [],
+                'bridging_concepts': [],
+                'knowledge_gaps': [],
+                'analysis_type': analysis_type,
+                'dominant_label': 'No Data'
+            }
+        }
+    
+    # Step 1: Extract terms using existing high-quality method
+    all_terms = extract_high_quality_terms(note_text, max_length=50, enable_lemmatization=True, max_text_length=max_text_length, exclusions=exclusions, inclusions=inclusions)
+    
+    # Convert to list format if needed
+    if isinstance(all_terms, dict):
+        # Sort by frequency and take top terms
+        sorted_terms = sorted(all_terms.items(), key=lambda x: x[1], reverse=True)
+        terms_list = [term for term, freq in sorted_terms[:120]]  # Limit to 120 terms
+    else:
+        terms_list = all_terms[:120] if len(all_terms) > 120 else all_terms
+    
+    if not terms_list:
+        return {
+            'nodes': [],
+            'links': [],
+            'insights': {
+                'total_nodes': 0,
+                'total_links': 0,
+                'total_clusters': 0,
+                'dominant_topics': [],
+                'bridging_concepts': [],
+                'knowledge_gaps': [],
+                'analysis_type': analysis_type,
+                'dominant_label': 'No Terms Found'
+            }
+        }
+    
+    # Step 2: AI Filtering (if provider configured)
+    if ai_provider and (api_key or (host and port)):
+        print(f"🤖 Applying AI filtering with {ai_provider}...")
+        text_sample = note_text[:2000]  # Sample for context
+        filtered_terms = await filter_terms_with_ai(
+            terms_list, text_sample, ai_provider, api_key, ai_model, host, port, language
+        )
+        important_terms = filtered_terms
+    else:
+        print("📝 No AI provider configured, using original term extraction...")
+        important_terms = terms_list
+    
+    if not important_terms:
+        return {
+            'nodes': [],
+            'links': [],
+            'insights': {
+                'total_nodes': 0,
+                'total_links': 0,
+                'total_clusters': 0,
+                'dominant_topics': [],
+                'bridging_concepts': [],
+                'knowledge_gaps': [],
+                'analysis_type': analysis_type,
+                'dominant_label': 'No Important Terms'
+            }
+        }
+    
+    # Step 3: Build graph using filtered terms
+    max_sentences = 200  # Consistent sentence limit
+    G = build_enhanced_graph(note_text, important_terms, analysis_type, max_sentences=max_sentences)
+    
+    if G.number_of_nodes() == 0:
+        return {
+            'nodes': [],
+            'links': [],
+            'insights': {
+                'total_nodes': 0,
+                'total_links': 0,
+                'total_clusters': 0,
+                'dominant_topics': [],
+                'bridging_concepts': [],
+                'knowledge_gaps': [],
+                'analysis_type': analysis_type,
+                'dominant_label': 'No Connections'
+            }
+        }
+    
+    # Step 4: Generate insights and convert to data format
+    insights = graph_insights(G, analysis_type=analysis_type)
+    graph_data = graph_to_data(G, analysis_type)
+    
+    return {
+        'nodes': graph_data['nodes'],
+        'links': graph_data['links'],
+        'insights': insights
+    }
+
+def build_concept_graph_legacy(note_text, analysis_type='bridges', max_text_length=100000, exclusions=None):
+    """Legacy synchronous concept graph generation (backward compatibility) with performance optimizations."""
     
     if exclusions is None:
         exclusions = []
     
-    # Handle very large texts
-    if len(note_text) > max_text_length:
-        # Take first 70% and last 30% to preserve structure
-        first_part = note_text[:int(max_text_length * 0.7)]
-        last_part = note_text[-int(max_text_length * 0.3):]
-        note_text = first_part + "\n...\n" + last_part
-    
-    # Determine max_terms based on text length for HIGH QUALITY (more generous limits)
-    text_length = len(note_text)
-    if text_length > 50000:
-        max_terms = 80  # Significantly increased for quality
-    elif text_length > 20000:
-        max_terms = 100  # Significantly increased for quality
-    else:
-        max_terms = 120  # Significantly increased for quality
+    # Use consistent max_terms regardless of text length (short text logic for all)
+    max_terms = 120  # Always use the same limit for consistent behavior
     
     # Extract terms using HIGH-QUALITY method for 80-90% quality
     all_terms = extract_high_quality_terms(note_text, max_length=50, enable_lemmatization=True, max_text_length=200000, exclusions=exclusions)
@@ -2020,8 +2819,8 @@ def build_concept_graph(note_text, analysis_type='bridges', max_text_length=1000
             }
         }
     
-    # Build graph using enhanced method with limited sentences for large texts
-    max_sentences = min(200, len(note_text.split('.')) // 2) if text_length > 20000 else 200
+    # Build graph using enhanced method with consistent sentence processing
+    max_sentences = 200  # Use consistent sentence limit for all texts
     G = build_enhanced_graph(note_text, important_terms, analysis_type, max_sentences=max_sentences)
     
     if G.number_of_nodes() == 0:
@@ -2051,3 +2850,194 @@ def build_concept_graph(note_text, analysis_type='bridges', max_text_length=1000
         'links': graph_data['links'],
         'insights': insights
     }
+
+
+async def generate_ai_nodes(note_text, current_nodes, ai_provider, api_key=None, ai_model=None, host=None, port=None, language='en'):
+    """
+    Generate 1-5 AI nodes that relate existing concept graph nodes.
+    
+    Args:
+        note_text (str): The original note text
+        current_nodes (list): List of current graph nodes with id, label, size, importance
+        ai_provider (str): AI provider ('openai', 'openrouter', 'google', 'groq', 'lmstudio', 'ollama')
+        api_key (str, optional): API key for cloud providers
+        ai_model (str, optional): Model name
+        host (str, optional): Host for local providers
+        port (str, optional): Port for local providers
+        language (str): Language code ('en' or 'es')
+    
+    Returns:
+        list: List of AI-generated nodes with label, importance, and related_nodes
+    """
+    from ai_reprocess import (_call_openai_api, _call_openrouter_api, _call_google_api, 
+                             _call_groq_api, _call_lmstudio_api, _call_ollama_api)
+    
+    # Prepare prompt based on language
+    if language == 'es':
+        system_prompt = """Eres un asistente AI experto en análisis de conceptos y mapas mentales. Tu tarea es generar entre 1 y 5 nodos conceptuales de nivel superior que relacionen y organicen los conceptos existentes de manera significativa.
+
+Analiza el texto y los conceptos existentes, luego genera nodos AI que:
+1. Representen categorías, temas o ideas principales que conecten múltiples conceptos existentes
+2. Ayuden a organizar y estructurar el conocimiento de manera jerárquica
+3. Proporcionen contexto o perspectivas más amplias sobre los conceptos
+4. Sean relevantes y añadan valor al mapa conceptual
+
+Responde SOLO con un JSON válido en este formato exacto:
+{
+  "ai_nodes": [
+    {
+      "label": "Nombre del concepto AI",
+      "importance": 0.8,
+      "related_nodes": ["concepto1", "concepto2"]
+    }
+  ]
+}
+
+Cada nodo AI debe tener:
+- label: Nombre claro y conciso del concepto (máximo 3 palabras)
+- importance: Valor entre 0.1 y 1.0 basado en relevancia
+- related_nodes: Lista de IDs de conceptos existentes que este nodo relaciona
+
+Genera entre 1-5 nodos AI que aporten valor organizacional al mapa."""
+        
+        user_prompt = f"""Texto original:
+{note_text}
+
+Conceptos existentes:
+{chr(10).join([f"- {node.get('label', node.get('id', ''))}" for node in current_nodes])}
+
+Genera nodos AI conceptuales que organicen y relacionen estos conceptos de manera significativa."""
+    else:
+        system_prompt = """You are an AI assistant expert in concept analysis and mind mapping. Your task is to generate between 1 and 5 high-level conceptual nodes that meaningfully relate and organize existing concepts.
+
+Analyze the text and existing concepts, then generate AI nodes that:
+1. Represent categories, themes, or main ideas that connect multiple existing concepts
+2. Help organize and structure knowledge hierarchically
+3. Provide broader context or perspectives on the concepts
+4. Are relevant and add value to the concept map
+
+Respond ONLY with valid JSON in this exact format:
+{
+  "ai_nodes": [
+    {
+      "label": "AI Concept Name",
+      "importance": 0.8,
+      "related_nodes": ["concept1", "concept2"]
+    }
+  ]
+}
+
+Each AI node must have:
+- label: Clear, concise concept name (max 3 words)
+- importance: Value between 0.1 and 1.0 based on relevance
+- related_nodes: List of existing concept IDs this node relates to
+
+Generate 1-5 AI nodes that add organizational value to the map."""
+        
+        user_prompt = f"""Original text:
+{note_text}
+
+Existing concepts:
+{chr(10).join([f"- {node.get('label', node.get('id', ''))}" for node in current_nodes])}
+
+Generate AI conceptual nodes that organize and relate these concepts meaningfully."""
+    
+    # Combine system and user prompts for providers that expect a single prompt
+    combined_prompt = f"{system_prompt}\n\n{user_prompt}"
+    
+    # Call AI provider
+    try:
+        response_text = None
+        
+        if ai_provider == 'openai':
+            response_text = await _call_openai_api(combined_prompt, api_key, ai_model)
+        elif ai_provider == 'openrouter':
+            response_text = await _call_openrouter_api(combined_prompt, api_key, ai_model)
+        elif ai_provider == 'google':
+            response_text = await _call_google_api(combined_prompt, api_key, ai_model)
+        elif ai_provider == 'groq':
+            response_text = await _call_groq_api(combined_prompt, api_key, ai_model)
+        elif ai_provider == 'lmstudio':
+            response_text = await _call_lmstudio_api(combined_prompt, ai_model, host, port)
+        elif ai_provider == 'ollama':
+            response_text = await _call_ollama_api(combined_prompt, ai_model, host, port)
+        else:
+            raise ValueError(f"Unsupported AI provider: {ai_provider}")
+        
+        if not response_text:
+            return []
+        
+        # Parse AI response
+        return _parse_ai_nodes_response(response_text, current_nodes)
+        
+    except Exception as e:
+        print(f"Error generating AI nodes: {str(e)}")
+        return []
+
+
+def _parse_ai_nodes_response(response_text, current_nodes):
+    """Parse AI response and extract node information."""
+    import json
+    import re
+    
+    try:
+        # Extract JSON from response
+        json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if not json_match:
+            return []
+        
+        json_str = json_match.group()
+        data = json.loads(json_str)
+        
+        ai_nodes = data.get('ai_nodes', [])
+        if not isinstance(ai_nodes, list):
+            return []
+        
+        # Validate and clean nodes
+        valid_nodes = []
+        current_node_ids = {node.get('id', node.get('label', '')) for node in current_nodes}
+        current_node_labels = {node.get('label', node.get('id', '')) for node in current_nodes}
+        
+        for node in ai_nodes[:5]:  # Limit to 5 nodes
+            if not isinstance(node, dict):
+                continue
+            
+            label = str(node.get('label', '')).strip()
+            if not label or len(label) > 50:  # Reasonable length limit
+                continue
+            
+            # Validate importance
+            try:
+                importance = float(node.get('importance', 0.5))
+                importance = max(0.1, min(1.0, importance))
+            except (ValueError, TypeError):
+                importance = 0.5
+            
+            # Validate related nodes
+            related_nodes = node.get('related_nodes', [])
+            if not isinstance(related_nodes, list):
+                related_nodes = []
+            
+            # Match related nodes to existing nodes (by ID or label)
+            valid_related = []
+            for related in related_nodes:
+                related_str = str(related).strip()
+                if related_str in current_node_ids or related_str in current_node_labels:
+                    valid_related.append(related_str)
+            
+            # Only include nodes with at least one valid relationship
+            if valid_related:
+                valid_nodes.append({
+                    'label': label,
+                    'importance': importance,
+                    'related_nodes': valid_related
+                })
+        
+        return valid_nodes
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON decode error: {str(e)}")
+        return []
+    except Exception as e:
+        print(f"Error parsing AI nodes response: {str(e)}")
+        return []
