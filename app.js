@@ -1818,10 +1818,11 @@ class NotesApp {
             if (result.success) {
                 // Replace note content with extracted text
                 const editor = document.getElementById('editor');
-                safeSetInnerHTML(editor, result.text);
-                
+                const htmlContent = this.markdownToHtml(result.text);
+                safeSetInnerHTML(editor, htmlContent);
+
                 // Update current note
-                this.currentNote.content = result.text;
+                this.currentNote.content = htmlContent;
                 this.saveCurrentNote();
                 
                 this.updateFileUploadStatus(fileItem, 'success', 'Content inserted successfully');
