@@ -337,6 +337,10 @@ def extract_spanish_terms(text: str, max_text_length: int = 200000) -> Dict[str,
         
         # Lemmatize the word
         lemmatized = simple_spanish_lemmatizer(word)
+
+        # Remove common verb and adjective forms that add little value
+        if re.search(r'(?:ando|iendo|ado|ada|ados|adas|ido|ida|idos|idas|mente|\b(?:ar|er|ir))$', lemmatized):
+            continue
         
         # Additional filtering for Spanish
         if (len(lemmatized) >= 3 and 

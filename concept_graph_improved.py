@@ -142,6 +142,13 @@ def extract_key_terms_improved(text: str, max_text_length: int = 75000) -> Dict[
                     
                     lemmatized = lemmatizer.lemmatize(word)
                     if lemmatized not in stop_words and len(lemmatized) >= 3:
+                        # Keep primarily nouns to avoid pronouns or verbs
+                        try:
+                            tags = nltk.pos_tag([lemmatized])
+                            if tags and not tags[0][1].startswith('NN'):
+                                continue
+                        except Exception:
+                            pass
                         term_freq[lemmatized] += 1
         
         except Exception as e:
