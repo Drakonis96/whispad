@@ -205,6 +205,10 @@ class NotesApp {
 
         this.selectedTags = new Set();
 
+        // Concept graph settings
+        this.conceptNoteScope = 'current'; // current, all, tagged
+        this.conceptSelectedTags = new Set();
+
         // Store default language options
         this.defaultLanguageOptions = [];
         
@@ -506,6 +510,20 @@ class NotesApp {
         this.setupRestoreDropZone();
         this.setupUploadModelsDropZone();
         this.setupDownloadModelButtons();
+        this.setupPdfUploadDropZone();
+        
+        // PDF Upload modal
+        document.getElementById('upload-pdf-btn').addEventListener('click', () => {
+            this.showUploadPdfModal();
+        });
+
+        document.getElementById('cancel-upload-pdf').addEventListener('click', () => {
+            this.hideUploadPdfModal();
+        });
+
+        document.getElementById('confirm-upload-pdf').addEventListener('click', () => {
+            this.processPdfUpload();
+        });
         
         // Modal de confirmación
         document.getElementById('cancel-delete').addEventListener('click', () => {
@@ -713,6 +731,8 @@ class NotesApp {
         const graphZoomOut = document.getElementById('zoom-out-graph-btn');
         const graphTypeSelect = document.getElementById('graph-type-select');
         const regenerateGraphBtn = document.getElementById('regenerate-graph-btn');
+        const conceptGraphBtn = document.getElementById('concept-graph-btn');
+        const conceptGraphClose = document.getElementById('close-concept-graph-modal');
         if (graphBtn) {
             graphBtn.addEventListener('click', () => { this.showGraphModal(); });
         }
@@ -743,6 +763,12 @@ class NotesApp {
             regenerateGraphBtn.addEventListener('click', () => {
                 this.showGraphModal();
             });
+        }
+        if (conceptGraphBtn) {
+            conceptGraphBtn.addEventListener('click', () => { this.showConceptGraphModal(); });
+        }
+        if (conceptGraphClose) {
+            conceptGraphClose.addEventListener('click', () => { this.hideConceptGraphModal(); });
         }
 
         // Auto-guardado cada 30 segundos
@@ -1545,6 +1571,16 @@ class NotesApp {
             this.saveCurrentNote(true);
         }, 1000);
     }
+
+    scheduleAutoSave() {
+        if (!this.currentNote) return;
+        if (this.aiInProgress) return;
+
+        clearTimeout(this.autoSaveTimeout);
+        this.autoSaveTimeout = setTimeout(() => {
+            this.saveCurrentNote(true);
+        }, 500); // Shorter timeout for tag changes
+    }
     
     saveCurrentNote(silent = false) {
         if (!this.currentNote) return;
@@ -1735,6 +1771,138 @@ class NotesApp {
         const modal = document.getElementById('restore-modal');
         modal.classList.remove('active');
         this.showMobileFab();
+    }
+
+    showUploadPdfModal() {
+        if (!this.currentNote) {
+            this.showNotification('Please select a note first', 'error');
+            return;
+        }
+        const modal = document.getElementById('upload-pdf-modal');
+        this.hideMobileFab();
+        modal.classList.add('active');
+        // Reset modal state
+        this.selectedPdfFile = null;
+        document.getElementById('confirm-upload-pdf').disabled = true;
+        const progressSection = document.getElementById('pdf-upload-progress-section');
+        const uploadList = document.getElementById('pdf-upload-list');
+        progressSection.style.display = 'none';
+        uploadList.innerHTML = '';
+    }
+
+    hideUploadPdfModal() {
+        const modal = document.getElementById('upload-pdf-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+        this.selectedPdfFile = null;
+    }
+
+    async processPdfUpload() {
+        if (!this.selectedPdfFile || !this.currentNote) {
+            return;
+        }
+
+        const progressSection = document.getElementById('pdf-upload-progress-section');
+        const uploadList = document.getElementById('pdf-upload-list');
+        progressSection.style.display = 'block';
+        uploadList.innerHTML = '';
+
+        // Create file upload item for progress display
+        const fileItem = this.createFileUploadItem(this.selectedPdfFile);
+        uploadList.appendChild(fileItem);
+
+        try {
+            // Upload and process the file
+            const result = await this.uploadPdfFileWithProgress(this.selectedPdfFile, fileItem);
+            
+            if (result.success) {
+                // Replace note content with extracted text
+                const editor = document.getElementById('editor');
+                safeSetInnerHTML(editor, result.text);
+                
+                // Update current note
+                this.currentNote.content = result.text;
+                this.saveCurrentNote();
+                
+                this.updateFileUploadStatus(fileItem, 'success', 'Content inserted successfully');
+                this.showNotification(`Content from ${result.filename} inserted into note`, 'success');
+                
+                // Close modal after a short delay
+                setTimeout(() => {
+                    this.hideUploadPdfModal();
+                }, 1500);
+            } else {
+                this.updateFileUploadStatus(fileItem, 'error', 'Processing failed');
+                this.showNotification('Error processing file', 'error');
+            }
+        } catch (error) {
+            console.error('PDF upload error:', error);
+            this.updateFileUploadStatus(fileItem, 'error', `Processing failed: ${error.message}`);
+            this.showNotification('Error processing file', 'error');
+        }
+    }
+
+    async uploadPdfFileWithProgress(file, fileItem) {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            
+            // Set timeout for large files
+            const timeoutId = setTimeout(() => {
+                xhr.abort();
+                reject(new Error('Upload timeout - file too large or connection too slow'));
+            }, 5 * 60 * 1000); // 5 minutes timeout
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    const progressBar = fileItem.querySelector('.progress-bar');
+                    const progressPercentage = fileItem.querySelector('.progress-percentage');
+                    const statusElement = fileItem.querySelector('.file-upload-status');
+                    
+                    if (progressBar && progressPercentage && statusElement) {
+                        progressBar.style.width = percentComplete + '%';
+                        progressPercentage.textContent = Math.round(percentComplete) + '%';
+                        
+                        if (percentComplete < 100) {
+                            statusElement.textContent = `Uploading... ${Math.round(percentComplete)}%`;
+                        } else {
+                            statusElement.textContent = 'Processing...';
+                        }
+                    }
+                }
+            });
+            
+            xhr.addEventListener('load', () => {
+                clearTimeout(timeoutId);
+                if (xhr.status === 200) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        resolve(result);
+                    } catch (e) {
+                        reject(new Error('Invalid response format'));
+                    }
+                } else {
+                    reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+                }
+            });
+            
+            xhr.addEventListener('error', () => {
+                clearTimeout(timeoutId);
+                reject(new Error('Network error during upload'));
+            });
+            
+            xhr.addEventListener('abort', () => {
+                clearTimeout(timeoutId);
+                reject(new Error('Upload was aborted'));
+            });
+            
+            xhr.open('POST', '/api/upload-pdf');
+            if (authToken) xhr.setRequestHeader('Authorization', authToken);
+            xhr.send(formData);
+        });
     }
 
     showAudioModal() {
@@ -2089,6 +2257,1718 @@ class NotesApp {
         this.applyGraphTransform();
     }
 
+    async loadConceptLanguagePreference() {
+        try {
+            const resp = await authFetch('/api/user-config', {
+                method: 'GET'
+            });
+            
+            if (resp.ok) {
+                const data = await resp.json();
+                const config = data.config || {};
+                const conceptLanguage = config.conceptLanguage || 'en';
+                const conceptLemmatization = config.conceptLemmatization ?? true;
+                
+                const languageSelect = document.getElementById('concept-language');
+                if (languageSelect) {
+                    languageSelect.value = conceptLanguage;
+                }
+                
+                const lemmatizationToggle = document.getElementById('concept-lemmatization');
+                if (lemmatizationToggle) {
+                    lemmatizationToggle.checked = conceptLemmatization;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading concept preferences:', error);
+            // Default to English and enabled lemmatization if loading fails
+            const languageSelect = document.getElementById('concept-language');
+            if (languageSelect) {
+                languageSelect.value = 'en';
+            }
+            const lemmatizationToggle = document.getElementById('concept-lemmatization');
+            if (lemmatizationToggle) {
+                lemmatizationToggle.checked = true;
+            }
+        }
+    }
+
+    async saveConceptLanguagePreference() {
+        try {
+            const languageSelect = document.getElementById('concept-language');
+            const lemmatizationToggle = document.getElementById('concept-lemmatization');
+            if (!languageSelect) return;
+            
+            const language = languageSelect.value;
+            const lemmatization = lemmatizationToggle ? lemmatizationToggle.checked : true;
+            
+            // Load current config
+            const resp = await authFetch('/api/user-config', {
+                method: 'GET'
+            });
+            
+            let config = {};
+            if (resp.ok) {
+                const data = await resp.json();
+                config = data.config || {};
+            }
+            
+            // Update concept preferences
+            config.conceptLanguage = language;
+            config.conceptLemmatization = lemmatization;
+            
+            // Save back to server
+            await authFetch('/api/user-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            });
+            
+            console.log('Concept preferences saved:', { language, lemmatization });
+        } catch (error) {
+            console.error('Error saving concept preferences:', error);
+        }
+    }
+
+    async showConceptGraphModal() {
+        const modal = document.getElementById('concept-graph-modal');
+        const container = document.getElementById('concept-graph-container');
+        const insightsEl = document.getElementById('map-insights');
+        const nodeDetailsEl = document.getElementById('node-details');
+        
+        if (!modal || !container) return;
+        
+        // Load user's preferred concept language
+        await this.loadConceptLanguagePreference();
+        
+        // Clear previous content
+        container.innerHTML = '';
+        insightsEl.innerHTML = '';
+        nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
+        
+        // Set up note scope functionality
+        this.setupConceptNoteScope();
+        
+        // Set up regenerate button
+        const regenerateBtn = document.getElementById('regenerate-concept-graph');
+        if (regenerateBtn) {
+            regenerateBtn.addEventListener('click', () => {
+                this.regenerateConceptGraph();
+            });
+        }
+        
+        // Set up AI reprocess button
+        const aiReprocessBtn = document.getElementById('ai-reprocess-btn');
+        if (aiReprocessBtn) {
+            aiReprocessBtn.addEventListener('click', () => {
+                this.reprocessGraphWithAI();
+            });
+        }
+        
+        // Set up AI suggestions button
+        const aiSuggestionsBtn = document.getElementById('ai-suggestions-btn');
+        if (aiSuggestionsBtn) {
+            aiSuggestionsBtn.addEventListener('click', () => {
+                this.showAISuggestionsWindow();
+            });
+        }
+        
+        // Set up concept removal button
+        const conceptRemovalBtn = document.getElementById('concept-removal-btn');
+        if (conceptRemovalBtn) {
+            conceptRemovalBtn.addEventListener('click', () => {
+                this.showConceptRemovalModal();
+            });
+        }
+        
+        // Set up AI suggestions window functionality
+        this.setupAISuggestionsWindow();
+        
+        // Set up concept removal modal functionality
+        this.setupConceptRemovalModal();
+        
+        // Set up language selector change event
+        const languageSelect = document.getElementById('concept-language');
+        if (languageSelect) {
+            languageSelect.addEventListener('change', () => {
+                this.saveConceptLanguagePreference();
+            });
+        }
+        
+        // Set up lemmatization toggle change event
+        const lemmatizationToggle = document.getElementById('concept-lemmatization');
+        if (lemmatizationToggle) {
+            lemmatizationToggle.addEventListener('change', () => {
+                this.saveConceptLanguagePreference();
+            });
+        }
+        
+        // Show modal first, then generate graph
+        modal.classList.add('active');
+        this.hideMobileFab();
+        
+        // Generate initial graph
+        await this.refreshConceptGraph();
+    }
+
+    async regenerateConceptGraph() {
+        const container = document.getElementById('concept-graph-container');
+        const insightsEl = document.getElementById('map-insights');
+        const nodeDetailsEl = document.getElementById('node-details');
+        
+        if (!container) return;
+        
+        // Clear content
+        container.innerHTML = '';
+        insightsEl.innerHTML = '';
+        nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
+        
+        // Get text length for better progress indication
+        const noteText = await this.getNotesContentForConcept();
+        if (!noteText) {
+            return;
+        }
+        
+        const textLength = noteText.length;
+        let progressMessage = 'Regenerating concept map...';
+        
+        if (textLength > 100000) {
+            progressMessage = 'Processing large document... This may take a moment.';
+        } else if (textLength > 50000) {
+            progressMessage = 'Processing medium document... Please wait.';
+        }
+        
+        this.showProcessingOverlay(progressMessage);
+        
+        try {
+            const analysisType = document.getElementById('concept-analysis-type')?.value || 'bridges';
+            const language = document.getElementById('concept-language')?.value || 'en';
+            
+            // Add timeout for large documents
+            const timeoutMs = textLength > 100000 ? 45000 : 30000; // 45s for large, 30s for others
+            
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+            
+            const resp = await authFetch('/api/concept-graph', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                signal: controller.signal,
+                body: JSON.stringify({ 
+                    note: noteText,
+                    analysis_type: analysisType,
+                    language: language
+                })
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!resp.ok) {
+                if (resp.status === 408) {
+                    throw new Error('Processing timed out. Try using AI reprocessing or working with shorter text sections.');
+                }
+                throw new Error('Request failed');
+            }
+            
+            const data = await resp.json();
+            
+            this.currentGraphData = data.graph;
+            this.currentGraphInsights = data.insights;
+            
+            this.renderConceptGraph(data.graph);
+            this.renderGraphInsights(data.insights);
+        } catch (e) {
+            if (e.name === 'AbortError') {
+                this.showNotification('Processing timed out. Try using AI reprocessing or working with shorter text sections.', 'error');
+            } else {
+                this.showNotification(e.message || 'Regeneration failed', 'error');
+            }
+        } finally {
+            this.hideProcessingOverlay();
+        }
+    }
+
+    renderGraphInsights(insights) {
+        const insightsEl = document.getElementById('map-insights');
+        if (!insightsEl) return;
+        
+        const analysisTypeText = insights.analysis_type === 'bridges' ? 'Bridge Analysis' :
+                                insights.analysis_type === 'hubs' ? 'Hub Analysis' :
+                                insights.analysis_type === 'global' ? 'Global Analysis' :
+                                'Local Analysis';
+        
+        const dominantLabel = insights.dominant_label || 'Key Concepts';
+        
+        insightsEl.innerHTML = `
+            <div class="insight-item">
+                <span class="insight-label">Analysis Type</span>
+                <div class="insight-value">${analysisTypeText}</div>
+            </div>
+            
+            <div class="insight-item">
+                <span class="insight-label">Network Size</span>
+                <div class="insight-value">${insights.total_nodes} nodes, ${insights.total_links} links</div>
+            </div>
+            
+            <div class="insight-item">
+                <span class="insight-label">Clusters</span>
+                <div class="insight-value">${insights.total_clusters} connected groups</div>
+            </div>
+            
+            <div class="insight-item">
+                <span class="insight-label">${dominantLabel}</span>
+                <div class="insight-tags">
+                    ${insights.dominant_topics.map(topic => `<span class="insight-tag">${topic}</span>`).join('')}
+                </div>
+            </div>
+            
+            <div class="insight-item">
+                <span class="insight-label">Bridging Concepts</span>
+                <div class="insight-tags">
+                    ${insights.bridging_concepts.map(concept => `<span class="insight-tag insight-tag--secondary">${concept}</span>`).join('')}
+                </div>
+            </div>
+            
+            <div class="insight-item">
+                <span class="insight-label">Knowledge Gaps</span>
+                <div class="insight-tags">
+                    ${insights.knowledge_gaps.map(gap => `<span class="insight-tag insight-tag--warning">${gap}</span>`).join('')}
+                </div>
+            </div>
+            
+            ${insights.centrality_threshold !== undefined ? `
+                <div class="insight-item">
+                    <span class="insight-label">Centrality Threshold</span>
+                    <div class="insight-value">${insights.centrality_threshold.toFixed(4)}</div>
+                </div>
+            ` : ''}
+        `;
+    }
+
+    renderNodeDetails(node, connectedNodes = []) {
+        const nodeDetailsEl = document.getElementById('node-details');
+        if (!nodeDetailsEl) return;
+        
+        const connections = connectedNodes.length;
+        const betweenness = node.betweenness_centrality || 0;
+        const degree_centrality = node.degree_centrality || 0;
+        const diversity = node.diversity || 0;
+        const degree = node.degree || 0;
+        
+        nodeDetailsEl.innerHTML = `
+            <div class="node-title">${node.label}</div>
+            
+            <div class="node-metric">
+                <span class="node-metric-label">Connections</span>
+                <span class="node-metric-value">${connections}</span>
+            </div>
+            
+            <div class="node-metric">
+                <span class="node-metric-label">Degree</span>
+                <span class="node-metric-value">${degree}</span>
+            </div>
+            
+            <div class="node-metric">
+                <span class="node-metric-label">Betweenness Centrality</span>
+                <span class="node-metric-value">${betweenness.toFixed(4)}</span>
+            </div>
+            
+            <div class="node-metric">
+                <span class="node-metric-label">Degree Centrality</span>
+                <span class="node-metric-value">${degree_centrality.toFixed(4)}</span>
+            </div>
+            
+            <div class="node-metric">
+                <span class="node-metric-label">Diversity</span>
+                <span class="node-metric-value">${diversity.toFixed(4)}</span>
+            </div>
+            
+            <div class="node-metric">
+                <span class="node-metric-label">Analysis Relevance</span>
+                <span class="node-metric-value">${this.getNodeRelevanceLabel(node, betweenness, degree_centrality, diversity)}</span>
+            </div>
+            
+            ${connections > 0 ? `
+                <div class="connected-nodes">
+                    <h5>Connected to (${connections})</h5>
+                    <div class="connected-list">
+                        ${connectedNodes.map(connectedNode => 
+                            `<span class="connected-node" data-node-id="${connectedNode.id}">${connectedNode.label}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+            ` : ''}
+        `;
+        
+        // Add click handlers for connected nodes
+        const connectedNodeElements = nodeDetailsEl.querySelectorAll('.connected-node');
+        connectedNodeElements.forEach(el => {
+            el.addEventListener('click', () => {
+                const nodeId = parseInt(el.dataset.nodeId);
+                this.highlightNode(nodeId);
+            });
+        });
+    }
+
+    getNodeRelevanceLabel(node, betweenness, degree_centrality, diversity) {
+        const analysisType = this.currentGraphInsights?.analysis_type || 'bridges';
+        
+        if (analysisType === 'bridges') {
+            if (betweenness > 0.1) return "Strong Bridge";
+            if (betweenness > 0.05) return "Moderate Bridge";
+            return "Weak Bridge";
+        } else if (analysisType === 'hubs') {
+            if (degree_centrality > 0.2) return "Major Hub";
+            if (degree_centrality > 0.1) return "Minor Hub";
+            return "Peripheral";
+        } else {
+            const combined = (betweenness + degree_centrality) / 2;
+            if (combined > 0.15) return "Highly Central";
+            if (combined > 0.08) return "Moderately Central";
+            return "Peripheral";
+        }
+    }
+
+    highlightNode(nodeId) {
+        // This will be called from connected node clicks
+        // Find the node in the graph and simulate a click
+        const nodeElement = d3.select('.concept-graph-container .nodes')
+            .selectAll('circle')
+            .filter(d => d.id === nodeId);
+        
+        if (!nodeElement.empty()) {
+            nodeElement.dispatch('click');
+        }
+    }
+
+    hideConceptGraphModal() {
+        const modal = document.getElementById('concept-graph-modal');
+        if (modal) modal.classList.remove('active');
+        
+        // Reset concept graph settings
+        this.conceptNoteScope = 'current';
+        this.conceptSelectedTags.clear();
+        
+        // Reset UI elements
+        const scopeSelect = document.getElementById('concept-note-scope');
+        const tagContainer = document.getElementById('tag-selection-container');
+        if (scopeSelect) scopeSelect.value = 'current';
+        if (tagContainer) tagContainer.classList.add('hidden');
+        
+        this.showMobileFab();
+    }
+
+    setupConceptNoteScope() {
+        const scopeSelect = document.getElementById('concept-note-scope');
+        const tagContainer = document.getElementById('tag-selection-container');
+        const refreshBtn = document.getElementById('refresh-concept-graph');
+
+        if (scopeSelect) {
+            scopeSelect.addEventListener('change', () => {
+                this.conceptNoteScope = scopeSelect.value;
+                if (this.conceptNoteScope === 'tagged') {
+                    tagContainer.classList.remove('hidden');
+                    this.renderConceptTagFilter();
+                } else {
+                    tagContainer.classList.add('hidden');
+                }
+            });
+        }
+
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.refreshConceptGraph();
+            });
+        }
+    }
+
+    renderConceptTagFilter() {
+        const container = document.getElementById('concept-tag-filter');
+        if (!container) return;
+
+        const allTags = this.gatherAllTags();
+        if (allTags.length === 0) {
+            container.innerHTML = '<p class="no-tags-message">No tags available</p>';
+            return;
+        }
+
+        container.innerHTML = allTags.map(tag => `
+            <div class="tag-checkbox-item">
+                <input type="checkbox" id="concept-tag-${tag}" value="${tag}" ${this.conceptSelectedTags.has(tag) ? 'checked' : ''}>
+                <label for="concept-tag-${tag}">${tag}</label>
+            </div>
+        `).join('');
+
+        // Add event listeners
+        container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                const tag = e.target.value;
+                if (e.target.checked) {
+                    this.conceptSelectedTags.add(tag);
+                } else {
+                    this.conceptSelectedTags.delete(tag);
+                }
+            });
+        });
+    }
+
+    async getNotesContentForConcept() {
+        switch (this.conceptNoteScope) {
+            case 'current':
+                return this.getCurrentMarkdown();
+            
+            case 'all':
+                let allContent = '';
+                for (const note of this.notes) {
+                    if (!note.loaded) {
+                        await this.fetchNoteContent(note);
+                        note.loaded = true;
+                    }
+                    allContent += `\n\n# ${note.title}\n${note.content}`;
+                }
+                return allContent;
+            
+            case 'tagged':
+                if (this.conceptSelectedTags.size === 0) {
+                    this.showNotification('Please select at least one tag', 'error');
+                    return '';
+                }
+                
+                let taggedContent = '';
+                for (const note of this.notes) {
+                    const noteTags = note.tags || [];
+                    const hasSelectedTag = [...this.conceptSelectedTags].some(tag => noteTags.includes(tag));
+                    
+                    if (hasSelectedTag) {
+                        if (!note.loaded) {
+                            await this.fetchNoteContent(note);
+                            note.loaded = true;
+                        }
+                        taggedContent += `\n\n# ${note.title}\n${note.content}`;
+                    }
+                }
+                
+                if (!taggedContent) {
+                    this.showNotification('No notes found with selected tags', 'warning');
+                    return '';
+                }
+                
+                return taggedContent;
+            
+            default:
+                return this.getCurrentMarkdown();
+        }
+    }
+
+    async refreshConceptGraph() {
+        const container = document.getElementById('concept-graph-container');
+        const insightsEl = document.getElementById('map-insights');
+        const nodeDetailsEl = document.getElementById('node-details');
+        
+        if (!container) return;
+        
+        // Clear content
+        container.innerHTML = '';
+        insightsEl.innerHTML = '';
+        nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
+        
+        this.showProcessingOverlay('Generating concept map...');
+        
+        try {
+            const noteText = await this.getNotesContentForConcept();
+            if (!noteText) {
+                this.hideProcessingOverlay();
+                return;
+            }
+            
+            const analysisType = document.getElementById('concept-analysis-type')?.value || 'bridges';
+            const language = document.getElementById('concept-language')?.value || 'en';
+            const enableLemmatization = document.getElementById('concept-lemmatization')?.checked ?? true;
+            
+            const resp = await authFetch('/api/concept-graph', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    note: noteText,
+                    analysis_type: analysisType,
+                    language: language,
+                    enable_lemmatization: enableLemmatization
+                })
+            });
+            
+            if (!resp.ok) throw new Error('Request failed');
+            const data = await resp.json();
+            
+            this.currentGraphData = data.graph;
+            this.currentGraphInsights = data.insights;
+            
+            this.renderConceptGraph(data.graph);
+            this.renderGraphInsights(data.insights);
+        } catch (e) {
+            this.showNotification(e.message || 'Graph generation failed', 'error');
+        } finally {
+            this.hideProcessingOverlay();
+        }
+    }
+
+    renderConceptGraph(graph) {
+        const container = document.getElementById('concept-graph-container');
+        if (!container) return;
+        
+        // Store original graph data for filtering
+        this.originalGraphData = JSON.parse(JSON.stringify(graph));
+        this.currentGraphData = graph;
+        
+        // Clear any existing content
+        container.innerHTML = '';
+        
+        // Check if we have data
+        if (!graph.nodes || graph.nodes.length === 0) {
+            container.innerHTML = '<div class="no-graph-data">No concept graph data available. Try adding more content to your note.</div>';
+            return;
+        }
+
+        const width = container.clientWidth || 800;
+        const height = container.clientHeight - 80; // Account for bottom controls
+        
+        // Create SVG with better styling
+        const svg = d3.select(container)
+            .append('svg')
+            .attr('width', width)
+            .attr('height', height)
+            .style('background', '#fafafa')
+            .style('border-radius', '8px');
+        
+        // Add zoom and pan functionality
+        const g = svg.append('g');
+        const zoom = d3.zoom()
+            .scaleExtent([0.1, 3])
+            .on('zoom', (event) => {
+                g.attr('transform', event.transform);
+            });
+        svg.call(zoom);
+        
+        // Store references for filtering
+        this.graphElements = {
+            svg: svg,
+            g: g,
+            zoom: zoom,
+            width: width,
+            height: height,
+            container: container
+        };
+        
+        // Initial render
+        this.updateGraphVisualization();
+        
+        // Add control panel
+        this.addGraphControls(container, null, zoom, svg);
+        
+        // Setup sliders
+        this.setupGraphSliders();
+    }
+
+    updateGraphVisualization() {
+        if (!this.graphElements || !this.currentGraphData) return;
+        
+        const { g, width, height } = this.graphElements;
+        const graph = this.currentGraphData;
+        
+        // Clear existing elements
+        g.selectAll("*").remove();
+        
+        // Create color scale for different clusters
+        const color = d3.scaleOrdinal()
+            .domain(graph.nodes.map(d => d.id))
+            .range(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']);
+        
+        // Create links with enhanced styling
+        const link = g.append('g')
+            .attr('class', 'links')
+            .selectAll('line')
+            .data(graph.links)
+            .enter().append('line')
+            .attr('stroke', '#999')
+            .attr('stroke-opacity', 0.4)
+            .attr('stroke-width', d => d.strength || Math.sqrt(d.weight || 1))
+            .style('cursor', 'pointer');
+        
+        // Create nodes with dynamic sizing based on importance
+        const node = g.append('g')
+            .attr('class', 'nodes')
+            .selectAll('circle')
+            .data(graph.nodes)
+            .enter().append('circle')
+            .attr('r', d => d.size || 8)
+            .attr('fill', (d, i) => color(i % 10))
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 2)
+            .style('cursor', 'pointer')
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+        
+        // Add hover effects
+        node.on('mouseover', function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(200)
+                .attr('r', (d.size || 8) * 1.3)
+                .attr('stroke-width', 3);
+            
+            // Highlight connected nodes and links
+            const connectedNodes = new Set();
+            link.style('stroke-opacity', l => {
+                if (l.source.id === d.id || l.target.id === d.id) {
+                    connectedNodes.add(l.source.id);
+                    connectedNodes.add(l.target.id);
+                    return 0.8;
+                }
+                return 0.1;
+            });
+            
+            node.style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
+        })
+        .on('mouseout', function(event, d) {
+            d3.select(this)
+                .transition()
+                .duration(200)
+                .attr('r', d.size || 8)
+                .attr('stroke-width', 2);
+            
+            // Reset highlighting
+            link.style('stroke-opacity', 0.4);
+            node.style('opacity', 1);
+        });
+        
+        // Add labels with better positioning and conditional visibility
+        const label = g.append('g')
+            .attr('class', 'labels')
+            .selectAll('text')
+            .data(graph.nodes)
+            .enter().append('text')
+            .attr('font-size', d => Math.max(10, Math.min(14, (d.size || 8) / 2 + 8)))
+            .attr('font-weight', d => d.importance > 0.5 ? 'bold' : 'normal')
+            .attr('dx', d => (d.size || 8) + 5)
+            .attr('dy', '0.35em')
+            .attr('fill', '#333')
+            .style('pointer-events', 'none')
+            .style('opacity', d => d.showText !== false ? 1 : 0)
+            .text(d => d.label);
+        
+        // Create force simulation with improved parameters
+        const simulation = d3.forceSimulation(graph.nodes)
+            .force('link', d3.forceLink(graph.links)
+                .id(d => d.id)
+                .distance(d => 80 + (d.weight || 1) * 20)
+                .strength(d => Math.min(1, (d.weight || 1) * 0.5))
+            )
+            .force('charge', d3.forceManyBody()
+                .strength(d => -300 - (d.size || 8) * 10)
+            )
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide()
+                .radius(d => (d.size || 8) + 10)
+            );
+        
+        // Update positions on each tick
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            
+            node
+                .attr('cx', d => d.x)
+                .attr('cy', d => d.y);
+            
+            label
+                .attr('x', d => d.x)
+                .attr('y', d => d.y);
+        });
+        
+        // Click to highlight connections and show node details
+        node.on('click', (event, d) => {
+            event.stopPropagation();
+            
+            // Find connected nodes
+            const connectedNodes = new Set([d.id]);
+            const connectedLinks = new Set();
+            const connectedNodeDetails = [];
+            
+            graph.links.forEach(l => {
+                if (l.source.id === d.id || l.target.id === d.id) {
+                    connectedNodes.add(l.source.id);
+                    connectedNodes.add(l.target.id);
+                    connectedLinks.add(l);
+                    
+                    // Add connected node details
+                    const connectedNode = l.source.id === d.id ? l.target : l.source;
+                    if (connectedNode.id !== d.id) {
+                        connectedNodeDetails.push(connectedNode);
+                    }
+                }
+            });
+            
+            // Update graph styling
+            node.attr('fill', n => connectedNodes.has(n.id) ? '#d62728' : color(n.id % 10))
+                .style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
+            
+            link.attr('stroke', l => connectedLinks.has(l) ? '#d62728' : '#999')
+                .attr('stroke-width', l => connectedLinks.has(l) ? (l.strength || 2) * 1.5 : l.strength || 1)
+                .style('opacity', l => connectedLinks.has(l) ? 1 : 0.2);
+            
+            label.style('opacity', n => {
+                const shouldShow = connectedNodes.has(n.id) && n.showText !== false;
+                return shouldShow ? 1 : (n.showText !== false ? 0.3 : 0);
+            }).attr('fill', n => connectedNodes.has(n.id) ? '#d62728' : '#333');
+            
+            // Show node details in sidebar
+            this.renderNodeDetails(d, connectedNodeDetails);
+        });
+        
+        // Click on background to reset
+        this.graphElements.svg.on('click', (event) => {
+            if (event.target === this.graphElements.svg.node()) {
+                node.attr('fill', (d, i) => color(i % 10))
+                    .style('opacity', 1);
+                link.attr('stroke', '#999')
+                    .attr('stroke-width', d => d.strength || Math.sqrt(d.weight || 1))
+                    .style('opacity', 0.4);
+                label.style('opacity', n => n.showText !== false ? 1 : 0)
+                    .attr('fill', '#333');
+                
+                // Reset node details panel
+                const nodeDetailsEl = document.getElementById('node-details');
+                if (nodeDetailsEl) {
+                    nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
+                }
+            }
+        });
+        
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+        
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+        
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+        
+        // Store simulation for later use
+        this.graphElements.simulation = simulation;
+    }
+
+    setupGraphSliders() {
+        // Get slider elements
+        const maxNodesSlider = document.getElementById('max-nodes-slider');
+        const nodeDegreeSlider = document.getElementById('node-degree-slider');
+        const textSizeSlider = document.getElementById('text-size-slider');
+        
+        const maxNodesValue = document.getElementById('max-nodes-value');
+        const nodeDegreeValue = document.getElementById('node-degree-value');
+        const textSizeValue = document.getElementById('text-size-value');
+
+        if (!maxNodesSlider || !nodeDegreeSlider || !textSizeSlider) return;
+
+        // Initialize values based on current graph
+        const nodeCount = this.originalGraphData.nodes.length;
+        maxNodesSlider.max = Math.max(50, nodeCount);
+        maxNodesSlider.value = Math.min(50, nodeCount);
+        maxNodesValue.textContent = maxNodesSlider.value;
+
+        // Set up event listeners
+        maxNodesSlider.addEventListener('input', (e) => {
+            maxNodesValue.textContent = e.target.value;
+            this.applyGraphFilters();
+        });
+
+        nodeDegreeSlider.addEventListener('input', (e) => {
+            nodeDegreeValue.textContent = e.target.value;
+            this.applyGraphFilters();
+        });
+
+        textSizeSlider.addEventListener('input', (e) => {
+            textSizeValue.textContent = e.target.value;
+            this.applyGraphFilters();
+        });
+    }
+
+    applyGraphFilters() {
+        if (!this.originalGraphData) return;
+
+        const maxNodes = parseInt(document.getElementById('max-nodes-slider')?.value || 50);
+        const minDegree = parseInt(document.getElementById('node-degree-slider')?.value || 1);
+        const minTextSize = parseInt(document.getElementById('text-size-slider')?.value || 8);
+
+        // Calculate node degrees from original data
+        const nodeDegrees = {};
+        this.originalGraphData.nodes.forEach(node => {
+            nodeDegrees[node.id] = 0;
+        });
+
+        this.originalGraphData.links.forEach(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            
+            if (nodeDegrees[sourceId] !== undefined) nodeDegrees[sourceId]++;
+            if (nodeDegrees[targetId] !== undefined) nodeDegrees[targetId]++;
+        });
+
+        // Filter nodes by degree and sort by importance/size
+        let filteredNodes = this.originalGraphData.nodes.filter(node => {
+            return nodeDegrees[node.id] >= minDegree;
+        });
+
+        // Sort by importance/size and limit to maxNodes
+        filteredNodes.sort((a, b) => (b.importance || b.size || 0) - (a.importance || a.size || 0));
+        filteredNodes = filteredNodes.slice(0, maxNodes);
+
+        // Create set of filtered node IDs for quick lookup
+        const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+
+        // Filter links to only include connections between filtered nodes
+        const filteredLinks = this.originalGraphData.links.filter(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
+        });
+
+        // Apply text size filter
+        filteredNodes.forEach(node => {
+            node.showText = (node.size || 8) >= minTextSize;
+        });
+
+        // Create filtered graph
+        const filteredGraph = {
+            nodes: filteredNodes,
+            links: filteredLinks
+        };
+
+        this.currentGraphData = filteredGraph;
+        this.updateGraphVisualization();
+    }
+    
+    addGraphControls(container, simulation, zoom, svg) {
+        // Create controls panel
+        const controls = d3.select(container)
+            .append('div')
+            .attr('class', 'graph-controls')
+            .style('position', 'absolute')
+            .style('top', '10px')
+            .style('right', '10px')
+            .style('background', 'rgba(255, 255, 255, 0.9)')
+            .style('padding', '10px')
+            .style('border-radius', '5px')
+            .style('box-shadow', '0 2px 10px rgba(0,0,0,0.1)')
+            .style('z-index', '1000');
+        
+        // Zoom controls
+        controls.append('button')
+            .html('<i class="fas fa-search-plus"></i>')
+            .attr('title', 'Zoom In')
+            .style('margin', '2px')
+            .style('padding', '5px 8px')
+            .style('border', '1px solid #ccc')
+            .style('background', '#fff')
+            .style('cursor', 'pointer')
+            .style('border-radius', '3px')
+            .on('click', () => {
+                svg.transition().call(zoom.scaleBy, 1.5);
+            });
+        
+        controls.append('button')
+            .html('<i class="fas fa-search-minus"></i>')
+            .attr('title', 'Zoom Out')
+            .style('margin', '2px')
+            .style('padding', '5px 8px')
+            .style('border', '1px solid #ccc')
+            .style('background', '#fff')
+            .style('cursor', 'pointer')
+            .style('border-radius', '3px')
+            .on('click', () => {
+                svg.transition().call(zoom.scaleBy, 1 / 1.5);
+            });
+        
+        controls.append('br');
+        
+        // Reset controls
+        controls.append('button')
+            .html('<i class="fas fa-compress-arrows-alt"></i>')
+            .attr('title', 'Reset View')
+            .style('margin', '2px')
+            .style('padding', '5px 8px')
+            .style('border', '1px solid #ccc')
+            .style('background', '#fff')
+            .style('cursor', 'pointer')
+            .style('border-radius', '3px')
+            .on('click', () => {
+                svg.transition().call(zoom.transform, d3.zoomIdentity);
+            });
+        
+        controls.append('button')
+            .html('<i class="fas fa-sync"></i>')
+            .attr('title', 'Restart Simulation')
+            .style('margin', '2px')
+            .style('padding', '5px 8px')
+            .style('border', '1px solid #ccc')
+            .style('background', '#fff')
+            .style('cursor', 'pointer')
+            .style('border-radius', '3px')
+            .on('click', () => {
+                simulation.alpha(1).restart();
+            });
+    }
+
+    async reprocessGraphWithAI() {
+        const aiBtn = document.getElementById('ai-reprocess-btn');
+        if (!aiBtn || !this.currentGraphData) return;
+        
+        try {
+            // Set button to processing state
+            aiBtn.disabled = true;
+            aiBtn.classList.add('processing');
+            aiBtn.innerHTML = '<i class="fas fa-robot"></i> Processing...';
+            
+            // Get current analysis type and language
+            const analysisType = document.getElementById('concept-analysis-type')?.value || 'bridges';
+            const language = document.getElementById('concept-language')?.value || 'en';
+            const enableLemmatization = document.getElementById('concept-lemmatization')?.checked ?? true;
+            
+            // Extract current nodes from graph
+            const currentNodes = this.currentGraphData.nodes.map(node => ({
+                id: node.id,
+                label: node.label,
+                size: node.size,
+                importance: node.importance
+            }));
+            
+            // Get current note text
+            const noteText = await this.getNotesContentForConcept();
+            if (!noteText) {
+                return;
+            }
+            
+            // Call AI reprocessing endpoint (AI provider config comes from user settings)
+            const resp = await authFetch('/api/concept-graph/ai-reprocess', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    note: noteText,
+                    current_nodes: currentNodes,
+                    analysis_type: analysisType,
+                    language: language,
+                    enable_lemmatization: enableLemmatization
+                })
+            });
+            
+            if (!resp.ok) {
+                const errorData = await resp.json();
+                throw new Error(errorData.error || 'AI reprocessing failed');
+            }
+            
+            const data = await resp.json();
+            
+            // Update graph with AI-filtered results
+            this.currentGraphData = data.graph;
+            this.currentGraphInsights = data.insights;
+            
+            // Re-render the graph
+            this.renderConceptGraph(data.graph);
+            this.renderGraphInsights(data.insights);
+            
+            this.showNotification('Graph reprocessed with AI successfully', 'success');
+            
+        } catch (error) {
+            console.error('AI reprocessing error:', error);
+            this.showNotification(error.message || 'AI reprocessing failed', 'error');
+        } finally {
+            // Reset button state
+            aiBtn.disabled = false;
+            aiBtn.classList.remove('processing');
+            aiBtn.innerHTML = '<i class="fas fa-robot"></i> Reprocess with AI';
+        }
+    }
+
+    setupAISuggestionsWindow() {
+        this.currentSuggestions = [];
+        this.currentSuggestionIndex = 0;
+        this.suggestionTypes = ['bridge_concepts', 'knowledge_gaps', 'exploration_areas'];
+        this.currentSuggestionType = 0;
+        this.suggestionsWindow = document.getElementById('ai-suggestions-window');
+        
+        // Window controls
+        const closeBtn = document.getElementById('close-suggestions');
+        const minimizeBtn = document.getElementById('minimize-suggestions');
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hideAISuggestionsWindow();
+            });
+        }
+        
+        if (minimizeBtn) {
+            minimizeBtn.addEventListener('click', () => {
+                this.toggleMinimizeSuggestions();
+            });
+        }
+        
+        // Navigation controls
+        const prevBtn = document.getElementById('prev-suggestion');
+        const nextBtn = document.getElementById('next-suggestion');
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                this.navigateSuggestion('prev');
+            });
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                this.navigateSuggestion('next');
+            });
+        }
+        
+        // Custom question input
+        const askBtn = document.getElementById('ask-suggestion');
+        const questionInput = document.getElementById('suggestion-question');
+        
+        if (askBtn) {
+            askBtn.addEventListener('click', () => {
+                this.askCustomSuggestion();
+            });
+        }
+        
+        if (questionInput) {
+            questionInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.askCustomSuggestion();
+                }
+            });
+        }
+        
+        // Make window draggable
+        this.makeWindowDraggable();
+    }
+
+    setupConceptRemovalModal() {
+        // Modal elements
+        this.conceptRemovalModal = document.getElementById('concept-removal-modal');
+        this.conceptExclusionsInput = document.getElementById('concept-exclusions-input');
+        this.exclusionCountElement = document.getElementById('exclusion-count');
+        this.conceptExclusionLoading = document.getElementById('concept-exclusion-loading');
+        
+        // Button handlers
+        const cancelBtn = document.getElementById('cancel-concept-removal');
+        const saveBtn = document.getElementById('save-concept-exclusions');
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => {
+                this.hideConceptRemovalModal();
+            });
+        }
+        
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                this.saveConceptExclusions();
+            });
+        }
+        
+        // Input handler to update count
+        if (this.conceptExclusionsInput) {
+            this.conceptExclusionsInput.addEventListener('input', () => {
+                this.updateExclusionCount();
+            });
+        }
+        
+        // Close modal when clicking outside
+        if (this.conceptRemovalModal) {
+            this.conceptRemovalModal.addEventListener('click', (e) => {
+                if (e.target === this.conceptRemovalModal) {
+                    this.hideConceptRemovalModal();
+                }
+            });
+        }
+    }
+
+    async showConceptRemovalModal() {
+        if (!this.conceptRemovalModal) return;
+        
+        // Show modal
+        this.conceptRemovalModal.classList.add('active');
+        
+        // Load current exclusions
+        await this.loadConceptExclusions();
+        
+        // Update count
+        this.updateExclusionCount();
+        
+        // Focus input
+        if (this.conceptExclusionsInput) {
+            setTimeout(() => this.conceptExclusionsInput.focus(), 100);
+        }
+    }
+
+    hideConceptRemovalModal() {
+        if (this.conceptRemovalModal) {
+            this.conceptRemovalModal.classList.remove('active');
+        }
+    }
+
+    async loadConceptExclusions() {
+        try {
+            const response = await fetch('/api/concept-exclusions', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (this.conceptExclusionsInput) {
+                    this.conceptExclusionsInput.value = data.exclusions.join(', ');
+                }
+            } else {
+                console.warn('Failed to load concept exclusions');
+                if (this.conceptExclusionsInput) {
+                    this.conceptExclusionsInput.value = '';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading concept exclusions:', error);
+            if (this.conceptExclusionsInput) {
+                this.conceptExclusionsInput.value = '';
+            }
+        }
+    }
+
+    async saveConceptExclusions() {
+        if (!this.conceptExclusionsInput) return;
+        
+        const input = this.conceptExclusionsInput.value.trim();
+        const exclusions = input ? input.split(',').map(word => word.trim()).filter(word => word) : [];
+        
+        // Show loading
+        if (this.conceptExclusionLoading) {
+            this.conceptExclusionLoading.classList.remove('hidden');
+        }
+        
+        try {
+            const response = await fetch('/api/concept-exclusions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ exclusions })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.showNotification(`Saved ${data.exclusions.length} concept exclusions`, 'success');
+                this.hideConceptRemovalModal();
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to save exclusions');
+            }
+        } catch (error) {
+            console.error('Error saving concept exclusions:', error);
+            this.showNotification(error.message || 'Failed to save concept exclusions', 'error');
+        } finally {
+            // Hide loading
+            if (this.conceptExclusionLoading) {
+                this.conceptExclusionLoading.classList.add('hidden');
+            }
+        }
+    }
+
+    updateExclusionCount() {
+        if (!this.conceptExclusionsInput || !this.exclusionCountElement) return;
+        
+        const input = this.conceptExclusionsInput.value.trim();
+        const count = input ? input.split(',').map(word => word.trim()).filter(word => word).length : 0;
+        
+        this.exclusionCountElement.textContent = count;
+    }
+
+    async showAISuggestionsWindow() {
+        if (!this.currentGraphData) return;
+        
+        this.suggestionsWindow.classList.remove('hidden');
+        this.suggestionsWindow.classList.remove('minimized');
+        
+        // Reset suggestion tracking
+        this.currentSuggestions = [];
+        this.currentSuggestionIndex = 0;
+        this.currentSuggestionType = 0;
+        
+        // Generate the first suggestion
+        await this.generateNextSuggestion();
+    }
+
+    hideAISuggestionsWindow() {
+        this.suggestionsWindow.classList.add('hidden');
+    }
+
+    toggleMinimizeSuggestions() {
+        this.suggestionsWindow.classList.toggle('minimized');
+    }
+
+    navigateSuggestion(direction) {
+        if (direction === 'prev') {
+            if (this.currentSuggestionIndex > 0) {
+                this.currentSuggestionIndex--;
+                this.displayCurrentSuggestion();
+            }
+        } else if (direction === 'next') {
+            // If we have more cached suggestions, show them
+            if (this.currentSuggestionIndex < this.currentSuggestions.length - 1) {
+                this.currentSuggestionIndex++;
+                this.displayCurrentSuggestion();
+            } else {
+                // Generate next suggestion
+                this.generateNextSuggestion();
+            }
+        }
+    }
+
+    async generateNextSuggestion() {
+        const content = document.getElementById('suggestion-content');
+        
+        // Show loading state
+        content.innerHTML = `
+            <div class="suggestion-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Generating AI suggestion...</span>
+            </div>
+        `;
+        
+        try {
+            // Get current note text and nodes
+            const noteText = await this.getNotesContentForConcept();
+            if (!noteText) {
+                content.innerHTML = '<p>Error: Could not get note content</p>';
+                return;
+            }
+            
+            const analysisType = document.getElementById('concept-analysis-type')?.value || 'bridges';
+            const language = document.getElementById('concept-language')?.value || 'en';
+            const enableLemmatization = document.getElementById('concept-lemmatization')?.checked ?? true;
+            
+            // Extract current nodes from graph
+            const currentNodes = this.currentGraphData.nodes.map(node => ({
+                id: node.id,
+                label: node.label,
+                size: node.size,
+                importance: node.importance
+            }));
+            
+            // Get the suggestion type to generate
+            const suggestionType = this.suggestionTypes[this.currentSuggestionType % this.suggestionTypes.length];
+            
+            // Call single suggestion endpoint
+            const resp = await authFetch('/api/concept-graph/ai-single-suggestion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    note: noteText,
+                    current_nodes: currentNodes,
+                    suggestion_type: suggestionType,
+                    analysis_type: analysisType,
+                    language: language,
+                    enable_lemmatization: enableLemmatization
+                })
+            });
+            
+            if (!resp.ok) {
+                const errorData = await resp.json();
+                throw new Error(errorData.error || 'Failed to generate suggestion');
+            }
+            
+            const data = await resp.json();
+            const newSuggestion = data.suggestion;
+            
+            if (newSuggestion) {
+                // Add to suggestions array
+                this.currentSuggestions.push(newSuggestion);
+                this.currentSuggestionIndex = this.currentSuggestions.length - 1;
+                this.currentSuggestionType++;
+                
+                // Process thinking tags and display
+                await this.displaySuggestionWithStreaming(newSuggestion);
+            } else {
+                content.innerHTML = '<p>No suggestion available. Try regenerating the concept graph first.</p>';
+            }
+            
+        } catch (error) {
+            console.error('Error generating AI suggestion:', error);
+            content.innerHTML = `<p>Error generating suggestion: ${error.message}</p>`;
+        }
+    }
+
+    displayCurrentSuggestion() {
+        if (this.currentSuggestions.length === 0) return;
+        
+        const suggestion = this.currentSuggestions[this.currentSuggestionIndex];
+        const content = document.getElementById('suggestion-content');
+        const counter = document.getElementById('suggestion-counter');
+        
+        // Update counter
+        counter.textContent = `${this.currentSuggestionIndex + 1} / ${this.currentSuggestions.length}`;
+        
+        // Update navigation buttons
+        const prevBtn = document.getElementById('prev-suggestion');
+        const nextBtn = document.getElementById('next-suggestion');
+        
+        if (prevBtn) prevBtn.disabled = this.currentSuggestionIndex === 0;
+        if (nextBtn) nextBtn.disabled = false; // Next is always enabled for new generation
+        
+        // Display suggestion content with highlighted concepts
+        const highlightedContent = this.highlightConceptsInText(suggestion.content, suggestion.concepts || []);
+        
+        content.innerHTML = `
+            <div class="suggestion-item">
+                <h4 class="suggestion-title">${suggestion.title}</h4>
+                <div class="suggestion-text">${highlightedContent}</div>
+            </div>
+        `;
+    }
+
+    async displaySuggestionWithStreaming(suggestion) {
+        const content = document.getElementById('suggestion-content');
+        const counter = document.getElementById('suggestion-counter');
+        
+        // Update counter
+        counter.textContent = `${this.currentSuggestionIndex + 1} / ${this.currentSuggestions.length}`;
+        
+        // Update navigation buttons
+        const prevBtn = document.getElementById('prev-suggestion');
+        const nextBtn = document.getElementById('next-suggestion');
+        
+        if (prevBtn) prevBtn.disabled = this.currentSuggestionIndex === 0;
+        if (nextBtn) nextBtn.disabled = false;
+        
+        // Check for thinking tags
+        const thinkingResult = this.processThinkTags(suggestion.content);
+        
+        if (thinkingResult.hasThinking) {
+            // Show thinking phase
+            content.innerHTML = `
+                <div class="suggestion-item">
+                    <h4 class="suggestion-title">${suggestion.title}</h4>
+                    <div class="thinking-indicator">
+                        <i class="fas fa-brain fa-pulse"></i>
+                        <span>Thinking...</span>
+                    </div>
+                </div>
+            `;
+            
+            // Wait a moment to show thinking
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Display the response with streaming effect
+        content.innerHTML = `
+            <div class="suggestion-item">
+                <h4 class="suggestion-title">${suggestion.title}</h4>
+                <div class="suggestion-text" id="streaming-suggestion"></div>
+            </div>
+        `;
+        
+        const streamingElement = document.getElementById('streaming-suggestion');
+        const textToDisplay = thinkingResult.hasThinking ? thinkingResult.response : suggestion.content;
+        
+        // Simulate streaming
+        await this.streamText(streamingElement, textToDisplay, suggestion.concepts || []);
+    }
+
+    processThinkTags(text) {
+        // Check for thinking tags
+        const thinkPattern = /<think>(.*?)<\/think>/gis;
+        const thinkingMatches = text.match(thinkPattern);
+        
+        if (thinkingMatches) {
+            // Remove thinking sections from response
+            const responseText = text.replace(thinkPattern, '').trim();
+            return {
+                hasThinking: true,
+                thinking: thinkingMatches.join('\n'),
+                response: responseText
+            };
+        }
+        
+        return {
+            hasThinking: false,
+            thinking: '',
+            response: text
+        };
+    }
+
+    async streamText(element, text, concepts) {
+        element.innerHTML = '';
+        
+        for (let i = 0; i <= text.length; i++) {
+            const partialText = text.substring(0, i);
+            const highlightedText = this.highlightConceptsInText(partialText, concepts);
+            element.innerHTML = highlightedText;
+            
+            // Add streaming cursor
+            if (i < text.length) {
+                element.innerHTML += '<span class="suggestion-streaming">|</span>';
+                await new Promise(resolve => setTimeout(resolve, 20));
+            }
+        }
+    }
+
+    highlightConceptsInText(text, concepts) {
+        if (!concepts || concepts.length === 0) return text;
+        
+        let highlightedText = text;
+        
+        // Get node colors from current graph
+        const nodeColorMap = {};
+        if (this.currentGraphData && this.currentGraphData.nodes) {
+            this.currentGraphData.nodes.forEach(node => {
+                nodeColorMap[node.label.toLowerCase()] = node.color || '#3b82f6';
+            });
+        }
+        
+        // Highlight each concept with its graph color
+        concepts.forEach(concept => {
+            const color = nodeColorMap[concept.toLowerCase()] || '#8b5cf6';
+            const regex = new RegExp(`\\b${concept.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi');
+            highlightedText = highlightedText.replace(regex, 
+                `<span class="suggestion-concept" style="background-color: ${color}; color: white;">${concept}</span>`
+            );
+        });
+        
+        return highlightedText;
+    }
+
+    async askCustomSuggestion() {
+        const questionInput = document.getElementById('suggestion-question');
+        const question = questionInput.value.trim();
+        
+        if (!question) return;
+        
+        const content = document.getElementById('suggestion-content');
+        
+        // Show loading state
+        content.innerHTML = `
+            <div class="suggestion-loading">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Getting AI response...</span>
+            </div>
+        `;
+        
+        try {
+            // Get current note text and nodes
+            const noteText = await this.getNotesContentForConcept();
+            if (!noteText) {
+                content.innerHTML = '<p>Error: Could not get note content</p>';
+                return;
+            }
+            
+            const language = document.getElementById('concept-language')?.value || 'en';
+            
+            // Extract current nodes from graph
+            const currentNodes = this.currentGraphData.nodes.map(node => ({
+                id: node.id,
+                label: node.label,
+                size: node.size,
+                importance: node.importance
+            }));
+            
+            // Set up streaming display
+            content.innerHTML = `
+                <div class="suggestion-item">
+                    <h4 class="suggestion-title">Custom Question</h4>
+                    <p class="suggestion-question"><strong>Q:</strong> ${question}</p>
+                    <div class="suggestion-text suggestion-streaming" id="streaming-text"></div>
+                </div>
+            `;
+            
+            const streamingElement = document.getElementById('streaming-text');
+            
+            // Call streaming endpoint
+            const resp = await authFetch('/api/concept-graph/ai-custom-suggestion-stream', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    question: question,
+                    note: noteText,
+                    current_nodes: currentNodes,
+                    language: language
+                })
+            });
+            
+            if (!resp.ok) {
+                const errorData = await resp.json();
+                throw new Error(errorData.error || 'Failed to get custom suggestion');
+            }
+            
+            // Process streaming response
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let fullResponse = '';
+            let isThinking = false;
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') {
+                            // Streaming complete - process final think tags
+                            const thinkingResult = this.processThinkTags(fullResponse);
+                            if (thinkingResult.hasThinking) {
+                                const highlightedText = this.highlightConceptsInText(
+                                    thinkingResult.response, 
+                                    this.extractConceptsFromCurrentGraph()
+                                );
+                                streamingElement.innerHTML = highlightedText;
+                            }
+                            streamingElement.classList.remove('suggestion-streaming');
+                            // Clear input
+                            questionInput.value = '';
+                            return;
+                        }
+                        
+                        try {
+                            const parsed = JSON.parse(data);
+                            const content = parsed.choices?.[0]?.delta?.content || '';
+                            if (content) {
+                                fullResponse += content;
+                                
+                                // Check for think tags in current response
+                                const hasThinkStart = fullResponse.includes('<think>');
+                                const hasThinkEnd = fullResponse.includes('</think>');
+                                
+                                if (hasThinkStart && !hasThinkEnd) {
+                                    // Currently in thinking mode
+                                    if (!isThinking) {
+                                        isThinking = true;
+                                        streamingElement.innerHTML = `
+                                            <div class="thinking-indicator">
+                                                <i class="fas fa-brain fa-pulse"></i>
+                                                <span>Thinking...</span>
+                                            </div>
+                                        `;
+                                    }
+                                } else if (hasThinkEnd && isThinking) {
+                                    // Thinking completed
+                                    isThinking = false;
+                                    const thinkingResult = this.processThinkTags(fullResponse);
+                                    const highlightedText = this.highlightConceptsInText(
+                                        thinkingResult.response, 
+                                        this.extractConceptsFromCurrentGraph()
+                                    );
+                                    streamingElement.innerHTML = highlightedText;
+                                } else if (!isThinking) {
+                                    // Normal streaming without thinking
+                                    const highlightedText = this.highlightConceptsInText(
+                                        fullResponse, 
+                                        this.extractConceptsFromCurrentGraph()
+                                    );
+                                    streamingElement.innerHTML = highlightedText;
+                                }
+                            }
+                        } catch (e) {
+                            // Skip invalid JSON
+                        }
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error getting custom suggestion:', error);
+            
+            // Show error message
+            content.innerHTML = `
+                <div class="suggestion-item">
+                    <h4 class="suggestion-title">Error</h4>
+                    <div class="suggestion-text" style="color: #ef4444;">
+                        ${error.message}
+                    </div>
+                </div>
+            `;
+            
+            setTimeout(() => {
+                // Reset to previous content after error
+                if (this.currentSuggestions.length > 0) {
+                    this.displayCurrentSuggestion();
+                }
+            }, 3000);
+        }
+    }
+
+    extractConceptsFromCurrentGraph() {
+        if (!this.currentGraphData || !this.currentGraphData.nodes) return [];
+        return this.currentGraphData.nodes.map(node => node.label);
+    }
+
+    makeWindowDraggable() {
+        const header = document.querySelector('.ai-suggestions-header');
+        if (!header) return;
+        
+        let isDragging = false;
+        let currentX = 0;
+        let currentY = 0;
+        let initialX = 0;
+        let initialY = 0;
+        let xOffset = 0;
+        let yOffset = 0;
+        
+        header.addEventListener('mousedown', (e) => {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+            
+            if (e.target === header || header.contains(e.target)) {
+                isDragging = true;
+                header.style.cursor = 'grabbing';
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                
+                xOffset = currentX;
+                yOffset = currentY;
+                
+                this.suggestionsWindow.style.transform = `translate(${currentX}px, ${currentY}px)`;
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                initialX = currentX;
+                initialY = currentY;
+                isDragging = false;
+                header.style.cursor = 'move';
+            }
+        });
+        
+        header.style.cursor = 'move';
+    }
+
     setupGraphPanZoom() {
         const wrapper = document.getElementById('graph-pan-zoom');
         if (!wrapper) return;
@@ -2177,6 +4057,76 @@ class NotesApp {
                 fileInput.value = '';
             });
         }
+    }
+
+    setupPdfUploadDropZone() {
+        const dropZone = document.getElementById('pdf-drop-zone');
+        const fileInput = document.getElementById('pdf-file-input');
+        if (!dropZone) return;
+        
+        ['dragenter', 'dragover'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                dropZone.classList.add('highlight');
+            });
+        });
+        
+        ['dragleave', 'drop'].forEach(evt => {
+            dropZone.addEventListener(evt, e => {
+                e.preventDefault();
+                dropZone.classList.remove('highlight');
+            });
+        });
+        
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            const files = Array.from(e.dataTransfer.files);
+            this.handlePdfFileSelection(files);
+        });
+        
+        if (fileInput) {
+            dropZone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', e => {
+                const files = Array.from(e.target.files);
+                this.handlePdfFileSelection(files);
+                fileInput.value = '';
+            });
+        }
+    }
+
+    handlePdfFileSelection(files) {
+        if (!files.length) return;
+        
+        // Filter only PDF and TXT files
+        const validFiles = files.filter(f => {
+            const ext = f.name.toLowerCase().split('.').pop();
+            return ext === 'pdf' || ext === 'txt';
+        });
+        
+        if (validFiles.length === 0) {
+            this.showNotification('Please select only PDF or TXT files', 'error');
+            return;
+        }
+        
+        if (validFiles.length > 1) {
+            this.showNotification('Please select only one file at a time', 'error');
+            return;
+        }
+        
+        // Store the selected file and enable upload button
+        this.selectedPdfFile = validFiles[0];
+        const confirmBtn = document.getElementById('confirm-upload-pdf');
+        confirmBtn.disabled = false;
+        
+        // Update drop zone to show selected file
+        const dropZone = document.getElementById('pdf-drop-zone');
+        dropZone.innerHTML = `
+            <i class="fas fa-file-${validFiles[0].name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'alt'}"></i>
+            <p><strong>${validFiles[0].name}</strong></p>
+            <p>Ready to upload (${this.formatFileSize(validFiles[0].size)})</p>
+        `;
+        
+        this.showNotification(`Selected: ${validFiles[0].name}`, 'success');
     }
 
     setupDownloadModelButtons() {
@@ -2882,20 +4832,46 @@ class NotesApp {
             });
         });
         container.style.display = tags.length ? 'flex' : 'none';
+        
+        // Update concept tag filter if visible
+        const conceptTagContainer = document.getElementById('tag-selection-container');
+        if (conceptTagContainer && !conceptTagContainer.classList.contains('hidden')) {
+            this.renderConceptTagFilter();
+        }
     }
 
     renderNoteTags(note) {
         const container = document.getElementById('note-tags');
         if (!container) return;
         const tags = (note && note.tags) ? note.tags : [];
-        safeSetInnerHTML(container, tags.map(t => `<span class="tag-badge" data-tag="${t}">${t}<span class="remove-tag" data-tag="${t}">&times;</span></span>`).join(''));
+        
+        // Create the main tag container structure
+        const tagStructure = `
+            <div class="current-tags">
+                ${tags.map(t => `<span class="tag-badge" data-tag="${t}">${t}<span class="remove-tag" data-tag="${t}">&times;</span></span>`).join('')}
+            </div>
+            <div class="available-tags-section">
+                <div class="available-tags-container">
+                    <div class="available-tags-scroll" id="available-tags-scroll"></div>
+                </div>
+            </div>
+        `;
+        
+        safeSetInnerHTML(container, tagStructure);
+        
+        // Add the input field
+        const currentTagsContainer = container.querySelector('.current-tags');
         const input = document.createElement('input');
         input.type = 'text';
         input.id = 'tag-input';
         input.className = 'tag-input';
         input.placeholder = 'Add tag...';
-        container.appendChild(input);
+        currentTagsContainer.appendChild(input);
 
+        // Render available tags
+        this.renderAvailableTags();
+
+        // Add event listeners for removing tags
         container.querySelectorAll('.remove-tag').forEach(btn => {
             const tag = btn.dataset.tag;
             btn.addEventListener('click', (e) => {
@@ -2904,6 +4880,7 @@ class NotesApp {
             });
         });
 
+        // Add event listeners for input
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ';' || e.key === ',') {
                 e.preventDefault();
@@ -2921,6 +4898,32 @@ class NotesApp {
                 this.addTag(val);
             }
             input.value = '';
+        });
+    }
+
+    renderAvailableTags() {
+        const container = document.getElementById('available-tags-scroll');
+        if (!container) return;
+        
+        const allTags = this.gatherAllTags();
+        const currentTags = (this.currentNote && this.currentNote.tags) ? this.currentNote.tags : [];
+        const availableTags = allTags.filter(tag => !currentTags.includes(tag));
+        
+        if (availableTags.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        container.innerHTML = availableTags.map(tag => 
+            `<span class="available-tag-badge" data-tag="${tag}" title="Click to add tag">${tag}</span>`
+        ).join('');
+        
+        // Add click listeners to available tags
+        container.querySelectorAll('.available-tag-badge').forEach(badge => {
+            badge.addEventListener('click', () => {
+                const tag = badge.dataset.tag;
+                this.addTag(tag);
+            });
         });
     }
 

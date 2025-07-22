@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Slider Test</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        
+        .test-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .concept-graph-container {
+            width: 100%;
+            height: 400px;
+            position: relative;
+            background: #fafafa;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .graph-controls-bottom {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+        
+        .slider-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 120px;
+        }
+        
+        .slider-control label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #333;
+            white-space: nowrap;
+        }
+        
+        .slider-control input[type="range"] {
+            width: 100px;
+            height: 4px;
+            border-radius: 2px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        
+        .slider-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #2180C8;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .test-output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #2180C8;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h2>🧪 Graph Slider Controls Test</h2>
+        <p>Testing the bottom controls for the concept graph with sample data.</p>
+        
+        <div class="concept-graph-container" id="test-graph-container">
+            <div class="graph-controls-bottom">
+                <div class="slider-control">
+                    <label for="test-max-nodes">Max Nodes: <span id="test-max-nodes-value">50</span></label>
+                    <input type="range" id="test-max-nodes" min="10" max="100" value="50" step="5">
+                </div>
+                <div class="slider-control">
+                    <label for="test-node-degree">Min Node Degree: <span id="test-node-degree-value">1</span></label>
+                    <input type="range" id="test-node-degree" min="1" max="10" value="1" step="1">
+                </div>
+                <div class="slider-control">
+                    <label for="test-text-size">Min Text Size: <span id="test-text-size-value">8</span></label>
+                    <input type="range" id="test-text-size" min="6" max="20" value="8" step="1">
+                </div>
+            </div>
+        </div>
+        
+        <div class="test-output" id="test-output">
+            <strong>Test Results:</strong><br>
+            Slider controls initialized. Move the sliders to test functionality.
+        </div>
+    </div>
+
+    <script>
+        // Create sample graph data
+        const sampleGraph = {
+            nodes: [
+                { id: 'node1', label: 'Machine Learning', size: 15, importance: 0.9 },
+                { id: 'node2', label: 'AI', size: 12, importance: 0.8 },
+                { id: 'node3', label: 'Data Science', size: 10, importance: 0.7 },
+                { id: 'node4', label: 'Neural Networks', size: 8, importance: 0.6 },
+                { id: 'node5', label: 'Python', size: 6, importance: 0.5 },
+                { id: 'node6', label: 'Statistics', size: 7, importance: 0.4 }
+            ],
+            links: [
+                { source: 'node1', target: 'node2', weight: 3 },
+                { source: 'node1', target: 'node3', weight: 2 },
+                { source: 'node2', target: 'node4', weight: 2 },
+                { source: 'node3', target: 'node5', weight: 1 },
+                { source: 'node4', target: 'node5', weight: 1 },
+                { source: 'node3', target: 'node6', weight: 1 }
+            ]
+        };
+
+        // Simple graph renderer
+        function renderTestGraph(graph) {
+            const container = d3.select('#test-graph-container');
+            
+            // Remove existing SVG
+            container.select('svg').remove();
+            
+            const width = 600;
+            const height = 320;
+            
+            const svg = container
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height)
+                .style('position', 'absolute')
+                .style('top', '0')
+                .style('left', '0');
+            
+            const g = svg.append('g');
+            
+            // Create color scale
+            const color = d3.scaleOrdinal(d3.schemeCategory10);
+            
+            // Create links
+            const link = g.append('g')
+                .selectAll('line')
+                .data(graph.links)
+                .enter().append('line')
+                .attr('stroke', '#999')
+                .attr('stroke-opacity', 0.6)
+                .attr('stroke-width', d => d.weight);
+            
+            // Create nodes
+            const node = g.append('g')
+                .selectAll('circle')
+                .data(graph.nodes)
+                .enter().append('circle')
+                .attr('r', d => d.size)
+                .attr('fill', (d, i) => color(i))
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+            
+            // Create labels
+            const label = g.append('g')
+                .selectAll('text')
+                .data(graph.nodes)
+                .enter().append('text')
+                .attr('dx', d => d.size + 5)
+                .attr('dy', '0.35em')
+                .attr('font-size', '12px')
+                .attr('fill', '#333')
+                .style('opacity', d => d.showText !== false ? 1 : 0)
+                .text(d => d.label);
+            
+            // Create simulation
+            const simulation = d3.forceSimulation(graph.nodes)
+                .force('link', d3.forceLink(graph.links).id(d => d.id).distance(80))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+            
+            // Update positions
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+                
+                label
+                    .attr('x', d => d.x)
+                    .attr('y', d => d.y);
+            });
+        }
+
+        // Filter logic
+        function applyFilters() {
+            const maxNodes = parseInt(document.getElementById('test-max-nodes').value);
+            const minDegree = parseInt(document.getElementById('test-node-degree').value);
+            const minTextSize = parseInt(document.getElementById('test-text-size').value);
+            
+            // Calculate degrees
+            const nodeDegrees = {};
+            sampleGraph.nodes.forEach(node => { nodeDegrees[node.id] = 0; });
+            sampleGraph.links.forEach(link => {
+                nodeDegrees[link.source]++;
+                nodeDegrees[link.target]++;
+            });
+            
+            // Filter nodes
+            let filteredNodes = sampleGraph.nodes.filter(node => nodeDegrees[node.id] >= minDegree);
+            filteredNodes.sort((a, b) => b.importance - a.importance);
+            filteredNodes = filteredNodes.slice(0, maxNodes);
+            
+            // Apply text size filter
+            filteredNodes.forEach(node => {
+                node.showText = node.size >= minTextSize;
+            });
+            
+            // Filter links
+            const nodeIds = new Set(filteredNodes.map(n => n.id));
+            const filteredLinks = sampleGraph.links.filter(link => 
+                nodeIds.has(link.source) && nodeIds.has(link.target)
+            );
+            
+            const filteredGraph = {
+                nodes: filteredNodes,
+                links: filteredLinks
+            };
+            
+            // Update output
+            const output = document.getElementById('test-output');
+            output.innerHTML = `
+                <strong>Filter Applied:</strong><br>
+                Max Nodes: ${maxNodes}<br>
+                Min Degree: ${minDegree}<br>
+                Min Text Size: ${minTextSize}<br>
+                Showing ${filteredNodes.length} nodes, ${filteredLinks.length} links<br>
+                Text visible on ${filteredNodes.filter(n => n.showText).length} nodes
+            `;
+            output.className = 'test-output success';
+            
+            renderTestGraph(filteredGraph);
+        }
+
+        // Setup sliders
+        document.getElementById('test-max-nodes').addEventListener('input', (e) => {
+            document.getElementById('test-max-nodes-value').textContent = e.target.value;
+            applyFilters();
+        });
+
+        document.getElementById('test-node-degree').addEventListener('input', (e) => {
+            document.getElementById('test-node-degree-value').textContent = e.target.value;
+            applyFilters();
+        });
+
+        document.getElementById('test-text-size').addEventListener('input', (e) => {
+            document.getElementById('test-text-size-value').textContent = e.target.value;
+            applyFilters();
+        });
+
+        // Initial render
+        renderTestGraph(sampleGraph);
+    </script>
+</body>
+</html>

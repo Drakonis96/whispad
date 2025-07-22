@@ -18,6 +18,7 @@ from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 from speaker_diarization import get_speaker_diarization_wrapper
 from mermaid import Mermaid
+from concept_graph import build_graph, build_concept_graph
 import ast
 import string
 from pydub import AudioSegment
@@ -140,6 +141,9 @@ from db import (
     update_password as db_update_password,
     update_user_providers as db_update_user_providers,
     delete_user as db_delete_user,
+    get_user_preference,
+    set_user_preference,
+    get_user_preferences,
 )
 
 HASHER = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=2, hash_len=32, type=Type.ID)
@@ -2914,6 +2918,755 @@ def generate_diagram():
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
 
 
+@app.route('/api/concept-graph', methods=['POST'])
+def concept_graph():
+    """Generate a concept co-occurrence graph from note markdown with AI enhancement."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note = data.get('note', '')
+    analysis_type = data.get('analysis_type', 'bridges')  # bridges, hubs, global, local
+    language = data.get('language', 'en')  # en, es
+    enable_lemmatization = data.get('enable_lemmatization', True)  # lemmatization toggle
+    
+    # Validate analysis type
+    valid_types = ['bridges', 'hubs', 'global', 'local']
+    if analysis_type not in valid_types:
+        analysis_type = 'bridges'
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Validate lemmatization setting
+    if not isinstance(enable_lemmatization, bool):
+        enable_lemmatization = True
+    
+    # Get user's concept exclusions
+    exclusions = []
+    try:
+        exclusions_str = get_user_preference(username, 'concept_exclusions')
+        if exclusions_str:
+            exclusions = [word.strip().lower() for word in exclusions_str.split(',') if word.strip()]
+    except Exception as e:
+        print(f"Error getting concept exclusions: {str(e)}")
+        # Continue without exclusions if there's an error
+    
+    # Get user's AI provider configuration for enhancement
+    user_data = get_user(username)
+    ai_provider = None
+    api_key = None
+    
+    if user_data and user_data.get('ai_provider_config'):
+        config = user_data['ai_provider_config']
+        ai_provider = config.get('provider')
+        
+        # Get API key based on provider
+        if ai_provider == 'openai':
+            api_key = config.get('api_key') or OPENAI_API_KEY
+        elif ai_provider == 'openrouter':
+            api_key = config.get('api_key') or OPENROUTER_API_KEY
+        elif ai_provider == 'google':
+            api_key = config.get('api_key') or GOOGLE_API_KEY
+    
+    try:
+        # Add timeout for large text processing
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Concept graph generation timed out")
+        
+        # Set timeout to 30 seconds for very large texts
+        text_length = len(note)
+        timeout_seconds = 30 if text_length > 50000 else 60
+        
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(timeout_seconds)
+        
+        try:
+            # Use enhanced build_graph function with AI support
+            if ai_provider and api_key:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    # Import the async function
+                    from concept_graph import build_enhanced_graph_with_ai
+                    graph_result = loop.run_until_complete(
+                        build_enhanced_graph_with_ai(note, analysis_type, ai_provider, api_key, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions)
+                    )
+                finally:
+                    loop.close()
+            else:
+                # Use standard build_graph function
+                graph_result = build_graph(note, analysis_type=analysis_type, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions)
+        finally:
+            signal.alarm(0)  # Cancel the alarm
+        
+        # Ensure the result has the expected format for frontend
+        result = {
+            'graph': {
+                'nodes': graph_result.get('nodes', []),
+                'links': graph_result.get('links', [])
+            },
+            'insights': graph_result.get('insights', {})
+        }
+        
+        return jsonify(result)
+    except TimeoutError:
+        return jsonify({"error": "Concept graph generation timed out. Please try with a shorter text or use AI reprocessing to reduce complexity."}), 408
+    except Exception as e:
+        print(f"Concept graph error: {str(e)}")
+        # Fallback to basic graph if enhanced version fails
+        try:
+            # Try with a more aggressive text truncation for fallback
+            truncated_note = note[:20000] if len(note) > 20000 else note
+            graph_result = build_concept_graph(truncated_note, analysis_type=analysis_type, exclusions=exclusions)
+            result = {
+                'graph': {
+                    'nodes': graph_result.get('nodes', []),
+                    'links': graph_result.get('links', [])
+                },
+                'insights': graph_result.get('insights', {})
+            }
+            return jsonify(result)
+        except Exception as fallback_error:
+            return jsonify({"error": f"Error generating graph: {str(fallback_error)}"}), 500
+
+
+@app.route('/api/concept-graph/ai-reprocess', methods=['POST'])
+def concept_graph_ai_reprocess():
+    """Reprocess concept graph nodes using AI to select only the most important concepts."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note = data.get('note', '')
+    current_nodes = data.get('current_nodes', [])
+    analysis_type = data.get('analysis_type', 'bridges')
+    language = data.get('language', 'en')
+    enable_lemmatization = data.get('enable_lemmatization', True)
+    
+    if not note or not current_nodes:
+        return jsonify({"error": "Note text and current nodes are required"}), 400
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Validate lemmatization setting
+    if not isinstance(enable_lemmatization, bool):
+        enable_lemmatization = True
+    
+    # Get user's configuration from the same file that frontend uses
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+                if not host or not port:
+                    return jsonify({"error": "LM Studio host and port not configured"}), 400
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+                if not host or not port:
+                    return jsonify({"error": "Ollama host and port not configured"}), 400
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured. Please configure an AI provider in settings."}), 400
+    
+    # Get API keys from environment variables (they're not stored in user config for security)
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the async AI reprocessing function
+            from ai_reprocess import ai_reprocess_nodes, build_graph_with_selected_nodes
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                filtered_nodes = loop.run_until_complete(
+                    ai_reprocess_nodes(note, current_nodes, analysis_type, ai_provider, 
+                                     api_key=None, ai_model=ai_model, host=host, port=port, language=language, enable_lemmatization=enable_lemmatization)
+                )
+            else:
+                filtered_nodes = loop.run_until_complete(
+                    ai_reprocess_nodes(note, current_nodes, analysis_type, ai_provider, 
+                                     api_key=api_key, language=language, enable_lemmatization=enable_lemmatization)
+                )
+            
+            # Regenerate graph with AI-filtered nodes
+            result = build_graph_with_selected_nodes(note, filtered_nodes, analysis_type, language=language, enable_lemmatization=enable_lemmatization)
+            
+            return jsonify(result)
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"AI reprocessing error: {str(e)}")
+        return jsonify({"error": f"AI reprocessing failed: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph/ai-suggestions', methods=['POST'])
+def concept_graph_ai_suggestions():
+    """Generate AI-based suggestions for bridging concepts, knowledge gaps, and exploration areas."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note = data.get('note', '')
+    current_nodes = data.get('current_nodes', [])
+    analysis_type = data.get('analysis_type', 'bridges')
+    language = data.get('language', 'en')
+    
+    if not note or not current_nodes:
+        return jsonify({"error": "Note text and current nodes are required"}), 400
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Get user's configuration from the same file that frontend uses (same as chat mode)
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file (same as ai_reprocess endpoint)
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+                if not host or not port:
+                    return jsonify({"error": "LM Studio host and port not configured"}), 400
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+                if not host or not port:
+                    return jsonify({"error": "Ollama host and port not configured"}), 400
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured. Please configure an AI provider in settings."}), 400
+    
+    # Get API keys from environment variables (they're not stored in user config for security)
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the AI suggestions function
+            from ai_suggestions import generate_ai_suggestions
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                suggestions = loop.run_until_complete(
+                    generate_ai_suggestions(note, current_nodes, analysis_type, ai_provider, 
+                                          api_key=None, ai_model=ai_model, host=host, port=port, language=language)
+                )
+            else:
+                suggestions = loop.run_until_complete(
+                    generate_ai_suggestions(note, current_nodes, analysis_type, ai_provider, 
+                                          api_key=api_key, ai_model=ai_model, language=language)
+                )
+            
+            return jsonify({"suggestions": suggestions})
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"AI suggestions error: {str(e)}")
+        return jsonify({"error": f"AI suggestions failed: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph/ai-single-suggestion', methods=['POST'])
+def concept_graph_ai_single_suggestion():
+    """Generate a single AI suggestion of the specified type."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note = data.get('note', '')
+    current_nodes = data.get('current_nodes', [])
+    suggestion_type = data.get('suggestion_type', 'bridge_concepts')
+    analysis_type = data.get('analysis_type', 'bridges')
+    language = data.get('language', 'en')
+    
+    if not note or not current_nodes:
+        return jsonify({"error": "Note text and current nodes are required"}), 400
+    
+    # Validate suggestion type
+    valid_types = ['bridge_concepts', 'knowledge_gaps', 'exploration_areas']
+    if suggestion_type not in valid_types:
+        suggestion_type = 'bridge_concepts'
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Get user's configuration (same as other AI endpoints)
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file (same as ai_reprocess endpoint)
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+                if not host or not port:
+                    return jsonify({"error": "LM Studio host and port not configured"}), 400
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+                if not host or not port:
+                    return jsonify({"error": "Ollama host and port not configured"}), 400
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured. Please configure an AI provider in settings."}), 400
+    
+    # Get API keys from environment variables (they're not stored in user config for security)
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the single suggestion function
+            from ai_suggestions import generate_single_ai_suggestion
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                suggestion = loop.run_until_complete(
+                    generate_single_ai_suggestion(note, current_nodes, suggestion_type, analysis_type, ai_provider, 
+                                                api_key=None, ai_model=ai_model, host=host, port=port, language=language)
+                )
+            else:
+                suggestion = loop.run_until_complete(
+                    generate_single_ai_suggestion(note, current_nodes, suggestion_type, analysis_type, ai_provider, 
+                                                api_key=api_key, ai_model=ai_model, language=language)
+                )
+            
+            if suggestion:
+                return jsonify({"suggestion": suggestion})
+            else:
+                return jsonify({"error": "Failed to generate suggestion"}), 500
+                
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"Single AI suggestion error: {str(e)}")
+        return jsonify({"error": f"Single suggestion failed: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph/ai-custom-suggestion', methods=['POST'])
+def concept_graph_ai_custom_suggestion():
+    """Generate a custom AI suggestion based on user question."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    question = data.get('question', '')
+    note = data.get('note', '')
+    current_nodes = data.get('current_nodes', [])
+    language = data.get('language', 'en')
+    
+    if not question or not note:
+        return jsonify({"error": "Question and note text are required"}), 400
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Get user's configuration (same as chat mode)
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file (same as ai_reprocess endpoint)
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+                if not host or not port:
+                    return jsonify({"error": "LM Studio host and port not configured"}), 400
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+                if not host or not port:
+                    return jsonify({"error": "Ollama host and port not configured"}), 400
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured. Please configure an AI provider in settings."}), 400
+    
+    # Get API keys from environment variables (they're not stored in user config for security)
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the custom suggestion function
+            from ai_suggestions import generate_custom_suggestion
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                suggestion = loop.run_until_complete(
+                    generate_custom_suggestion(question, note, current_nodes, ai_provider, 
+                                             api_key=None, ai_model=ai_model, host=host, port=port, language=language)
+                )
+            else:
+                suggestion = loop.run_until_complete(
+                    generate_custom_suggestion(question, note, current_nodes, ai_provider, 
+                                             api_key=api_key, ai_model=ai_model, language=language)
+                )
+            
+            if suggestion:
+                return jsonify({
+                    "suggestion": suggestion,
+                    "type": "custom",
+                    "question": question
+                })
+            else:
+                return jsonify({"error": "Failed to generate suggestion"}), 500
+                
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"Custom AI suggestion error: {str(e)}")
+        return jsonify({"error": f"Custom suggestion failed: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph/ai-custom-suggestion-stream', methods=['POST'])
+def concept_graph_ai_custom_suggestion_stream():
+    """Generate a custom AI suggestion with streaming response."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    question = data.get('question', '')
+    note = data.get('note', '')
+    current_nodes = data.get('current_nodes', [])
+    language = data.get('language', 'en')
+    
+    if not question or not note:
+        return jsonify({"error": "Question and note text are required"}), 400
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Get user's configuration (same as chat mode)
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file (same as chat mode)
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured. Please configure an AI provider in settings."}), 400
+    
+    # Get API keys from environment variables (they're not stored in user config for security)
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    # Extract node labels for context
+    node_labels = []
+    for node in current_nodes:
+        if isinstance(node, dict):
+            node_labels.append(node.get('label', ''))
+        else:
+            node_labels.append(str(node))
+    
+    # Create custom prompt for streaming
+    if language == 'spanish':
+        prompt = f"""Basándote en el siguiente texto y conceptos, responde la pregunta del usuario de manera específica y útil.
+
+TEXTO:
+{note[:1000]}...
+
+CONCEPTOS ACTUALES:
+{', '.join(node_labels)}
+
+PREGUNTA DEL USUARIO:
+{question}
+
+INSTRUCCIONES:
+- Responde de manera específica y útil
+- Relaciona tu respuesta con los conceptos existentes cuando sea relevante
+- Proporciona ideas prácticas y accionables
+- Mantén un enfoque analítico y constructivo
+- Responde en español"""
+    else:
+        prompt = f"""Based on the following text and concepts, answer the user's question in a specific and helpful way.
+
+TEXT:
+{note[:1000]}...
+
+CURRENT CONCEPTS:
+{', '.join(node_labels)}
+
+USER QUESTION:
+{question}
+
+INSTRUCTIONS:
+- Answer specifically and helpfully
+- Relate your answer to existing concepts when relevant
+- Provide practical and actionable ideas
+- Maintain an analytical and constructive focus
+- Respond in English"""
+    
+    # Create messages for streaming (same format as chat mode)
+    messages = [{"role": "user", "content": prompt}]
+    
+    # Use the same streaming functions as chat mode
+    try:
+        if ai_provider == 'openai':
+            return chat_openai_stream(messages, ai_model)
+        elif ai_provider == 'google':
+            return chat_google_stream(messages, ai_model)
+        elif ai_provider == 'openrouter':
+            return chat_openrouter_stream(messages, ai_model)
+        elif ai_provider == 'groq':
+            return chat_groq_stream(messages, ai_model)
+        elif ai_provider == 'lmstudio':
+            return chat_lmstudio_stream(messages, ai_model, host, port)
+        elif ai_provider == 'ollama':
+            return chat_ollama_stream(messages, ai_model, host, port)
+        else:
+            return jsonify({"error": "Provider not supported for streaming"}), 400
+    except Exception as e:
+        print(f"Streaming AI suggestion error: {str(e)}")
+        return jsonify({"error": f"Streaming suggestion failed: {str(e)}"}), 500
+
+
+@app.route('/api/concept-exclusions', methods=['GET'])
+def get_concept_exclusions():
+    """Get user's concept exclusion list."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        exclusions_str = get_user_preference(username, 'concept_exclusions')
+        if exclusions_str:
+            exclusions = [word.strip() for word in exclusions_str.split(',') if word.strip()]
+        else:
+            exclusions = []
+        
+        return jsonify({"exclusions": exclusions})
+    except Exception as e:
+        print(f"Error getting concept exclusions: {str(e)}")
+        return jsonify({"error": "Failed to get concept exclusions"}), 500
+
+
+@app.route('/api/concept-exclusions', methods=['POST'])
+def set_concept_exclusions():
+    """Set user's concept exclusion list."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    exclusions = data.get('exclusions', [])
+    
+    # Validate that exclusions is a list
+    if not isinstance(exclusions, list):
+        return jsonify({"error": "Exclusions must be a list"}), 400
+    
+    # Clean and validate exclusions
+    cleaned_exclusions = []
+    for word in exclusions:
+        if isinstance(word, str) and word.strip():
+            # Basic validation - no special characters except spaces, hyphens, apostrophes
+            cleaned_word = word.strip().lower()
+            if re.match(r"^[a-zA-Z0-9\s\-'áéíóúüñ]+$", cleaned_word):
+                cleaned_exclusions.append(cleaned_word)
+    
+    try:
+        # Save as comma-separated string
+        exclusions_str = ','.join(cleaned_exclusions)
+        set_user_preference(username, 'concept_exclusions', exclusions_str)
+        
+        return jsonify({
+            "success": True, 
+            "exclusions": cleaned_exclusions,
+            "message": f"Saved {len(cleaned_exclusions)} concept exclusions"
+        })
+    except Exception as e:
+        print(f"Error setting concept exclusions: {str(e)}")
+        return jsonify({"error": "Failed to save concept exclusions"}), 500
+
+
 @app.route('/api/app-config', methods=['GET'])
 def app_config():
     """Return basic frontend configuration"""
@@ -3286,6 +4039,71 @@ def upload_note():
         return jsonify({"success": True, "filename": filename, "overwritten": overwritten})
     except Exception as e:
         return jsonify({"error": f"Error al subir nota: {str(e)}"}), 500
+
+@app.route('/api/upload-pdf', methods=['POST'])
+def upload_pdf():
+    """Upload and convert PDF/TXT file to markdown text"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if 'file' not in request.files:
+            return jsonify({"error": "No file provided"}), 400
+
+        uploaded_file = request.files['file']
+        if uploaded_file.filename == '':
+            return jsonify({"error": "No file selected"}), 400
+
+        # Check file extension
+        ext = os.path.splitext(uploaded_file.filename)[1].lower()
+        if ext not in ['.pdf', '.txt']:
+            return jsonify({"error": "Only PDF and TXT files are supported"}), 400
+
+        # Read file content
+        file_content = uploaded_file.read()
+        
+        try:
+            if ext == '.txt':
+                # For TXT files, simply decode the content
+                extracted_text = file_content.decode('utf-8')
+            else:
+                # For PDF files, use markitdown
+                try:
+                    from markitdown import MarkItDown
+                    md = MarkItDown()
+                    
+                    # Create a temporary file for markitdown to process
+                    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
+                        tmp_file.write(file_content)
+                        tmp_file_path = tmp_file.name
+                    
+                    try:
+                        result = md.convert(tmp_file_path)
+                        extracted_text = result.text_content
+                    finally:
+                        # Clean up temporary file
+                        os.unlink(tmp_file_path)
+                        
+                except ImportError:
+                    return jsonify({"error": "PDF processing not available. markitdown is not installed."}), 500
+                except Exception as e:
+                    return jsonify({"error": f"Failed to process PDF: {str(e)}"}), 500
+
+            # Clean up the extracted text (remove excessive whitespace)
+            extracted_text = re.sub(r'\n\s*\n\s*\n', '\n\n', extracted_text.strip())
+            
+            return jsonify({
+                "success": True, 
+                "text": extracted_text,
+                "filename": uploaded_file.filename
+            })
+            
+        except UnicodeDecodeError:
+            return jsonify({"error": "Unable to decode text file. Please ensure it's in UTF-8 format."}), 400
+            
+    except Exception as e:
+        return jsonify({"error": f"Error processing file: {str(e)}"}), 500
 
 def _transcribe_bytes(audio_bytes, filename, language, provider, model=None,
                       detect_emotion=True, detect_events=True, use_itn=True,

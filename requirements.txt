@@ -5,6 +5,7 @@ python-dotenv
 pydub
 librosa
 soundfile
+aiohttp
 # Optional dependencies for SenseVoice (installed on-demand)
 torch>=2.0.0
 funasr
@@ -16,7 +17,13 @@ argon2-cffi
 mermaid-py
 markdownify
 beautifulsoup4
+markitdown[pdf]
 # Dependencies for speaker diarization
 pyannote.audio
 torchaudio
 numpy
+networkx
+# For lemmatization support in concept graphs
+nltk
+# For AI-enhanced concept graph
+aiohttp

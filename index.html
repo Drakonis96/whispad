@@ -56,9 +56,14 @@
     <div id="app-content" class="hidden">
     <!-- App Header -->
     <header class="app-header">
-        <div class="app-brand">
-            <img src="/logos/logo.png" alt="WhisPad Logo" class="app-logo">
-            <h1 class="app-title">WhisPad</h1>
+        <div class="header-left">
+            <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
+                <span></span><span></span><span></span>
+            </button>
+            <div class="app-brand">
+                <img src="/logos/logo.png" alt="WhisPad Logo" class="app-logo">
+                <h1 class="app-title">WhisPad</h1>
+            </div>
         </div>
         <div class="header-actions">
             <button class="btn btn--outline btn--sm admin-only" id="upload-models-btn" title="Manage whisper.cpp models">
@@ -71,9 +76,8 @@
                 <i class="fas fa-users"></i>&nbsp;<span class="header-btn-text">Users</span>
             </button>
             <button class="btn btn--outline btn--sm hidden" id="current-user-btn"><span class="header-btn-text" id="current-user-text"></span></button>
-            <button class="btn btn--error btn--sm hidden" id="logout-btn"><span class="header-btn-text">Logout</span></button>
-            <button class="hamburger-menu" id="hamburger-menu" aria-label="Show/Hide notes menu">
-                <span></span><span></span><span></span>
+            <button class="btn btn--error btn--sm hidden" id="logout-btn" title="Logout">
+                <i class="fas fa-sign-out-alt"></i>&nbsp;<span class="header-btn-text">Logout</span>
             </button>
         </div>
     </header>
@@ -85,15 +89,15 @@
             <div class="sidebar-header">
                 <div class="header-top">
                     <h2>My Notes</h2>
-                    <button class="btn btn--primary btn--sm" id="new-note-btn">
-                        <i class="fas fa-plus"></i>&nbsp;New Note
-                    </button>
                 </div>
                 <div class="notes-actions">
-                    <button class="btn btn--outline btn--sm" id="download-all-btn" title="Download all notes">
-                        <i class="fas fa-file-zipper"></i>&nbsp;Download All
+                    <button class="btn btn--primary btn--sm notes-action-btn" id="new-note-btn">
+                        <i class="fas fa-plus"></i>&nbsp;New Note
                     </button>
-                    <button class="btn btn--outline btn--sm" id="restore-btn" title="Restore notes from files">
+                    <button class="btn btn--outline btn--sm notes-action-btn" id="download-all-btn" title="Backup all notes">
+                        <i class="fas fa-file-zipper"></i>&nbsp;Backup
+                    </button>
+                    <button class="btn btn--outline btn--sm notes-action-btn" id="restore-btn" title="Restore notes from files">
                         <i class="fas fa-upload"></i>&nbsp;Restore
                     </button>
                 </div>
@@ -150,11 +154,14 @@
                         <button class="btn btn--outline btn--sm" id="chat-sidebar-toggle" title="Chat assistant">
                             <i class="fas fa-comments"></i>&nbsp;Chat
                         </button>
+                        <button class="btn btn--outline btn--sm" id="files-btn" title="Files">
+                            <i class="fas fa-folder"></i>&nbsp;Files
+                        </button>
                         <button class="btn btn--outline btn--sm" id="graph-btn" title="Graph view">
                             <i class="fas fa-project-diagram"></i>&nbsp;Graph
                         </button>
-                        <button class="btn btn--outline btn--sm" id="files-btn" title="Files">
-                            <i class="fas fa-folder"></i>&nbsp;Files
+                        <button class="btn btn--outline btn--sm" id="concept-graph-btn" title="Concept map">
+                            <i class="fas fa-network-wired"></i>&nbsp;Concept
                         </button>
                     </div>
                     </div>
@@ -190,6 +197,9 @@
                     <div class="section-header">
                         <input type="text" class="form-control note-title" id="note-title" placeholder="Note title...">
                         <div class="editor-actions section-content">
+                            <button class="btn btn--outline btn--sm" id="upload-pdf-btn">
+                                <i class="fas fa-file-pdf"></i>&nbsp;<span id="upload-pdf-text">Upload PDF</span>
+                            </button>
                             <button class="btn btn--outline btn--sm" id="save-btn">
                                 <i class="fas fa-save"></i>&nbsp;<span id="save-text">Save</span>
                             </button>
@@ -351,6 +361,179 @@
                 </button>
                 <button class="btn btn--outline btn--sm" id="download-graph-btn">Download</button>
                 <button class="btn btn--outline btn--sm" id="close-graph-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Concept graph modal -->
+    <div class="modal" id="concept-graph-modal">
+        <div class="modal-content modal-content--fullscreen">
+            <div class="concept-graph-layout">
+                <div class="concept-graph-left-sidebar">
+                    <div class="node-info-panel" id="node-info-panel">
+                        <h4>Node Details</h4>
+                        <div class="node-details" id="node-details">
+                            <p class="no-selection">Click on a node to view its details</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="concept-graph-main">
+                    <div class="concept-graph-container" id="concept-graph-container"></div>
+                    <div class="graph-controls-bottom" id="graph-controls-bottom">
+                        <div class="slider-control">
+                            <label for="max-nodes-slider">Max Nodes: <span id="max-nodes-value">50</span></label>
+                            <input type="range" id="max-nodes-slider" min="10" max="100" value="50" step="5">
+                        </div>
+                        <div class="slider-control">
+                            <label for="node-degree-slider">Min Node Degree: <span id="node-degree-value">1</span></label>
+                            <input type="range" id="node-degree-slider" min="1" max="10" value="1" step="1">
+                        </div>
+                        <div class="slider-control">
+                            <label for="text-size-slider">Min Text Size: <span id="text-size-value">8</span></label>
+                            <input type="range" id="text-size-slider" min="6" max="20" value="8" step="1">
+                        </div>
+                    </div>
+                </div>
+                <div class="concept-graph-sidebar">
+                    <div class="analysis-controls">
+                        <h4>Note Scope</h4>
+                        <div class="scope-controls">
+                            <select class="form-control" id="concept-note-scope">
+                                <option value="current" selected>Selected note</option>
+                                <option value="all">All notes</option>
+                                <option value="tagged">Only notes with tag(s)</option>
+                            </select>
+                        </div>
+                        <button class="btn btn--outline btn--sm refresh-btn" id="refresh-concept-graph" title="Refresh graph" style="margin-top: 8px;">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                        
+                        <div class="tag-selection-container hidden" id="tag-selection-container">
+                            <h5>Select Tags</h5>
+                            <div class="tag-filter-checkboxes" id="concept-tag-filter"></div>
+                        </div>
+                        
+                        <h4 style="margin-top: 16px;">Analysis Type</h4>
+                        <select class="form-control" id="concept-analysis-type">
+                            <option value="bridges" selected>Bridges (Betweenness)</option>
+                            <option value="hubs">Hubs (Degree)</option>
+                            <option value="global">Global (Combined)</option>
+                            <option value="local">Local (Clustering)</option>
+                        </select>
+                        
+                        <h4 style="margin-top: 16px;">Language</h4>
+                        <select class="form-control" id="concept-language">
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                        </select>
+                        
+                        <h4 style="margin-top: 16px;">Processing Options</h4>
+                        <div class="checkbox-group" style="margin-bottom: 12px;">
+                            <input type="checkbox" id="concept-lemmatization" checked>
+                            <label for="concept-lemmatization">Enable lemmatization</label>
+                        </div>
+                        <div class="help-text" style="font-size: 0.85em; color: var(--color-text-secondary); margin-bottom: 12px;">
+                            Lemmatization reduces words to their base forms (e.g., "running" → "run") to improve concept grouping and analysis accuracy.
+                        </div>
+                        
+                        <button class="btn btn--primary btn--sm" id="regenerate-concept-graph" style="margin-top: 8px;">
+                            <i class="fas fa-sync"></i>&nbsp;Regenerate
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-reprocess-btn" id="ai-reprocess-btn">
+                            <i class="fas fa-robot"></i>&nbsp;Reprocess with AI
+                        </button>
+                        <button class="btn btn--tertiary btn--sm ai-suggestions-btn" id="ai-suggestions-btn">
+                            <i class="fas fa-lightbulb"></i>&nbsp;AI Suggestions
+                        </button>
+                        <button class="btn btn--outline btn--sm concept-removal-btn" id="concept-removal-btn">
+                            <i class="fas fa-filter"></i>&nbsp;Concept removal
+                        </button>
+                    </div>
+                    <div class="graph-info-panel">
+                        <h4>Graph Overview</h4>
+                        <div class="map-insights" id="map-insights"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline btn--sm" id="close-concept-graph-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Suggestions floating window -->
+    <div class="ai-suggestions-window hidden" id="ai-suggestions-window">
+        <div class="ai-suggestions-header">
+            <div class="ai-suggestions-title">
+                <i class="fas fa-lightbulb"></i>
+                <span>AI Suggestions</span>
+            </div>
+            <div class="ai-suggestions-controls">
+                <button class="btn btn--icon" id="minimize-suggestions" title="Minimize">
+                    <i class="fas fa-minus"></i>
+                </button>
+                <button class="btn btn--icon" id="close-suggestions" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="ai-suggestions-content">
+            <div class="suggestions-navigation">
+                <button class="btn btn--sm btn--outline" id="prev-suggestion" title="Previous suggestion">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="suggestion-counter" id="suggestion-counter">1 / 1</span>
+                <button class="btn btn--sm btn--outline" id="next-suggestion" title="Next suggestion">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="suggestion-content" id="suggestion-content">
+                <div class="suggestion-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Generating AI suggestions...</span>
+                </div>
+            </div>
+            <div class="suggestion-input-area">
+                <div class="suggestion-input-container">
+                    <input type="text" class="form-control" id="suggestion-question" 
+                           placeholder="Ask AI about bridging concepts, knowledge gaps..." />
+                    <button class="btn btn--primary btn--sm" id="ask-suggestion">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Concept removal modal -->
+    <div class="modal" id="concept-removal-modal">
+        <div class="modal-content">
+            <h3>Concept Removal Settings</h3>
+            <div class="modal-body">
+                <p>Enter words or phrases (separated by commas) that should be excluded from concept graph generation:</p>
+                <div class="concept-exclusion-container">
+                    <textarea class="form-control" id="concept-exclusions-input" 
+                              placeholder="e.g., the, and, very, really, technology, system..."
+                              rows="4"></textarea>
+                    <div class="help-text" style="margin-top: 8px; font-size: 0.85em; color: var(--color-text-secondary);">
+                        <i class="fas fa-info-circle"></i> 
+                        These exclusions will be applied to all your concept graphs. Words will be matched case-insensitively.
+                    </div>
+                </div>
+                <div class="concept-exclusion-stats" id="concept-exclusion-stats" style="margin-top: 12px;">
+                    <div class="exclusion-count">
+                        <strong>Current exclusions:</strong> <span id="exclusion-count">0</span>
+                    </div>
+                </div>
+                <div class="loading-indicator hidden" id="concept-exclusion-loading">
+                    <i class="fas fa-spinner fa-spin"></i> Saving...
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline btn--sm" id="cancel-concept-removal">Cancel</button>
+                <button class="btn btn--primary btn--sm" id="save-concept-exclusions">
+                    <i class="fas fa-save"></i>&nbsp;Save Changes
+                </button>
             </div>
         </div>
     </div>
@@ -847,6 +1030,35 @@
         </div>
     </div>
 
+    <!-- Upload PDF modal -->
+    <div class="modal" id="upload-pdf-modal">
+        <div class="modal-content">
+            <h3>Upload PDF/TXT File</h3>
+            <div class="modal-body">
+                <p class="modal-description">Select a PDF or TXT file to extract its text and insert it into the current note.</p>
+                <div class="upload-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This will replace all current note content with the extracted text from the file.
+                </div>
+                <div class="drop-zone" id="pdf-drop-zone">
+                    <i class="fas fa-file-pdf"></i>
+                    <p>Drop PDF or TXT file here or click to select</p>
+                </div>
+                <input type="file" id="pdf-file-input" accept=".pdf,.txt" style="display:none">
+                
+                <!-- Progress section -->
+                <div class="upload-progress-section" id="pdf-upload-progress-section" style="display:none;">
+                    <h4>Processing File</h4>
+                    <div class="file-upload-list" id="pdf-upload-list"></div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-upload-pdf">Cancel</button>
+                <button class="btn btn--primary" id="confirm-upload-pdf" disabled>Upload & Replace Content</button>
+            </div>
+        </div>
+    </div>
+
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
@@ -869,12 +1081,16 @@
         <button class="mobile-tool-btn" data-target="graph-btn" aria-label="Graph">
             <i class="fas fa-project-diagram"></i>
         </button>
+        <button class="mobile-tool-btn" data-target="concept-graph-btn" aria-label="Concept">
+            <i class="fas fa-network-wired"></i>
+        </button>
         <button class="mobile-tool-btn" data-target="files-btn" aria-label="Files">
             <i class="fas fa-folder"></i>
         </button>
     </div>
     </div> <!-- end app-content -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="/backend-api.js"></script>
     <script src="/app.js"></script>
 </body>
