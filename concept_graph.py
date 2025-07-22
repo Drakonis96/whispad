@@ -3,6 +3,7 @@ import itertools
 import networkx as nx
 from collections import Counter
 import math
+import unicodedata
 
 # Import NLTK for lemmatization support
 try:
@@ -35,6 +36,12 @@ if NLTK_AVAILABLE:
             print(f"Warning: Could not download NLTK data: {e}")
             NLTK_AVAILABLE = False
 
+# Helper for accent-insensitive comparisons
+def normalize_word(word: str) -> str:
+    """Return a lowercase, accent-free version of the given word."""
+    nfkd_form = unicodedata.normalize('NFD', word)
+    return ''.join(c for c in nfkd_form if unicodedata.category(c) != 'Mn').lower()
+
 # Extended stopwords including common academic and generic terms
 STOPWORDS = {
     # Articles and common words
@@ -54,6 +61,7 @@ STOPWORDS = {
     'only','even','still','yet','already','now','then','soon','later','early','late','today','tomorrow',
     'yesterday','however','therefore','thus','hence','moreover','furthermore','nevertheless','nonetheless',
     'meanwhile','otherwise','instead','besides','indeed','certainly','perhaps','maybe','probably','possibly',
+    'various','numerous','multiple','overall','specific',
     
     # Pronouns (all forms)
     'i','me','my','mine','myself','you','your','yours','yourself','yourselves','he','him','his','himself',
@@ -145,6 +153,7 @@ STOPWORDS_SPANISH = {
     'sesenta','setenta','ochenta','noventa','cien','mil','millón','billón','primero','segundo','tercero',
     'cuarto','quinto','sexto','séptimo','octavo','noveno','décimo','algunos','varios','muchos','pocos',
     'todos','ninguno','cada','cualquier','ambos','ningún','algún','cierto','cierta','ciertos','ciertas',
+    'numeroso','numerosa','numerosos','numerosas','diverso','diversa','diversos','diversas','usted','ustedes',
     
     # Time and space
     'hoy','ayer','mañana','ahora','antes','después','luego','entonces','pronto','tarde','temprano',
@@ -162,12 +171,16 @@ STOPWORDS_SPANISH = {
     'por qué','para qué','ah','oh','uf','ay','vaya','caramba','dios mío','por dios'
 }
 
+# Build accent-insensitive stopword sets
+STOPWORDS_NORMALIZED = {normalize_word(w) for w in STOPWORDS}
+STOPWORDS_SPANISH_NORMALIZED = {normalize_word(w) for w in STOPWORDS_SPANISH}
+
 def get_stopwords(language='english'):
     """Get stopwords for the specified language."""
     if language.lower() in ['spanish', 'es', 'español']:
-        return STOPWORDS_SPANISH
+        return STOPWORDS_SPANISH_NORMALIZED
     else:
-        return STOPWORDS  # Default to English
+        return STOPWORDS_NORMALIZED  # Default to English
 
 def get_wordnet_pos(treebank_tag):
     """Convert treebank POS tag to wordnet POS tag for lemmatization."""
@@ -583,7 +596,7 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
     # Language-specific technical terms and stopwords
     if language.lower() in ['spanish', 'es', 'español']:
         # Enhanced Spanish stopwords (more comprehensive)
-        spanish_stopwords = {
+        spanish_stopwords = {normalize_word(w) for w in {
             # Articles
             'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
             # Prepositions  
@@ -615,7 +628,7 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
             'nuevo', 'nueva', 'viejo', 'vieja', 'grande', 'pequeño', 'pequeña',
             'bueno', 'buena', 'malo', 'mala', 'mismo', 'misma', 'otro', 'otra',
             'igual', 'diferente', 'similar', 'tal', 'cada', 'cualquier',
-        }
+        }}
         
         technical_terms = {
             # Spanish technical vocabulary
@@ -719,14 +732,16 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
             
             # Process all remaining words with lemmatization
             for word in words:
-                if (len(word) >= 3 and 
-                    word not in stopwords and 
+                norm_word = normalize_word(word)
+                if (len(norm_word) >= 3 and
+                    norm_word not in stopwords and
                     word not in technical_terms and  # Already processed
                     not word.endswith('_') and  # Skip compound tokens
                     word.isalpha()):
-                    
+
                     lemmatized = lemmatize_word(word, language, enable_lemmatization)
-                    if lemmatized not in stopwords and len(lemmatized) >= 3:
+                    lem_norm = normalize_word(lemmatized)
+                    if lem_norm not in stopwords and len(lem_norm) >= 3:
                         # Boost frequency for domain-relevant terms
                         boost = 1
                         if any(keyword in lemmatized for keyword in 
@@ -743,9 +758,11 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
     filtered_terms = []
     
     for term, freq in term_freq.items():
-        if (freq >= min_freq and 
-            len(term) >= min_length and 
-            len(term) <= max_length):  # Allow longer compound terms
+        term_norm = normalize_word(term)
+        if (freq >= min_freq and
+            len(term_norm) >= min_length and
+            len(term_norm) <= max_length and
+            term_norm not in stopwords):  # Allow longer compound terms
             filtered_terms.append(term)
     
     # Ensure all compound terms are preserved regardless of frequency
@@ -852,9 +869,10 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
         
         # Apply semantic filters for single words
         for word in words:
-            if (len(word) >= min_length and len(word) <= max_length and
-                word not in stopwords and
-                is_meaningful_word(word, language)):
+            norm_word = normalize_word(word)
+            if (len(norm_word) >= min_length and len(norm_word) <= max_length and
+                norm_word not in stopwords and
+                is_meaningful_word(norm_word, language)):
                 terms.append(word)
                 term_counter[word] = term_counter.get(word, 0) + 1
     
@@ -868,13 +886,14 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
     # Enhanced filtering for meaningful terms
     filtered_terms = []
     for term in frequent_terms:
+        term_norm = normalize_word(term)
         # Skip stopwords and short/long terms
-        if (term not in stopwords and 
-            min_length <= len(term) <= max_length and
-            not term.isdigit() and
-            not re.match(r'^[a-z]{1,2}$', term) and  # Skip single/double letters
-            is_content_word(term, language)):
-            
+        if (term_norm not in stopwords and
+            min_length <= len(term_norm) <= max_length and
+            not term_norm.isdigit() and
+            not re.match(r'^[a-z]{1,2}$', term_norm) and  # Skip single/double letters
+            is_content_word(term_norm, language)):
+
             filtered_terms.append(term)
     
     # Apply user exclusions (filter out excluded words/phrases)
@@ -899,6 +918,7 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
 
 def is_meaningful_word(word, language='english'):
     """Check if a word is semantically meaningful."""
+    word = normalize_word(word)
     # Skip words that are mostly inflected forms without semantic value
     if language.lower() in ['spanish', 'es', 'español']:
         # Spanish-specific inflection patterns
@@ -943,6 +963,7 @@ def is_meaningful_word(word, language='english'):
 
 def is_content_word(term, language='english'):
     """Check if a term is a content word (noun, verb, adjective, adverb with semantic meaning)."""
+    term = normalize_word(term)
     # Language-specific generic terms
     if language.lower() in ['spanish', 'es', 'español']:
         generic_terms = {
