@@ -3,6 +3,7 @@ import itertools
 import networkx as nx
 from collections import Counter
 import math
+import unicodedata
 
 # Import NLTK for lemmatization support
 try:
@@ -34,6 +35,16 @@ if NLTK_AVAILABLE:
         except Exception as e:
             print(f"Warning: Could not download NLTK data: {e}")
             NLTK_AVAILABLE = False
+
+# Helper functions for text normalization
+def normalize_word(word: str) -> str:
+    """Normalize a word by removing accents and converting to lowercase."""
+    nfkd = unicodedata.normalize("NFKD", word)
+    return "".join(c for c in nfkd if not unicodedata.combining(c)).lower()
+
+def normalize_set(words):
+    """Return a set with all words normalized."""
+    return {normalize_word(w) for w in words}
 
 # Extended stopwords including common academic and generic terms
 STOPWORDS = {
@@ -162,12 +173,16 @@ STOPWORDS_SPANISH = {
     'por qué','para qué','ah','oh','uf','ay','vaya','caramba','dios mío','por dios'
 }
 
+# Normalized versions for accent-insensitive comparison
+STOPWORDS_NORMALIZED = normalize_set(STOPWORDS)
+STOPWORDS_SPANISH_NORMALIZED = normalize_set(STOPWORDS_SPANISH)
+
 def get_stopwords(language='english'):
     """Get stopwords for the specified language."""
     if language.lower() in ['spanish', 'es', 'español']:
-        return STOPWORDS_SPANISH
+        return STOPWORDS_SPANISH_NORMALIZED
     else:
-        return STOPWORDS  # Default to English
+        return STOPWORDS_NORMALIZED  # Default to English
 
 def get_wordnet_pos(treebank_tag):
     """Convert treebank POS tag to wordnet POS tag for lemmatization."""
@@ -353,7 +368,7 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
         exclusions = []
     
     # Convert exclusions to lowercase for case-insensitive matching
-    exclusions_lower = [exc.lower() for exc in exclusions]
+    exclusions_lower = [normalize_word(exc) for exc in exclusions]
     
     # Initialize language detection variables
     spanish_count = 0
@@ -682,10 +697,12 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
         }
     
     # Extract technical terms
-    words = re.findall(r'\b[a-zA-Z]{3,}\b', text_processed)
+    technical_terms_normalized = {normalize_word(t) for t in technical_terms}
+    words = re.findall(r'\b[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]{3,}\b', text_processed)
     for word in words:
-        if word in technical_terms and not word.endswith('_'):
-            term_freq[word] += 1
+        norm_word = normalize_word(word)
+        if norm_word in technical_terms_normalized and not word.endswith('_'):
+            term_freq[norm_word] += 1
     
     # Method 3: Enhanced extraction with language-specific stopwords
     stopwords = get_stopwords(language)
@@ -719,21 +736,23 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
             
             # Process all remaining words with lemmatization
             for word in words:
-                if (len(word) >= 3 and 
-                    word not in stopwords and 
-                    word not in technical_terms and  # Already processed
+                norm_word = normalize_word(word)
+                if (len(norm_word) >= 3 and
+                    norm_word not in stopwords and
+                    norm_word not in technical_terms_normalized and  # Already processed
                     not word.endswith('_') and  # Skip compound tokens
                     word.isalpha()):
-                    
+
                     lemmatized = lemmatize_word(word, language, enable_lemmatization)
-                    if lemmatized not in stopwords and len(lemmatized) >= 3:
+                    norm_lemma = normalize_word(lemmatized)
+                    if norm_lemma not in stopwords and len(norm_lemma) >= 3:
                         # Boost frequency for domain-relevant terms
                         boost = 1
-                        if any(keyword in lemmatized for keyword in 
-                               ['tech', 'data', 'system', 'manage', 'develop', 
+                        if any(keyword in lemmatized for keyword in
+                               ['tech', 'data', 'system', 'manage', 'develop',
                                 'design', 'create', 'build', 'implement', 'analyze']):
                             boost = 2
-                        term_freq[lemmatized] += boost
+                        term_freq[norm_lemma] += boost
         
         except Exception as e:
             print(f"NLTK processing error: {e}")
@@ -758,13 +777,12 @@ def extract_high_quality_terms(text, min_length=3, max_length=50, language='engl
     if exclusions_lower:
         final_terms = []
         for term in filtered_terms:
-            term_lower = term.lower()
+            term_lower = normalize_word(term)
             # Check if the term or any part of it matches exclusions
             excluded = False
             for exclusion in exclusions_lower:
-                if (exclusion in term_lower or term_lower in exclusion or 
-                    # Check for word boundary matches
-                    any(word in exclusions_lower for word in term_lower.split())):
+                if (exclusion in term_lower or term_lower in exclusion or
+                    any(normalize_word(word) in exclusions_lower for word in term_lower.split())):
                     excluded = True
                     break
             if not excluded:
@@ -779,7 +797,7 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
         exclusions = []
     
     # Convert exclusions to lowercase for case-insensitive matching
-    exclusions_lower = [exc.lower() for exc in exclusions]
+    exclusions_lower = [normalize_word(exc) for exc in exclusions]
     
     stopwords = get_stopwords(language)
     
@@ -812,9 +830,9 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
         compound_terms = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', sentence)
         for term in compound_terms:
             if len(term.split()) <= 3 and len(term) >= min_length:
-                term_lower = term.lower()
-                terms.append(term_lower)
-                term_counter[term_lower] = term_counter.get(term_lower, 0) + 1
+                term_norm = normalize_word(term)
+                terms.append(term_norm)
+                term_counter[term_norm] = term_counter.get(term_norm, 0) + 1
         
         # Find specific important compound terms (case-insensitive)
         important_compounds = [
@@ -832,31 +850,32 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
                 term_counter[compound] = term_counter.get(compound, 0) + 1
         
         # Find hyphenated terms and compound words
-        hyphenated = re.findall(r'\b[a-zA-Z]+-[a-zA-Z]+(?:-[a-zA-Z]+)*\b', sentence)
+        hyphenated = re.findall(r'\b[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+-[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+(?:-[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+)*\b', sentence)
         for term in hyphenated:
             if len(term) >= min_length:
-                term_lower = term.lower()
-                terms.append(term_lower)
-                term_counter[term_lower] = term_counter.get(term_lower, 0) + 1
+                term_norm = normalize_word(term)
+                terms.append(term_norm)
+                term_counter[term_norm] = term_counter.get(term_norm, 0) + 1
         
         # Find domain-specific terms (words with numbers, technical patterns)
-        technical = re.findall(r'\b[a-zA-Z]*[0-9]+[a-zA-Z]*\b|\b[a-zA-Z]+[0-9]+\b', sentence)
+        technical = re.findall(r'\b[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]*[0-9]+[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]*\b|\b[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+[0-9]+\b', sentence)
         for term in technical:
             if len(term) >= min_length:
-                term_lower = term.lower()
-                terms.append(term_lower)
-                term_counter[term_lower] = term_counter.get(term_lower, 0) + 1
+                term_norm = normalize_word(term)
+                terms.append(term_norm)
+                term_counter[term_norm] = term_counter.get(term_norm, 0) + 1
         
         # Find single meaningful words with improved filtering
-        words = re.findall(r'\b[a-zA-Z]{3,}\b', sentence.lower())
+        words = re.findall(r'\b[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]{3,}\b', sentence.lower())
         
         # Apply semantic filters for single words
         for word in words:
-            if (len(word) >= min_length and len(word) <= max_length and
-                word not in stopwords and
-                is_meaningful_word(word, language)):
-                terms.append(word)
-                term_counter[word] = term_counter.get(word, 0) + 1
+            norm_word = normalize_word(word)
+            if (len(norm_word) >= min_length and len(norm_word) <= max_length and
+                norm_word not in stopwords and
+                is_meaningful_word(norm_word, language)):
+                terms.append(norm_word)
+                term_counter[norm_word] = term_counter.get(norm_word, 0) + 1
     
     # Early filtering: keep only terms that appear at least once and are meaningful
     frequent_terms = [term for term, count in term_counter.items() if count >= 1]
@@ -868,26 +887,26 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
     # Enhanced filtering for meaningful terms
     filtered_terms = []
     for term in frequent_terms:
+        norm_term = normalize_word(term)
         # Skip stopwords and short/long terms
-        if (term not in stopwords and 
-            min_length <= len(term) <= max_length and
+        if (norm_term not in stopwords and
+            min_length <= len(norm_term) <= max_length and
             not term.isdigit() and
-            not re.match(r'^[a-z]{1,2}$', term) and  # Skip single/double letters
-            is_content_word(term, language)):
-            
+            not re.match(r'^[a-z]{1,2}$', norm_term) and  # Skip single/double letters
+            is_content_word(norm_term, language)):
+
             filtered_terms.append(term)
     
     # Apply user exclusions (filter out excluded words/phrases)
     if exclusions_lower:
         final_filtered_terms = []
         for term in filtered_terms:
-            term_lower = term.lower()
+            term_lower = normalize_word(term)
             # Check if the term or any part of it matches exclusions
             excluded = False
             for exclusion in exclusions_lower:
-                if (exclusion in term_lower or term_lower in exclusion or 
-                    # Check for word boundary matches
-                    any(word in exclusions_lower for word in term_lower.split())):
+                if (exclusion in term_lower or term_lower in exclusion or
+                    any(normalize_word(word) in exclusions_lower for word in term_lower.split())):
                     excluded = True
                     break
             if not excluded:
@@ -899,50 +918,50 @@ def extract_key_terms(text, min_length=3, max_length=25, language='english', ena
 
 def is_meaningful_word(word, language='english'):
     """Check if a word is semantically meaningful."""
+    norm = normalize_word(word)
     # Skip words that are mostly inflected forms without semantic value
     if language.lower() in ['spanish', 'es', 'español']:
-        # Spanish-specific inflection patterns
-        if word.endswith(('ando', 'endo', 'ado', 'ido', 'ción', 'sión', 'mente')) and len(word) <= 7:
+        if norm.endswith(('ando', 'endo', 'ado', 'ido', 'cion', 'sion', 'mente')) and len(norm) <= 7:
             return False
     else:
-        # English inflection patterns
-        if word.endswith(('ing', 'ed', 'er', 'est', 'ly', 'tion', 'sion')) and len(word) <= 6:
+        if norm.endswith(('ing', 'ed', 'er', 'est', 'ly', 'tion', 'sion')) and len(norm) <= 6:
             return False
     
     # Skip words with repetitive characters (like 'aaa', 'hmm')
-    if len(set(word)) <= 2 and len(word) > 2:
+    if len(set(norm)) <= 2 and len(norm) > 2:
         return False
     
     # Language-specific auxiliary verbs and modal verbs
     if language.lower() in ['spanish', 'es', 'español']:
-        auxiliary_verbs = {'ser', 'estar', 'haber', 'tener', 'hacer', 'ir', 'venir', 'dar', 'decir', 'poder', 
-                          'deber', 'querer', 'saber', 'ver', 'poner', 'salir', 'llegar', 'pasar', 'seguir',
-                          'quedar', 'creer', 'llevar', 'dejar', 'sentir', 'volver', 'encontrar', 'parecer'}
+        auxiliary_verbs = normalize_set({'ser','estar','haber','tener','hacer','ir','venir','dar','decir','poder',
+                          'deber','querer','saber','ver','poner','salir','llegar','pasar','seguir',
+                          'quedar','creer','llevar','dejar','sentir','volver','encontrar','parecer'})
     else:
-        auxiliary_verbs = {'get', 'got', 'getting', 'gets', 'set', 'put', 'putting', 'puts', 
-                          'has', 'had', 'having', 'can', 'could', 'may', 'might', 'will', 
-                          'would', 'shall', 'should', 'must', 'ought', 'need', 'needs'}
+        auxiliary_verbs = normalize_set({'get','got','getting','gets','set','put','putting','puts',
+                          'has','had','having','can','could','may','might','will',
+                          'would','shall','should','must','ought','need','needs'})
     
-    if word in auxiliary_verbs:
+    if norm in auxiliary_verbs:
         return False
     
     # Language-specific intensifiers and qualifiers
     if language.lower() in ['spanish', 'es', 'español']:
-        qualifiers = {'muy', 'bastante', 'poco', 'mucho', 'demasiado', 'algo', 'nada', 'todo', 'realmente', 
-                     'verdaderamente', 'exactamente', 'aproximadamente', 'casi', 'apenas', 'solo',
-                     'únicamente', 'especialmente', 'particularmente', 'generalmente', 'normalmente'}
+        qualifiers = normalize_set({'muy','bastante','poco','mucho','demasiado','algo','nada','todo','realmente',
+                     'verdaderamente','exactamente','aproximadamente','casi','apenas','solo',
+                     'únicamente','especialmente','particularmente','generalmente','normalmente'})
     else:
-        qualifiers = {'very', 'quite', 'rather', 'pretty', 'really', 'truly', 'actually', 
-                     'basically', 'essentially', 'literally', 'definitely', 'absolutely',
-                     'completely', 'totally', 'entirely', 'fully', 'perfectly', 'exactly'}
+        qualifiers = normalize_set({'very','quite','rather','pretty','really','truly','actually',
+                     'basically','essentially','literally','definitely','absolutely',
+                     'completely','totally','entirely','fully','perfectly','exactly'})
     
-    if word in qualifiers:
+    if norm in qualifiers:
         return False
-    
+
     return True
 
 def is_content_word(term, language='english'):
     """Check if a term is a content word (noun, verb, adjective, adverb with semantic meaning)."""
+    norm_term = normalize_word(term)
     # Language-specific generic terms
     if language.lower() in ['spanish', 'es', 'español']:
         generic_terms = {
@@ -974,7 +993,8 @@ def is_content_word(term, language='english'):
             'person', 'people', 'individual', 'individuals', 'human', 'humans'
         }
     
-    if term in generic_terms:
+    generic_terms = normalize_set(generic_terms)
+    if norm_term in generic_terms:
         return False
     
     # Language-specific discourse markers and connectives
@@ -998,7 +1018,8 @@ def is_content_word(term, language='english'):
             'normally', 'commonly', 'frequently', 'often', 'sometimes', 'occasionally'
         }
     
-    if term in discourse_markers:
+    discourse_markers = normalize_set(discourse_markers)
+    if norm_term in discourse_markers:
         return False
     
     # Language-specific meta-language terms
@@ -1019,9 +1040,10 @@ def is_content_word(term, language='english'):
             'analyzed', 'examined', 'investigated', 'studied', 'researched'
         }
     
-    if term in meta_terms:
+    meta_terms = normalize_set(meta_terms)
+    if norm_term in meta_terms:
         return False
-    
+
     return True
 
 def calculate_term_importance(terms, text, max_sentences=100):
