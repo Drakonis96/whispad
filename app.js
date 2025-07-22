@@ -2901,7 +2901,11 @@ class NotesApp {
             .data(graph.nodes)
             .enter().append('circle')
             .attr('r', d => d.size || 8)
-            .attr('fill', (d, i) => color(i % 10))
+            .attr('fill', (d, i) => {
+                const col = color(i % 10);
+                d._color = col; // store original color for later reference
+                return col;
+            })
             .attr('stroke', '#fff')
             .attr('stroke-width', 2)
             .style('cursor', 'pointer')
@@ -3013,18 +3017,21 @@ class NotesApp {
                 }
             });
             
-            // Update graph styling
-            node.attr('fill', n => connectedNodes.has(n.id) ? '#d62728' : color(n.id % 10))
+            // Determine highlight color based on the clicked node
+            const highlightColor = d._color || color(graph.nodes.indexOf(d) % 10);
+
+            // Update graph styling using the clicked node's color
+            node.attr('fill', n => connectedNodes.has(n.id) ? highlightColor : '#ccc')
                 .style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
-            
-            link.attr('stroke', l => connectedLinks.has(l) ? '#d62728' : '#999')
+
+            link.attr('stroke', l => connectedLinks.has(l) ? highlightColor : '#ccc')
                 .attr('stroke-width', l => connectedLinks.has(l) ? (l.strength || 2) * 1.5 : l.strength || 1)
                 .style('opacity', l => connectedLinks.has(l) ? 1 : 0.2);
-            
+
             label.style('opacity', n => {
                 const shouldShow = connectedNodes.has(n.id) && n.showText !== false;
                 return shouldShow ? 1 : (n.showText !== false ? 0.3 : 0);
-            }).attr('fill', n => connectedNodes.has(n.id) ? '#d62728' : '#333');
+            }).attr('fill', '#333');
             
             // Show node details in sidebar
             this.renderNodeDetails(d, connectedNodeDetails);
@@ -3033,7 +3040,7 @@ class NotesApp {
         // Click on background to reset
         this.graphElements.svg.on('click', (event) => {
             if (event.target === this.graphElements.svg.node()) {
-                node.attr('fill', (d, i) => color(i % 10))
+                node.attr('fill', d => d._color || color(graph.nodes.indexOf(d) % 10))
                     .style('opacity', 1);
                 link.attr('stroke', '#999')
                     .attr('stroke-width', d => d.strength || Math.sqrt(d.weight || 1))
