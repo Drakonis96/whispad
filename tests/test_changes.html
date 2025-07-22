@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Changes</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body { padding: 20px; }
+        .test-section { margin: 20px 0; padding: 20px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <div class="test-section">
+        <h2>Dark Mode Warning Test</h2>
+        <div class="upload-warning">
+            <i class="fas fa-exclamation-triangle"></i>
+            <div>
+                <strong>Warning:</strong> This will replace all current note content with the extracted text from the file.
+            </div>
+        </div>
+        <p>Switch to dark mode to test the warning text color.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Graph Controls Bottom Test</h2>
+        <div style="position: relative; height: 400px; background: #f0f0f0; border-radius: 8px;">
+            <div class="graph-controls-bottom">
+                <div class="slider-control">
+                    <label for="test-max-nodes">Max Nodes: <span>50</span></label>
+                    <input type="range" id="test-max-nodes" min="10" max="100" value="50" step="5">
+                </div>
+                <div class="slider-control">
+                    <label for="test-node-degree">Min Node Degree: <span>1</span></label>
+                    <input type="range" id="test-node-degree" min="1" max="10" value="1" step="1">
+                </div>
+                <div class="slider-control">
+                    <label for="test-text-size">Min Text Size: <span>8</span></label>
+                    <input type="range" id="test-text-size" min="6" max="20" value="8" step="1">
+                </div>
+            </div>
+        </div>
+        <p>The sliders should appear at the bottom of the graph container with a glassmorphism effect.</p>
+    </div>
+
+    <script>
+        // Test dark mode toggle
+        const toggleDarkMode = () => {
+            document.documentElement.setAttribute('data-color-scheme', 
+                document.documentElement.getAttribute('data-color-scheme') === 'dark' ? 'light' : 'dark'
+            );
+        };
+        
+        // Add toggle button
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = 'Toggle Dark Mode';
+        toggleBtn.onclick = toggleDarkMode;
+        toggleBtn.style.position = 'fixed';
+        toggleBtn.style.top = '10px';
+        toggleBtn.style.right = '10px';
+        toggleBtn.style.padding = '10px';
+        document.body.appendChild(toggleBtn);
+    </script>
+</body>
+</html>

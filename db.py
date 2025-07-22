@@ -32,6 +32,18 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                username TEXT NOT NULL,
+                preference_key VARCHAR(255) NOT NULL,
+                preference_value TEXT NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (username, preference_key),
+                FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+            )
+            """
+        )
         conn.commit()
 
 
@@ -202,5 +214,41 @@ def migrate_server_config_to_db(json_path="data/server_config.json"):
         os.remove(json_path)
     except Exception as e:
         print(f"Error migrating server config: {e}")
+
+
+def get_user_preference(username: str, preference_key: str):
+    """Get a user preference value."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            "SELECT preference_value FROM user_preferences WHERE username=%s AND preference_key=%s",
+            [username, preference_key],
+        )
+        row = cur.fetchone()
+        return row[0] if row else None
+
+
+def set_user_preference(username: str, preference_key: str, preference_value: str):
+    """Set a user preference value."""
+    with pool.connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO user_preferences (username, preference_key, preference_value, updated_at) 
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT (username, preference_key) 
+            DO UPDATE SET preference_value = EXCLUDED.preference_value, updated_at = CURRENT_TIMESTAMP
+            """,
+            [username, preference_key, preference_value],
+        )
+        conn.commit()
+
+
+def get_user_preferences(username: str):
+    """Get all preferences for a user as a dictionary."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            "SELECT preference_key, preference_value FROM user_preferences WHERE username=%s",
+            [username],
+        )
+        return dict(cur.fetchall())
 
 
