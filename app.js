@@ -2374,6 +2374,14 @@ class NotesApp {
             });
         }
         
+        // Set up AI generate nodes button
+        const aiGenerateNodesBtn = document.getElementById('ai-generate-nodes-btn');
+        if (aiGenerateNodesBtn) {
+            aiGenerateNodesBtn.addEventListener('click', () => {
+                this.generateAINodes();
+            });
+        }
+        
         // Set up concept removal button
         const conceptRemovalBtn = document.getElementById('concept-removal-btn');
         if (conceptRemovalBtn) {
@@ -2897,30 +2905,62 @@ class NotesApp {
         // Create nodes with dynamic sizing based on importance
         const node = g.append('g')
             .attr('class', 'nodes')
-            .selectAll('circle')
+            .selectAll('g')
             .data(graph.nodes)
-            .enter().append('circle')
-            .attr('r', d => d.size || 8)
-            .attr('fill', (d, i) => {
-                const col = color(i % 10);
-                d._color = col; // store original color for later reference
-                return col;
-            })
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 2)
+            .enter().append('g')
+            .attr('class', 'node')
             .style('cursor', 'pointer')
             .call(d3.drag()
                 .on('start', dragstarted)
                 .on('drag', dragged)
                 .on('end', dragended));
         
+        // Add shapes to nodes - circles for regular nodes, pentagons for AI nodes
+        node.each(function(d) {
+            const nodeGroup = d3.select(this);
+            const radius = d.size || 8;
+            
+            if (d.isAIGenerated) {
+                // Create pentagon path for AI nodes
+                const pentagon = [];
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 2 * Math.PI / 5) - Math.PI / 2; // Start from top
+                    const x = radius * Math.cos(angle);
+                    const y = radius * Math.sin(angle);
+                    pentagon.push([x, y]);
+                }
+                
+                const pathData = `M${pentagon.map(p => p.join(',')).join('L')}Z`;
+                
+                nodeGroup.append('path')
+                    .attr('d', pathData)
+                    .attr('fill', '#8b5cf6') // Purple color for AI nodes
+                    .attr('stroke', '#fff')
+                    .attr('stroke-width', 2);
+            } else {
+                // Create circle for regular nodes
+                const col = color(graph.nodes.indexOf(d) % 10);
+                d._color = col; // store original color for later reference
+                
+                nodeGroup.append('circle')
+                    .attr('r', radius)
+                    .attr('fill', col)
+                    .attr('stroke', '#fff')
+                    .attr('stroke-width', 2);
+            }
+        });
+        
         // Add hover effects
         node.on('mouseover', function(event, d) {
-            d3.select(this)
-                .transition()
+            const nodeGroup = d3.select(this);
+            const shape = nodeGroup.select(d.isAIGenerated ? 'path' : 'circle');
+            
+            // Scale up the shape on hover
+            nodeGroup.transition()
                 .duration(200)
-                .attr('r', (d.size || 8) * 1.3)
-                .attr('stroke-width', 3);
+                .attr('transform', 'scale(1.3)');
+            
+            shape.attr('stroke-width', 3);
             
             // Highlight connected nodes and links
             const connectedNodes = new Set();
@@ -2936,11 +2976,15 @@ class NotesApp {
             node.style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
         })
         .on('mouseout', function(event, d) {
-            d3.select(this)
-                .transition()
+            const nodeGroup = d3.select(this);
+            const shape = nodeGroup.select(d.isAIGenerated ? 'path' : 'circle');
+            
+            // Reset scale
+            nodeGroup.transition()
                 .duration(200)
-                .attr('r', d.size || 8)
-                .attr('stroke-width', 2);
+                .attr('transform', 'scale(1)');
+            
+            shape.attr('stroke-width', 2);
             
             // Reset highlighting
             link.style('stroke-opacity', 0.4);
@@ -2986,8 +3030,7 @@ class NotesApp {
                 .attr('y2', d => d.target.y);
             
             node
-                .attr('cx', d => d.x)
-                .attr('cy', d => d.y);
+                .attr('transform', d => `translate(${d.x},${d.y})`);
             
             label
                 .attr('x', d => d.x)
@@ -3308,6 +3351,116 @@ class NotesApp {
         }
     }
 
+    async generateAINodes() {
+        const aiBtn = document.getElementById('ai-generate-nodes-btn');
+        if (!aiBtn || !this.currentGraphData) return;
+        
+        try {
+            // Set button to processing state
+            aiBtn.disabled = true;
+            aiBtn.classList.add('processing');
+            aiBtn.innerHTML = '<i class="fas fa-magic fa-spin"></i> Generating...';
+            
+            // Get current language from dropdown
+            const language = document.getElementById('concept-language')?.value || 'en';
+            
+            // Extract current nodes from graph
+            const currentNodes = this.currentGraphData.nodes.map(node => ({
+                id: node.id,
+                label: node.label,
+                size: node.size,
+                importance: node.importance
+            }));
+            
+            // Get current note text
+            const noteText = await this.getNotesContentForConcept();
+            if (!noteText) {
+                return;
+            }
+            
+            // Call AI node generation endpoint
+            const resp = await authFetch('/api/concept-graph/ai-generate-nodes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    note: noteText,
+                    current_nodes: currentNodes,
+                    language: language
+                })
+            });
+            
+            if (!resp.ok) {
+                const errorData = await resp.json();
+                throw new Error(errorData.error || 'AI node generation failed');
+            }
+            
+            const data = await resp.json();
+            
+            if (data.ai_nodes && data.ai_nodes.length > 0) {
+                // Add AI nodes to current graph
+                this.addAINodesToConcept(data.ai_nodes);
+                this.showNotification(`Generated ${data.ai_nodes.length} AI nodes successfully`, 'success');
+            } else {
+                this.showNotification('No AI nodes were generated', 'info');
+            }
+            
+        } catch (error) {
+            console.error('AI node generation error:', error);
+            this.showNotification(error.message || 'AI node generation failed', 'error');
+        } finally {
+            // Reset button state
+            aiBtn.disabled = false;
+            aiBtn.classList.remove('processing');
+            aiBtn.innerHTML = '<i class="fas fa-magic"></i> Generate AI Nodes';
+        }
+    }
+
+    addAINodesToConcept(aiNodes) {
+        if (!this.currentGraphData || !aiNodes || aiNodes.length === 0) return;
+        
+        // Add AI nodes to the graph data
+        const existingNodeIds = new Set(this.currentGraphData.nodes.map(n => n.id));
+        const newNodes = [];
+        const newEdges = [];
+        
+        aiNodes.forEach((aiNode, index) => {
+            const nodeId = `ai_${Date.now()}_${index}`;
+            
+            // Create AI node with special styling
+            const newNode = {
+                id: nodeId,
+                label: aiNode.label,
+                size: Math.max(15, Math.min(30, aiNode.importance * 20)), // Size based on importance
+                importance: aiNode.importance,
+                isAIGenerated: true, // Special flag for styling
+                group: 'ai_generated'
+            };
+            
+            newNodes.push(newNode);
+            
+            // Create edges to related nodes
+            if (aiNode.related_nodes && Array.isArray(aiNode.related_nodes)) {
+                aiNode.related_nodes.forEach(relatedNodeId => {
+                    if (existingNodeIds.has(relatedNodeId)) {
+                        newEdges.push({
+                            source: nodeId,
+                            target: relatedNodeId,
+                            strength: 0.8, // AI connections have high strength
+                            isAIGenerated: true
+                        });
+                    }
+                });
+            }
+        });
+        
+        // Update graph data
+        this.currentGraphData.nodes = [...this.currentGraphData.nodes, ...newNodes];
+        this.currentGraphData.links = [...this.currentGraphData.links, ...newEdges];
+        
+        // Re-render the graph with AI nodes
+        this.renderConceptGraph(this.currentGraphData);
+    }
+
     setupAISuggestionsWindow() {
         this.currentSuggestions = [];
         this.currentSuggestionIndex = 0;
@@ -3373,7 +3526,9 @@ class NotesApp {
         // Modal elements
         this.conceptRemovalModal = document.getElementById('concept-removal-modal');
         this.conceptExclusionsInput = document.getElementById('concept-exclusions-input');
+        this.conceptInclusionsInput = document.getElementById('concept-inclusions-input');
         this.exclusionCountElement = document.getElementById('exclusion-count');
+        this.inclusionCountElement = document.getElementById('inclusion-count');
         this.conceptExclusionLoading = document.getElementById('concept-exclusion-loading');
         
         // Button handlers
@@ -3388,14 +3543,20 @@ class NotesApp {
         
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
-                this.saveConceptExclusions();
+                this.saveConceptFilters();
             });
         }
         
-        // Input handler to update count
+        // Input handlers to update counts
         if (this.conceptExclusionsInput) {
             this.conceptExclusionsInput.addEventListener('input', () => {
                 this.updateExclusionCount();
+            });
+        }
+        
+        if (this.conceptInclusionsInput) {
+            this.conceptInclusionsInput.addEventListener('input', () => {
+                this.updateInclusionCount();
             });
         }
         
@@ -3415,13 +3576,15 @@ class NotesApp {
         // Show modal
         this.conceptRemovalModal.classList.add('active');
         
-        // Load current exclusions
+        // Load current exclusions and inclusions
         await this.loadConceptExclusions();
+        await this.loadConceptInclusions();
         
-        // Update count
+        // Update counts
         this.updateExclusionCount();
+        this.updateInclusionCount();
         
-        // Focus input
+        // Focus first input
         if (this.conceptExclusionsInput) {
             setTimeout(() => this.conceptExclusionsInput.focus(), 100);
         }
@@ -3461,11 +3624,14 @@ class NotesApp {
         }
     }
 
-    async saveConceptExclusions() {
-        if (!this.conceptExclusionsInput) return;
+    async saveConceptFilters() {
+        if (!this.conceptExclusionsInput || !this.conceptInclusionsInput) return;
         
-        const input = this.conceptExclusionsInput.value.trim();
-        const exclusions = input ? input.split(',').map(word => word.trim()).filter(word => word) : [];
+        const exclusionsInput = this.conceptExclusionsInput.value.trim();
+        const exclusions = exclusionsInput ? exclusionsInput.split(',').map(word => word.trim()).filter(word => word) : [];
+        
+        const inclusionsInput = this.conceptInclusionsInput.value.trim();
+        const inclusions = inclusionsInput ? inclusionsInput.split(',').map(word => word.trim()).filter(word => word) : [];
         
         // Show loading
         if (this.conceptExclusionLoading) {
@@ -3473,7 +3639,8 @@ class NotesApp {
         }
         
         try {
-            const response = await fetch('/api/concept-exclusions', {
+            // Save exclusions
+            const exclusionsResponse = await fetch('/api/concept-exclusions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -3481,21 +3648,58 @@ class NotesApp {
                 body: JSON.stringify({ exclusions })
             });
             
-            if (response.ok) {
-                const data = await response.json();
-                this.showNotification(`Saved ${data.exclusions.length} concept exclusions`, 'success');
+            // Save inclusions
+            const inclusionsResponse = await fetch('/api/concept-inclusions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ inclusions })
+            });
+            
+            if (exclusionsResponse.ok && inclusionsResponse.ok) {
+                const exclusionsData = await exclusionsResponse.json();
+                const inclusionsData = await inclusionsResponse.json();
+                this.showNotification(`Saved ${exclusionsData.exclusions.length} exclusions and ${inclusionsData.inclusions.length} inclusions`, 'success');
                 this.hideConceptRemovalModal();
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to save exclusions');
+                throw new Error('Failed to save filters');
             }
         } catch (error) {
-            console.error('Error saving concept exclusions:', error);
-            this.showNotification(error.message || 'Failed to save concept exclusions', 'error');
+            console.error('Error saving concept filters:', error);
+            this.showNotification(error.message || 'Failed to save concept filters', 'error');
         } finally {
             // Hide loading
             if (this.conceptExclusionLoading) {
                 this.conceptExclusionLoading.classList.add('hidden');
+            }
+        }
+    }
+
+    async loadConceptInclusions() {
+        try {
+            const response = await fetch('/api/concept-inclusions', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (this.conceptInclusionsInput) {
+                    this.conceptInclusionsInput.value = data.inclusions.join(', ');
+                }
+            } else {
+                console.warn('Failed to load concept inclusions');
+                if (this.conceptInclusionsInput) {
+                    this.conceptInclusionsInput.value = '';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading concept inclusions:', error);
+            if (this.conceptInclusionsInput) {
+                this.conceptInclusionsInput.value = '';
             }
         }
     }
@@ -3507,6 +3711,15 @@ class NotesApp {
         const count = input ? input.split(',').map(word => word.trim()).filter(word => word).length : 0;
         
         this.exclusionCountElement.textContent = count;
+    }
+
+    updateInclusionCount() {
+        if (!this.conceptInclusionsInput || !this.inclusionCountElement) return;
+        
+        const input = this.conceptInclusionsInput.value.trim();
+        const count = input ? input.split(',').map(word => word.trim()).filter(word => word).length : 0;
+        
+        this.inclusionCountElement.textContent = count;
     }
 
     async showAISuggestionsWindow() {

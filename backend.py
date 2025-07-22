@@ -2945,8 +2945,9 @@ def concept_graph():
     if not isinstance(enable_lemmatization, bool):
         enable_lemmatization = True
     
-    # Get user's concept exclusions
+    # Get user's concept exclusions and inclusions
     exclusions = []
+    inclusions = []
     try:
         exclusions_str = get_user_preference(username, 'concept_exclusions')
         if exclusions_str:
@@ -2954,6 +2955,14 @@ def concept_graph():
     except Exception as e:
         print(f"Error getting concept exclusions: {str(e)}")
         # Continue without exclusions if there's an error
+    
+    try:
+        inclusions_str = get_user_preference(username, 'concept_inclusions')
+        if inclusions_str:
+            inclusions = [word.strip().lower() for word in inclusions_str.split(',') if word.strip()]
+    except Exception as e:
+        print(f"Error getting concept inclusions: {str(e)}")
+        # Continue without inclusions if there's an error
     
     # Get user's AI provider configuration for enhancement
     user_data = get_user(username)
@@ -2996,13 +3005,13 @@ def concept_graph():
                     # Import the async function
                     from concept_graph import build_enhanced_graph_with_ai
                     graph_result = loop.run_until_complete(
-                        build_enhanced_graph_with_ai(note, analysis_type, ai_provider, api_key, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions)
+                        build_enhanced_graph_with_ai(note, analysis_type, ai_provider, api_key, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
                     )
                 finally:
                     loop.close()
             else:
                 # Use standard build_graph function
-                graph_result = build_graph(note, analysis_type=analysis_type, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions)
+                graph_result = build_graph(note, analysis_type=analysis_type, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
         finally:
             signal.alarm(0)  # Cancel the alarm
         
@@ -3024,7 +3033,7 @@ def concept_graph():
         try:
             # Try with a more aggressive text truncation for fallback
             truncated_note = note[:20000] if len(note) > 20000 else note
-            graph_result = build_concept_graph(truncated_note, analysis_type=analysis_type, exclusions=exclusions)
+            graph_result = build_concept_graph(truncated_note, analysis_type=analysis_type, exclusions=exclusions, inclusions=inclusions)
             result = {
                 'graph': {
                     'nodes': graph_result.get('nodes', []),
@@ -3123,20 +3132,23 @@ def concept_graph_ai_reprocess():
             # Import the async AI reprocessing function
             from ai_reprocess import ai_reprocess_nodes, build_graph_with_selected_nodes
             
+            # Convert language parameter from frontend format to backend format
+            language_param = 'spanish' if language == 'es' else 'english'
+            
             # Prepare arguments based on provider type
             if ai_provider in ['lmstudio', 'ollama']:
-                filtered_nodes = loop.run_until_complete(
+                filtered_terms = loop.run_until_complete(
                     ai_reprocess_nodes(note, current_nodes, analysis_type, ai_provider, 
-                                     api_key=None, ai_model=ai_model, host=host, port=port, language=language, enable_lemmatization=enable_lemmatization)
+                                     api_key=None, ai_model=ai_model, host=host, port=port, language=language_param, enable_lemmatization=enable_lemmatization)
                 )
             else:
-                filtered_nodes = loop.run_until_complete(
+                filtered_terms = loop.run_until_complete(
                     ai_reprocess_nodes(note, current_nodes, analysis_type, ai_provider, 
-                                     api_key=api_key, language=language, enable_lemmatization=enable_lemmatization)
+                                     api_key=api_key, language=language_param, enable_lemmatization=enable_lemmatization)
                 )
             
-            # Regenerate graph with AI-filtered nodes
-            result = build_graph_with_selected_nodes(note, filtered_nodes, analysis_type, language=language, enable_lemmatization=enable_lemmatization)
+            # Regenerate graph with AI-filtered terms (not nodes)
+            result = build_graph_with_selected_nodes(note, filtered_terms, analysis_type, language=language_param, enable_lemmatization=enable_lemmatization)
             
             return jsonify(result)
         finally:
@@ -3145,6 +3157,107 @@ def concept_graph_ai_reprocess():
     except Exception as e:
         print(f"AI reprocessing error: {str(e)}")
         return jsonify({"error": f"AI reprocessing failed: {str(e)}"}), 500
+
+
+@app.route('/api/concept-graph/ai-generate-nodes', methods=['POST'])
+def concept_graph_ai_generate_nodes():
+    """Generate AI-driven super nodes that relate existing concept graph nodes."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note = data.get('note', '')
+    current_nodes = data.get('current_nodes', [])
+    language = data.get('language', 'en')
+    
+    if not note or not current_nodes:
+        return jsonify({"error": "Note text and current nodes are required"}), 400
+    
+    # Validate language
+    valid_languages = ['en', 'es']
+    if language not in valid_languages:
+        language = 'en'
+    
+    # Get user's configuration from the same file that frontend uses
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+                if not host or not port:
+                    return jsonify({"error": "LM Studio host and port not configured"}), 400
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+                if not host or not port:
+                    return jsonify({"error": "Ollama host and port not configured"}), 400
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured. Please configure an AI provider in settings."}), 400
+    
+    # Get API keys from environment variables
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the async AI node generation function
+            from concept_graph import generate_ai_nodes
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                ai_nodes = loop.run_until_complete(
+                    generate_ai_nodes(note, current_nodes, ai_provider, 
+                                    api_key=None, ai_model=ai_model, host=host, port=port, language=language)
+                )
+            else:
+                ai_nodes = loop.run_until_complete(
+                    generate_ai_nodes(note, current_nodes, ai_provider, 
+                                    api_key=api_key, ai_model=ai_model, language=language)
+                )
+            
+            return jsonify({"ai_nodes": ai_nodes})
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"AI node generation error: {str(e)}")
+        return jsonify({"error": f"AI node generation failed: {str(e)}"}), 500
 
 
 @app.route('/api/concept-graph/ai-suggestions', methods=['POST'])
@@ -3665,6 +3778,64 @@ def set_concept_exclusions():
     except Exception as e:
         print(f"Error setting concept exclusions: {str(e)}")
         return jsonify({"error": "Failed to save concept exclusions"}), 500
+
+
+@app.route('/api/concept-inclusions', methods=['GET'])
+def get_concept_inclusions():
+    """Get user's concept inclusion list."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        inclusions_str = get_user_preference(username, 'concept_inclusions')
+        if inclusions_str:
+            inclusions = [word.strip() for word in inclusions_str.split(',') if word.strip()]
+        else:
+            inclusions = []
+        
+        return jsonify({"inclusions": inclusions})
+    except Exception as e:
+        print(f"Error getting concept inclusions: {str(e)}")
+        return jsonify({"error": "Failed to get concept inclusions"}), 500
+
+
+@app.route('/api/concept-inclusions', methods=['POST'])
+def set_concept_inclusions():
+    """Set user's concept inclusion list."""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    inclusions = data.get('inclusions', [])
+    
+    # Validate that inclusions is a list
+    if not isinstance(inclusions, list):
+        return jsonify({"error": "Inclusions must be a list"}), 400
+    
+    # Clean and validate inclusions
+    cleaned_inclusions = []
+    for word in inclusions:
+        if isinstance(word, str) and word.strip():
+            # Basic validation - no special characters except spaces, hyphens, apostrophes
+            cleaned_word = word.strip().lower()
+            if re.match(r"^[a-zA-Z0-9\s\-'áéíóúüñ]+$", cleaned_word):
+                cleaned_inclusions.append(cleaned_word)
+    
+    try:
+        # Save as comma-separated string
+        inclusions_str = ','.join(cleaned_inclusions)
+        set_user_preference(username, 'concept_inclusions', inclusions_str)
+        
+        return jsonify({
+            "success": True, 
+            "inclusions": cleaned_inclusions,
+            "message": f"Saved {len(cleaned_inclusions)} concept inclusions"
+        })
+    except Exception as e:
+        print(f"Error setting concept inclusions: {str(e)}")
+        return jsonify({"error": "Failed to save concept inclusions"}), 500
 
 
 @app.route('/api/app-config', methods=['GET'])

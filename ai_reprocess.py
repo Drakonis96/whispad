@@ -5,8 +5,8 @@ from concept_graph import build_graph
 
 async def ai_reprocess_nodes(note_text, current_nodes, analysis_type='bridges', ai_provider=None, 
                            api_key=None, ai_model=None, host=None, port=None, language='english', enable_lemmatization=True):
-    """Use AI to filter and select only the most important nodes from current graph."""
-    if not ai_provider or not current_nodes:
+    """Use AI to filter out unimportant terms from the original text and regenerate the entire graph."""
+    if not ai_provider:
         return current_nodes
     
     # Ensure ai_provider is a string
@@ -24,111 +24,124 @@ async def ai_reprocess_nodes(note_text, current_nodes, analysis_type='bridges', 
         return current_nodes
     
     try:
-        # Extract node labels from current nodes
-        node_labels = [node['label'] if isinstance(node, dict) else str(node) for node in current_nodes]
+        # Import the term extraction function
+        from concept_graph import extract_high_quality_terms
         
-        # Create AI prompt for node filtering
+        # Step 1: Extract ALL terms from the original text (not just current nodes)
+        # This gives us the complete vocabulary before AI filtering
+        language_param = 'spanish' if language.lower() in ['spanish', 'es', 'español'] else 'english'
+        all_extracted_terms = extract_high_quality_terms(
+            note_text, 
+            language=language_param, 
+            enable_lemmatization=enable_lemmatization,
+            max_text_length=200000
+        )
+        
+        # Convert to list format if it's a dict
+        if isinstance(all_extracted_terms, dict):
+            term_list = list(all_extracted_terms.keys())
+        else:
+            term_list = all_extracted_terms
+        
+        if not term_list:
+            return current_nodes
+        
+        # Step 2: Create AI prompt for term filtering (remove non-important words)
         if language.lower() in ['spanish', 'es', 'español']:
             prompt = f"""
-            Eres un experto en análisis semántico y mapeo de conceptos. Dado el siguiente texto y lista de conceptos extraídos,
-            por favor selecciona solo los 8-12 conceptos semánticamente más importantes y significativos que mejor representen las ideas centrales.
+            Eres un experto en análisis semántico y procesamiento de lenguaje natural. Tu tarea es filtrar términos extraídos de un texto para crear un grafo de conceptos de alta calidad.
 
             CONTENIDO DEL TEXTO:
             {note_text[:1500]}...
 
-            CONCEPTOS ACTUALES:
-            {', '.join(node_labels)}
-
-            TIPO DE ANÁLISIS: {analysis_type}
-            {"(Enfócate en conceptos que conecten diferentes temas)" if analysis_type == 'bridges' else ""}
-            {"(Enfócate en conceptos centrales como hubs)" if analysis_type == 'hubs' else ""}
+            TÉRMINOS EXTRAÍDOS DEL TEXTO:
+            {', '.join(term_list[:100])}
 
             TAREA:
-            1. Eliminar palabras genéricas, pronombres, verbos comunes y términos sin significado
-            2. Seleccionar 8-12 conceptos semánticamente más significativos
-            3. Priorizar términos específicos del dominio, nombres propios y conceptos clave
-            4. Asegurar que los conceptos seleccionados representen los temas principales del texto
+            Filtra la lista de términos para ELIMINAR palabras que NO son conceptos importantes para un grafo de conocimiento:
 
-            REGLAS:
-            - Eliminar: pronombres (tú, su, ellos, etc.), palabras genéricas (cosa, manera, tiempo), verbos comunes (hacer, tener, ser)
-            - Mantener: términos técnicos, nombres propios, conceptos específicos del dominio, temas clave
-            - Apuntar a máximo 8-12 conceptos finales
-            - Enfocarse en conceptos que añadan valor semántico
+            ELIMINAR:
+            - Artículos: el, la, los, las, un, una, etc.
+            - Pronombres: yo, tú, él, ella, nosotros, ellos, esto, eso, etc.
+            - Verbos comunes: ser, estar, tener, hacer, ir, venir, etc.
+            - Preposiciones: de, en, a, por, para, con, sin, etc.
+            - Conjunciones: y, o, pero, si, que, como, etc.
+            - Adverbios genéricos: muy, más, menos, bien, mal, etc.
+            - Adjetivos vagos: bueno, malo, grande, pequeño, etc.
+            - Palabras funcionales sin significado semántico
 
-            Responde SOLO con un array JSON de las etiquetas de conceptos seleccionados:
+            MANTENER:
+            - Sustantivos conceptuales importantes
+            - Nombres propios
+            - Términos técnicos y específicos del dominio
+            - Conceptos clave del tema
+            - Entidades nombradas
+            - Términos compuestos importantes
+
+            Responde SOLO con un array JSON de los términos que DEBEN MANTENERSE (los conceptos importantes):
             ["concepto1", "concepto2", "concepto3", ...]
             """
         else:
             prompt = f"""
-            You are an expert in semantic analysis and concept mapping. Given the following text and list of extracted concepts, 
-            please select only the 8-12 most semantically important and meaningful concepts that best represent the core ideas.
+            You are an expert in semantic analysis and natural language processing. Your task is to filter extracted terms from a text to create a high-quality concept graph.
 
             TEXT CONTENT:
             {note_text[:1500]}...
 
-            CURRENT CONCEPTS:
-            {', '.join(node_labels)}
-
-            ANALYSIS TYPE: {analysis_type}
-            {"(Focus on concepts that bridge different topics)" if analysis_type == 'bridges' else ""}
-            {"(Focus on central hub concepts)" if analysis_type == 'hubs' else ""}
+            EXTRACTED TERMS FROM TEXT:
+            {', '.join(term_list[:100])}
 
             TASK:
-            1. Remove generic words, pronouns, common verbs, and non-meaningful terms
-            2. Select 8-12 concepts that are most semantically significant
-            3. Prioritize domain-specific terms, proper nouns, and key concepts
-            4. Ensure selected concepts represent the main themes of the text
+            Filter the term list to REMOVE words that are NOT important concepts for a knowledge graph:
 
-            RULES:
-            - Remove: pronouns (you, his, its, they, etc.), generic words (thing, way, time), common verbs (get, make, have)
-            - Keep: technical terms, proper nouns, domain-specific concepts, key themes
-            - Aim for 8-12 final concepts maximum
-            - Focus on concepts that add semantic value
+            REMOVE:
+            - Articles: the, a, an, this, that, these, those, etc.
+            - Pronouns: I, you, he, she, it, we, they, etc.
+            - Common verbs: be, have, do, get, make, go, come, etc.
+            - Prepositions: of, in, to, for, with, by, from, etc.
+            - Conjunctions: and, or, but, if, when, while, etc.
+            - Generic adverbs: very, more, most, well, etc.
+            - Vague adjectives: good, bad, big, small, etc.
+            - Function words without semantic meaning
 
-            Respond with ONLY a JSON array of the selected concept labels:
+            KEEP:
+            - Important conceptual nouns
+            - Proper names
+            - Technical and domain-specific terms
+            - Key concepts of the topic
+            - Named entities
+            - Important compound terms
+
+            Respond with ONLY a JSON array of terms that SHOULD BE KEPT (the important concepts):
             ["concept1", "concept2", "concept3", ...]
             """
         
         # Configure API call based on provider
-        filtered_concepts = []
+        filtered_terms = []
         
         if ai_provider.lower() == 'openai':
-            filtered_concepts = await _call_openai_api(prompt, api_key, ai_model)
+            filtered_terms = await _call_openai_api(prompt, api_key, ai_model)
         elif ai_provider.lower() == 'openrouter':
-            filtered_concepts = await _call_openrouter_api(prompt, api_key, ai_model)
+            filtered_terms = await _call_openrouter_api(prompt, api_key, ai_model)
         elif ai_provider.lower() == 'google':
-            filtered_concepts = await _call_google_api(prompt, api_key, ai_model)
+            filtered_terms = await _call_google_api(prompt, api_key, ai_model)
         elif ai_provider.lower() == 'groq':
-            filtered_concepts = await _call_groq_api(prompt, api_key, ai_model)
+            filtered_terms = await _call_groq_api(prompt, api_key, ai_model)
         elif ai_provider.lower() == 'lmstudio':
-            filtered_concepts = await _call_lmstudio_api(prompt, ai_model, host, port)
+            filtered_terms = await _call_lmstudio_api(prompt, ai_model, host, port)
         elif ai_provider.lower() == 'ollama':
-            filtered_concepts = await _call_ollama_api(prompt, ai_model, host, port)
+            filtered_terms = await _call_ollama_api(prompt, ai_model, host, port)
         else:
             return current_nodes
         
-        # Filter current nodes to only include AI-selected concepts
-        if filtered_concepts:
-            filtered_nodes = []
-            for node in current_nodes:
-                node_label = node['label'] if isinstance(node, dict) else str(node)
-                # Ensure all concepts are strings and convert to lowercase safely
-                safe_concepts = [str(concept).lower() for concept in filtered_concepts if concept]
-                if any(concept in node_label.lower() or node_label.lower() in concept 
-                       for concept in safe_concepts):
-                    filtered_nodes.append(node)
-            
-            # Ensure we have at least a few nodes
-            if len(filtered_nodes) < 3 and len(current_nodes) >= 3:
-                # Fallback: return top nodes by importance if available
-                sorted_nodes = sorted(current_nodes, 
-                                    key=lambda x: x.get('importance', 0) if isinstance(x, dict) else 0, 
-                                    reverse=True)
-                return sorted_nodes[:8]
-            
-            return filtered_nodes[:12]  # Limit to 12 nodes max
+        # Step 3: Use filtered terms as stop word exclusions to regenerate graph
+        if filtered_terms:
+            # The AI-filtered terms become our "important terms" 
+            # Terms NOT in this list are treated as stop words (filtered out)
+            print(f"🤖 AI filtered {len(term_list)} terms → {len(filtered_terms)} important terms")
+            return filtered_terms  # Return the AI-filtered terms
         
-        return current_nodes
+        return current_nodes  # Fallback to current nodes if AI filtering fails
         
     except Exception as e:
         print(f"AI reprocessing error: {str(e)}")
@@ -156,7 +169,7 @@ async def _call_openai_api(prompt, api_key, model=None):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_concepts_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_openrouter_api(prompt, api_key, model=None):
@@ -183,7 +196,7 @@ async def _call_openrouter_api(prompt, api_key, model=None):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_concepts_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_google_api(prompt, api_key, model=None):
@@ -210,13 +223,13 @@ async def _call_google_api(prompt, api_key, model=None):
             if response.status == 200:
                 result = await response.json()
                 content = result["candidates"][0]["content"]["parts"][0]["text"]
-                return _parse_concepts_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_groq_api(prompt, api_key, model=None):
     """Call Groq API for concept filtering."""
     if not model:
-        model = "llama-3.1-70b-versatile"
+        model = "llama3-8b-8192"
     
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -235,7 +248,7 @@ async def _call_groq_api(prompt, api_key, model=None):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_concepts_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_lmstudio_api(prompt, model, host, port):
@@ -256,7 +269,7 @@ async def _call_lmstudio_api(prompt, model, host, port):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_concepts_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_ollama_api(prompt, model, host, port):
@@ -276,11 +289,11 @@ async def _call_ollama_api(prompt, model, host, port):
             if response.status == 200:
                 result = await response.json()
                 content = result["message"]["content"]
-                return _parse_concepts_response(content)
+                return _parse_filtering_response(content)
     return []
 
-def _parse_concepts_response(content):
-    """Parse AI response and extract concept list."""
+def _parse_filtering_response(content):
+    """Parse AI response and extract filtered terms list."""
     try:
         # Try to find JSON array in the response
         import re
@@ -315,60 +328,62 @@ def _parse_concepts_response(content):
     
     return []
 
-def build_graph_with_selected_nodes(note_text, selected_concepts, analysis_type='bridges', language='english', enable_lemmatization=True):
-    """Build a new concept graph using only the AI-selected concepts."""
-    if not selected_concepts:
+def build_graph_with_selected_nodes(note_text, selected_terms, analysis_type='bridges', language='english', enable_lemmatization=True):
+    """Build a new concept graph using only the AI-filtered terms (excluding filtered-out terms)."""
+    if not selected_terms:
         # Fallback to original build_graph
+        from concept_graph import build_graph
         return build_graph(note_text, analysis_type, language=language, enable_lemmatization=enable_lemmatization)
     
-    # Use the original build_graph function but filter results
-    full_result = build_graph(note_text, analysis_type, language=language, enable_lemmatization=enable_lemmatization)
+    # Use the selected terms as inclusions and create exclusions list from all other terms
+    from concept_graph import build_graph, extract_high_quality_terms
     
-    if not full_result or 'nodes' not in full_result:
-        return full_result
+    # Step 1: Extract all terms from the text
+    language_param = 'spanish' if language.lower() in ['spanish', 'es', 'español'] else 'english'
+    all_extracted_terms = extract_high_quality_terms(
+        note_text, 
+        language=language_param, 
+        enable_lemmatization=enable_lemmatization,
+        max_text_length=200000
+    )
     
-    # Extract concept strings from selected_concepts (handle both strings and dictionaries)
-    concept_strings = []
-    for concept in selected_concepts:
-        if isinstance(concept, dict):
-            # If it's a node dictionary, extract the label
-            concept_strings.append(concept.get('label', '').lower())
-        elif isinstance(concept, str):
-            # If it's already a string, use it directly
-            concept_strings.append(concept.lower())
-        else:
-            # Convert to string as fallback
-            concept_strings.append(str(concept).lower())
+    # Convert to list format if it's a dict
+    if isinstance(all_extracted_terms, dict):
+        all_terms_list = list(all_extracted_terms.keys())
+    else:
+        all_terms_list = all_extracted_terms
     
-    # Filter nodes to include only selected concepts
-    filtered_nodes = []
-    for node in full_result['nodes']:
-        node_label = node.get('label', '').lower()
-        if any(concept_str in node_label or node_label in concept_str 
-               for concept_str in concept_strings if concept_str):
-            filtered_nodes.append(node)
+    # Step 2: Create exclusions list (terms NOT selected by AI become stop words)
+    selected_terms_lower = [term.lower().strip() for term in selected_terms if term]
+    exclusions = []
     
-    # Filter edges to only include edges between filtered nodes
-    filtered_node_ids = {node['id'] for node in filtered_nodes}
-    filtered_links = []
-    for link in full_result.get('links', []):
-        if link['source'] in filtered_node_ids and link['target'] in filtered_node_ids:
-            filtered_links.append(link)
+    for term in all_terms_list:
+        term_lower = term.lower().strip()
+        # If this term wasn't selected by AI, add it to exclusions
+        if not any(selected_term in term_lower or term_lower in selected_term 
+                  for selected_term in selected_terms_lower):
+            exclusions.append(term)
     
-    # Update the result
-    result = full_result.copy()
-    result['graph'] = {
-        'nodes': filtered_nodes,
-        'links': filtered_links
-    }
+    print(f"🎯 Building graph with {len(selected_terms)} AI-selected terms, excluding {len(exclusions)} filtered terms")
     
-    # Update insights to reflect the filtered graph
-    if 'insights' in result:
-        result['insights']['total_nodes'] = len(filtered_nodes)
-        result['insights']['total_edges'] = len(filtered_links)
-        if len(filtered_nodes) > 1:
-            result['insights']['density'] = len(filtered_links) / (len(filtered_nodes) * (len(filtered_nodes) - 1) / 2)
-        else:
-            result['insights']['density'] = 0
+    # Step 3: Build graph with AI-selected terms as inclusions and filtered terms as exclusions
+    result = build_graph(
+        note_text, 
+        analysis_type=analysis_type, 
+        language=language_param, 
+        enable_lemmatization=enable_lemmatization,
+        inclusions=selected_terms,  # Prioritize AI-selected terms
+        exclusions=exclusions       # Exclude terms filtered out by AI
+    )
+    
+    # Wrap result in expected format for the API
+    if 'graph' not in result:
+        result = {
+            'graph': {
+                'nodes': result.get('nodes', []),
+                'links': result.get('links', [])
+            },
+            'insights': result.get('insights', {})
+        }
     
     return result

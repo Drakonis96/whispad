@@ -445,8 +445,11 @@
                         <button class="btn btn--tertiary btn--sm ai-suggestions-btn" id="ai-suggestions-btn">
                             <i class="fas fa-lightbulb"></i>&nbsp;AI Suggestions
                         </button>
+                        <button class="btn btn--purple btn--sm ai-generate-nodes-btn" id="ai-generate-nodes-btn">
+                            <i class="fas fa-magic"></i>&nbsp;Generate AI Nodes
+                        </button>
                         <button class="btn btn--outline btn--sm concept-removal-btn" id="concept-removal-btn">
-                            <i class="fas fa-filter"></i>&nbsp;Concept removal
+                            <i class="fas fa-filter"></i>&nbsp;Node filter
                         </button>
                     </div>
                     <div class="graph-info-panel">
@@ -505,26 +508,49 @@
         </div>
     </div>
 
-    <!-- Concept removal modal -->
+    <!-- Node filter modal -->
     <div class="modal" id="concept-removal-modal">
         <div class="modal-content">
-            <h3>Concept Removal Settings</h3>
+            <h3>Node Filter Settings</h3>
             <div class="modal-body">
-                <p>Enter words or phrases (separated by commas) that should be excluded from concept graph generation:</p>
-                <div class="concept-exclusion-container">
-                    <textarea class="form-control" id="concept-exclusions-input" 
-                              placeholder="e.g., the, and, very, really, technology, system..."
-                              rows="4"></textarea>
-                    <div class="help-text" style="margin-top: 8px; font-size: 0.85em; color: var(--color-text-secondary);">
-                        <i class="fas fa-info-circle"></i> 
-                        These exclusions will be applied to all your concept graphs. Words will be matched case-insensitively.
+                <div class="filter-section">
+                    <h4>Exclusion Words</h4>
+                    <p>Enter words or phrases (separated by commas) that should be excluded from concept graph generation:</p>
+                    <div class="concept-exclusion-container">
+                        <textarea class="form-control" id="concept-exclusions-input" 
+                                  placeholder="e.g., the, and, very, really, technology, system..."
+                                  rows="4"></textarea>
+                        <div class="help-text" style="margin-top: 8px; font-size: 0.85em; color: var(--color-text-secondary);">
+                            <i class="fas fa-info-circle"></i> 
+                            These words will be removed from all your concept graphs. Words will be matched case-insensitively.
+                        </div>
+                    </div>
+                    <div class="concept-exclusion-stats" id="concept-exclusion-stats" style="margin-top: 12px;">
+                        <div class="exclusion-count">
+                            <strong>Current exclusions:</strong> <span id="exclusion-count">0</span>
+                        </div>
                     </div>
                 </div>
-                <div class="concept-exclusion-stats" id="concept-exclusion-stats" style="margin-top: 12px;">
-                    <div class="exclusion-count">
-                        <strong>Current exclusions:</strong> <span id="exclusion-count">0</span>
+                
+                <div class="filter-section" style="margin-top: 24px;">
+                    <h4>Inclusion Words</h4>
+                    <p>Enter words or phrases (separated by commas) that must be included in concept graph generation:</p>
+                    <div class="concept-inclusion-container">
+                        <textarea class="form-control" id="concept-inclusions-input" 
+                                  placeholder="e.g., artificial intelligence, machine learning, neural networks..."
+                                  rows="4"></textarea>
+                        <div class="help-text" style="margin-top: 8px; font-size: 0.85em; color: var(--color-text-secondary);">
+                            <i class="fas fa-info-circle"></i> 
+                            These words will be prioritized and guaranteed to appear in your concept graphs if found in the text.
+                        </div>
+                    </div>
+                    <div class="concept-inclusion-stats" id="concept-inclusion-stats" style="margin-top: 12px;">
+                        <div class="inclusion-count">
+                            <strong>Current inclusions:</strong> <span id="inclusion-count">0</span>
+                        </div>
                     </div>
                 </div>
+                
                 <div class="loading-indicator hidden" id="concept-exclusion-loading">
                     <i class="fas fa-spinner fa-spin"></i> Saving...
                 </div>
