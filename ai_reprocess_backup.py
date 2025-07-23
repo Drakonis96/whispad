@@ -27,7 +27,8 @@ async def ai_reprocess_nodes(note_text, current_nodes, analysis_type='bridges', 
         # Import the term extraction function
         from concept_graph import extract_high_quality_terms
         
-        # Step 1: Extract ALL terms from the original text
+        # Step 1: Extract ALL terms from the original text (not just current nodes)
+        # This gives us the complete vocabulary before AI filtering
         language_param = 'spanish' if language.lower() in ['spanish', 'es', 'español'] else 'english'
         all_extracted_terms = extract_high_quality_terms(
             note_text, 
@@ -181,20 +182,22 @@ async def _call_openai_api(prompt, api_key, model=None):
     return []
 
 async def _call_openrouter_api(prompt, api_key, model=None):
-    """Call OpenRouter API for stop word identification."""
+    """Call OpenRouter API for concept filtering."""
     if not model:
         model = "meta-llama/llama-3.1-8b-instruct:free"
     
     url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://whispad.local",
+        "X-Title": "WhisPad AI"
     }
     data = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 800,
-        "temperature": 0.1
+        "max_tokens": 500,
+        "temperature": 0.2
     }
     
     async with aiohttp.ClientSession() as session:
@@ -202,21 +205,25 @@ async def _call_openrouter_api(prompt, api_key, model=None):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_stop_words_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_google_api(prompt, api_key, model=None):
-    """Call Google Gemini API for stop word identification."""
+    """Call Google Gemini API for concept filtering."""
     if not model:
-        model = "gemini-1.5-flash"
+        model = "gemini-2.0-flash"
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json"
+    }
     data = {
-        "contents": [{"parts": [{"text": prompt}]}],
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
         "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 800
+            "temperature": 0.2,
+            "maxOutputTokens": 500
         }
     }
     
@@ -224,15 +231,14 @@ async def _call_google_api(prompt, api_key, model=None):
         async with session.post(url, headers=headers, json=data) as response:
             if response.status == 200:
                 result = await response.json()
-                if 'candidates' in result and result['candidates']:
-                    content = result['candidates'][0]['content']['parts'][0]['text']
-                    return _parse_stop_words_response(content)
+                content = result["candidates"][0]["content"]["parts"][0]["text"]
+                return _parse_filtering_response(content)
     return []
 
 async def _call_groq_api(prompt, api_key, model=None):
-    """Call Groq API for stop word identification."""
+    """Call Groq API for concept filtering."""
     if not model:
-        model = "llama-3.3-70b-versatile"
+        model = "llama3-8b-8192"
     
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -242,8 +248,8 @@ async def _call_groq_api(prompt, api_key, model=None):
     data = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 800,
-        "temperature": 0.1
+        "max_tokens": 500,
+        "temperature": 0.2
     }
     
     async with aiohttp.ClientSession() as session:
@@ -251,18 +257,20 @@ async def _call_groq_api(prompt, api_key, model=None):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_stop_words_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_lmstudio_api(prompt, model, host, port):
-    """Call LM Studio API for stop word identification."""
+    """Call LM Studio API for concept filtering."""
     url = f"http://{host}:{port}/v1/chat/completions"
-    headers = {"Content-Type": "application/json"}
+    headers = {
+        "Content-Type": "application/json"
+    }
     data = {
-        "model": model,
+        "model": model or "local-model",
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 800,
-        "temperature": 0.1
+        "max_tokens": 500,
+        "temperature": 0.2
     }
     
     async with aiohttp.ClientSession() as session:
@@ -270,26 +278,27 @@ async def _call_lmstudio_api(prompt, model, host, port):
             if response.status == 200:
                 result = await response.json()
                 content = result["choices"][0]["message"]["content"]
-                return _parse_stop_words_response(content)
+                return _parse_filtering_response(content)
     return []
 
 async def _call_ollama_api(prompt, model, host, port):
-    """Call Ollama API for stop word identification."""
-    url = f"http://{host}:{port}/api/generate"
-    headers = {"Content-Type": "application/json"}
+    """Call Ollama API for concept filtering."""
+    url = f"http://{host}:{port}/api/chat"
+    headers = {
+        "Content-Type": "application/json"
+    }
     data = {
-        "model": model,
-        "prompt": prompt,
-        "stream": False,
-        "options": {"temperature": 0.1, "num_predict": 800}
+        "model": model or "llama3",
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False
     }
     
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=data) as response:
             if response.status == 200:
                 result = await response.json()
-                content = result.get("response", "")
-                return _parse_stop_words_response(content)
+                content = result["message"]["content"]
+                return _parse_filtering_response(content)
     return []
 
 def _parse_stop_words_response(content):
@@ -329,27 +338,52 @@ def _parse_stop_words_response(content):
     
     return []
 
-def build_graph_with_selected_nodes(note_text, filtered_terms, analysis_type='bridges', language='english', enable_lemmatization=True):
-    """Build a new concept graph using the AI-filtered terms (with stop words removed)."""
-    if not filtered_terms:
+def build_graph_with_selected_nodes(note_text, selected_terms, analysis_type='bridges', language='english', enable_lemmatization=True):
+    """Build a new concept graph using only the AI-filtered terms (excluding filtered-out terms)."""
+    if not selected_terms:
         # Fallback to original build_graph
         from concept_graph import build_graph
         return build_graph(note_text, analysis_type, language=language, enable_lemmatization=enable_lemmatization)
     
-    # Build graph with the filtered terms (stop words have been removed)
-    from concept_graph import build_graph
+    # Use the selected terms as inclusions and create exclusions list from all other terms
+    from concept_graph import build_graph, extract_high_quality_terms
     
+    # Step 1: Extract all terms from the text
     language_param = 'spanish' if language.lower() in ['spanish', 'es', 'español'] else 'english'
+    all_extracted_terms = extract_high_quality_terms(
+        note_text, 
+        language=language_param, 
+        enable_lemmatization=enable_lemmatization,
+        max_text_length=200000
+    )
     
-    print(f"🎯 Building graph with {len(filtered_terms)} AI-filtered terms (stop words removed)")
+    # Convert to list format if it's a dict
+    if isinstance(all_extracted_terms, dict):
+        all_terms_list = list(all_extracted_terms.keys())
+    else:
+        all_terms_list = all_extracted_terms
     
-    # Build graph with the filtered terms as inclusions (stop words excluded)
+    # Step 2: Create exclusions list (terms NOT selected by AI become stop words)
+    selected_terms_lower = [term.lower().strip() for term in selected_terms if term]
+    exclusions = []
+    
+    for term in all_terms_list:
+        term_lower = term.lower().strip()
+        # If this term wasn't selected by AI, add it to exclusions
+        if not any(selected_term in term_lower or term_lower in selected_term 
+                  for selected_term in selected_terms_lower):
+            exclusions.append(term)
+    
+    print(f"🎯 Building graph with {len(selected_terms)} AI-selected terms, excluding {len(exclusions)} filtered terms")
+    
+    # Step 3: Build graph with AI-selected terms as inclusions and filtered terms as exclusions
     result = build_graph(
         note_text, 
         analysis_type=analysis_type, 
         language=language_param, 
         enable_lemmatization=enable_lemmatization,
-        inclusions=filtered_terms  # Use the AI-filtered terms (stop words removed)
+        inclusions=selected_terms,  # Prioritize AI-selected terms
+        exclusions=exclusions       # Exclude terms filtered out by AI
     )
     
     # Wrap result in expected format for the API

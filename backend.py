@@ -16,7 +16,17 @@ import shutil
 from markdownify import markdownify
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
-from speaker_diarization import get_speaker_diarization_wrapper
+
+# Optional import for speaker diarization
+try:
+    from speaker_diarization import get_speaker_diarization_wrapper
+    SPEAKER_DIARIZATION_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Speaker diarization not available: {e}")
+    SPEAKER_DIARIZATION_AVAILABLE = False
+    def get_speaker_diarization_wrapper():
+        return None
+
 from mermaid import Mermaid
 from concept_graph import build_graph, build_concept_graph
 import ast
@@ -1601,13 +1611,12 @@ def chat_openai_stream(messages, model):
                     if line.startswith('data: '):
                         data_str = line[6:]
                         if data_str.strip() == '[DONE]':
-                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            yield f"data: [DONE]\n\n"
                             break
                         try:
                             data = json.loads(data_str)
-                            delta = data['choices'][0].get('delta', {})
-                            if 'content' in delta:
-                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                            # Forward the original OpenAI response format
+                            yield f"data: {json.dumps(data)}\n\n"
                         except json.JSONDecodeError:
                             continue
         except Exception as e:
@@ -1634,8 +1643,9 @@ def chat_google_stream(messages, model):
             result = resp.json()
             text = result['candidates'][0]['content']['parts'][0]['text']
             for word in text.split(' '):
-                yield f"data: {json.dumps({'content': word if word.startswith(' ') else ' ' + word})}\n\n"
-            yield f"data: {json.dumps({'done': True})}\n\n"
+                content = word if word.startswith(' ') else ' ' + word
+                yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
+            yield f"data: [DONE]\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
@@ -1668,13 +1678,12 @@ def chat_openrouter_stream(messages, model):
                     if line.startswith('data: '):
                         data_str = line[6:]
                         if data_str.strip() == '[DONE]':
-                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            yield f"data: [DONE]\n\n"
                             break
                         try:
                             data = json.loads(data_str)
-                            delta = data['choices'][0].get('delta', {})
-                            if 'content' in delta:
-                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                            # Forward the original OpenRouter response format
+                            yield f"data: {json.dumps(data)}\n\n"
                         except json.JSONDecodeError:
                             continue
         except Exception as e:
@@ -1704,13 +1713,12 @@ def chat_groq_stream(messages, model):
                     if line.startswith('data: '):
                         data_str = line[6:]
                         if data_str.strip() == '[DONE]':
-                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            yield f"data: [DONE]\n\n"
                             break
                         try:
                             data = json.loads(data_str)
-                            delta = data['choices'][0].get('delta', {})
-                            if 'content' in delta:
-                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                            # Forward the original Groq response format
+                            yield f"data: {json.dumps(data)}\n\n"
                         except json.JSONDecodeError:
                             continue
         except Exception as e:
@@ -1740,13 +1748,12 @@ def chat_lmstudio_stream(messages, model, host, port):
                     if line.startswith('data: '):
                         data_str = line[6:]
                         if data_str.strip() == '[DONE]':
-                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            yield f"data: [DONE]\n\n"
                             break
                         try:
                             data = json.loads(data_str)
-                            delta = data['choices'][0].get('delta', {})
-                            if 'content' in delta:
-                                yield f"data: {json.dumps({'content': delta['content']})}\n\n"
+                            # Forward the original LMStudio response format
+                            yield f"data: {json.dumps(data)}\n\n"
                         except json.JSONDecodeError:
                             continue
         except Exception as e:
@@ -1775,9 +1782,10 @@ def chat_ollama_stream(messages, model, host, port):
                     try:
                         data = json.loads(line.decode('utf-8'))
                         if data.get('message') and data['message'].get('content'):
-                            yield f"data: {json.dumps({'content': data['message']['content']})}\n\n"
+                            content = data['message']['content']
+                            yield f"data: {json.dumps({'choices': [{'delta': {'content': content}}]})}\n\n"
                         if data.get('done'):
-                            yield f"data: {json.dumps({'done': True})}\n\n"
+                            yield f"data: [DONE]\n\n"
                             break
                     except json.JSONDecodeError:
                         continue
@@ -2082,6 +2090,146 @@ def save_note():
     except Exception as e:
         return jsonify({"error": f"Error al guardar la nota: {str(e)}"}), 500
 
+@app.route('/api/create-note-in-folder', methods=['POST'])
+def create_note_in_folder():
+    """Create a new note directly in a specific folder"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+        
+        folder_path = data.get('folder_path', '').strip()
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        note_id = data.get('id', '')
+        tags = data.get('tags', [])
+        
+        if isinstance(tags, str):
+            tags = [t.strip().lower() for t in tags.split(';') if t.strip()]
+        elif isinstance(tags, list):
+            tags = [str(t).strip().lower() for t in tags if str(t).strip()]
+        else:
+            tags = []
+        
+        if not note_id:
+            return jsonify({"error": "Note ID is required"}), 400
+        
+        if not title and not content:
+            return jsonify({"error": "Note must have at least a title or content"}), 400
+        
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        
+        with SAVE_LOCK:
+            os.makedirs(saved_notes_dir, exist_ok=True)
+            
+            # Determine target directory
+            if folder_path:
+                # Handle nested folder paths - sanitize each component separately
+                folder_components = folder_path.split('/')
+                sanitized_components = [sanitize_filename(component) for component in folder_components if component]
+                target_folder_path = os.path.join(*sanitized_components) if sanitized_components else ''
+                
+                if target_folder_path:
+                    target_dir = os.path.join(saved_notes_dir, target_folder_path)
+                else:
+                    target_dir = saved_notes_dir
+            else:
+                target_dir = saved_notes_dir
+            
+            # Security check
+            if not is_path_within_directory(saved_notes_dir, target_dir):
+                return jsonify({"error": "Invalid folder path"}), 400
+            
+            # Ensure target directory exists
+            os.makedirs(target_dir, exist_ok=True)
+            
+            # Generate safe filename
+            if not title:
+                title = "Untitled Note"
+            
+            safe_filename = generate_safe_filename(title)
+            new_filename = sanitize_filename(f"{safe_filename}.md")
+            new_filepath = os.path.join(target_dir, new_filename)
+            
+            if not is_path_within_directory(saved_notes_dir, new_filepath):
+                return jsonify({"error": "Invalid file path"}), 400
+            
+            # Check if file already exists and generate unique name if needed
+            if os.path.exists(new_filepath):
+                counter = 1
+                while True:
+                    name_without_ext = os.path.splitext(new_filename)[0]
+                    temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
+                    temp_filepath = os.path.join(target_dir, temp_filename)
+                    if not is_path_within_directory(saved_notes_dir, temp_filepath):
+                        return jsonify({"error": "Invalid file path"}), 400
+                    if not os.path.exists(temp_filepath):
+                        new_filename = temp_filename
+                        new_filepath = temp_filepath
+                        break
+                    counter += 1
+            
+            # Convert HTML to Markdown if necessary
+            markdown_content = html_to_markdown(content) if content else ""
+            
+            # Create file content
+            file_content = f"# {title}\n\n"
+            if markdown_content:
+                file_content += markdown_content
+            else:
+                file_content += "*This note is empty*\n"
+            
+            # Save markdown file
+            with open(new_filepath, 'w', encoding='utf-8') as f:
+                f.write(file_content)
+            
+            # Save metadata
+            meta_filepath = f"{new_filepath}.meta"
+            metadata = {
+                "id": note_id,
+                "title": title,
+                "updated": datetime.now().isoformat(),
+                "tags": tags
+            }
+            with open(meta_filepath, 'w', encoding='utf-8') as meta_file:
+                json.dump(metadata, meta_file, ensure_ascii=False, indent=2)
+        
+        # Send to webhook if configured
+        if WORKFLOW_WEBHOOK_URL:
+            headers = {"Content-Type": "application/json"}
+            if WORKFLOW_WEBHOOK_TOKEN:
+                headers["Authorization"] = f"Bearer {WORKFLOW_WEBHOOK_TOKEN}"
+            try:
+                requests.post(
+                    WORKFLOW_WEBHOOK_URL,
+                    json={
+                        "id": note_id,
+                        "title": title,
+                        "content": content,
+                        "tags": tags,
+                        "user": WORKFLOW_WEBHOOK_USER or username,
+                    },
+                    headers=headers,
+                    timeout=5,
+                )
+            except Exception as e:
+                print(f"Webhook error: {e}")
+        
+        return jsonify({
+            "success": True,
+            "message": "Note created in folder successfully",
+            "filename": new_filename,
+            "filepath": new_filepath,
+            "relative_path": os.path.relpath(new_filepath, saved_notes_dir)
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Error creating note in folder: {str(e)}"}), 500
+
 def generate_safe_filename(title):
     """Genera un nombre de archivo seguro a partir del título"""
     # Reemplazar caracteres no permitidos
@@ -2099,22 +2247,24 @@ def generate_safe_filename(title):
     return safe_filename
 
 def find_existing_note_file(saved_notes_dir, note_id):
-    """Busca un archivo existente que contenga el ID de nota especificado"""
+    """Busca un archivo existente que contenga el ID de nota especificado (búsqueda recursiva)"""
     try:
-        for filename in os.listdir(saved_notes_dir):
-            if filename.endswith('.meta'):
-                meta_path = os.path.join(saved_notes_dir, filename)
-                try:
-                    with open(meta_path, 'r', encoding='utf-8') as meta_file:
-                        data = json.load(meta_file)
-                    if str(data.get('id')) == str(note_id):
-                        # remove both .meta and .md extensions to get base name
-                        base = os.path.splitext(os.path.splitext(filename)[0])[0]
-                        md_file = os.path.join(saved_notes_dir, f"{base}.md")
-                        if os.path.exists(md_file):
-                            return md_file
-                except Exception:
-                    continue
+        # Recursively search all subdirectories for .meta files
+        for root, dirs, files in os.walk(saved_notes_dir):
+            for filename in files:
+                if filename.endswith('.meta'):
+                    meta_path = os.path.join(root, filename)
+                    try:
+                        with open(meta_path, 'r', encoding='utf-8') as meta_file:
+                            data = json.load(meta_file)
+                        if str(data.get('id')) == str(note_id):
+                            # remove both .meta and .md extensions to get base name
+                            base = os.path.splitext(os.path.splitext(filename)[0])[0]
+                            md_file = os.path.join(root, f"{base}.md")
+                            if os.path.exists(md_file):
+                                return md_file
+                    except Exception:
+                        continue
         return None
     except OSError:
         return None
@@ -3004,14 +3154,20 @@ def concept_graph():
                 try:
                     # Import the async function
                     from concept_graph import build_enhanced_graph_with_ai
+                    
+                    # No limit on node generation - allow unlimited nodes
+                    max_nodes = None  # Remove all node generation limits
+                    
                     graph_result = loop.run_until_complete(
-                        build_enhanced_graph_with_ai(note, analysis_type, ai_provider, api_key, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
+                        build_enhanced_graph_with_ai(note, analysis_type, ai_provider, api_key, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions, max_terms=max_nodes)
                     )
                 finally:
                     loop.close()
             else:
-                # Use standard build_graph function
-                graph_result = build_graph(note, analysis_type=analysis_type, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
+                # No limit on node generation - allow unlimited nodes
+                max_nodes = None  # Remove all node generation limits
+                
+                graph_result = build_graph(note, analysis_type=analysis_type, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions, max_terms=max_nodes)
         finally:
             signal.alarm(0)  # Cancel the alarm
         
@@ -3033,7 +3189,11 @@ def concept_graph():
         try:
             # Try with a more aggressive text truncation for fallback
             truncated_note = note[:20000] if len(note) > 20000 else note
-            graph_result = build_concept_graph(truncated_note, analysis_type=analysis_type, exclusions=exclusions, inclusions=inclusions)
+            
+            # No limit on node generation for fallback
+            fallback_max_nodes = None  # Remove all node generation limits
+            
+            graph_result = build_graph(truncated_note, analysis_type=analysis_type, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions, max_terms=fallback_max_nodes)
             result = {
                 'graph': {
                     'nodes': graph_result.get('nodes', []),
@@ -5096,6 +5256,307 @@ def get_transcription_providers():
         
     except Exception as e:
         return jsonify({"error": f"Error interno: {str(e)}"}), 500
+
+# === FOLDER MANAGEMENT ENDPOINTS ===
+
+@app.route('/api/folders', methods=['GET'])
+def list_folders():
+    """List all folders for the current user"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        
+        # Get all folders (directories) in user's notes directory
+        folders = []
+        if os.path.exists(saved_notes_dir):
+            for item in os.listdir(saved_notes_dir):
+                item_path = os.path.join(saved_notes_dir, item)
+                if os.path.isdir(item_path) and not item.startswith('.'):
+                    folder_info = {
+                        "name": item,
+                        "path": item,
+                        "created": datetime.fromtimestamp(os.path.getctime(item_path)).isoformat(),
+                        "modified": datetime.fromtimestamp(os.path.getmtime(item_path)).isoformat()
+                    }
+                    folders.append(folder_info)
+        
+        # Sort folders by name
+        folders.sort(key=lambda x: x['name'].lower())
+        
+        return jsonify({"folders": folders})
+    
+    except Exception as e:
+        return jsonify({"error": f"Error listing folders: {str(e)}"}), 500
+
+@app.route('/api/folders', methods=['POST'])
+def create_folder():
+    """Create a new folder"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        data = request.get_json()
+        if not data or 'name' not in data:
+            return jsonify({"error": "Folder name is required"}), 400
+        
+        folder_name = data['name'].strip()
+        parent_folder = data.get('parent', '').strip()
+        
+        if not folder_name:
+            return jsonify({"error": "Folder name cannot be empty"}), 400
+        
+        # Sanitize folder name
+        folder_name = sanitize_filename(folder_name)
+        if not folder_name:
+            return jsonify({"error": "Invalid folder name"}), 400
+        
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        
+        # Build the full folder path
+        if parent_folder:
+            # Handle nested folder paths - sanitize each component separately
+            parent_components = parent_folder.split('/')
+            sanitized_parent_components = [sanitize_filename(component) for component in parent_components if component]
+            parent_folder_path = os.path.join(*sanitized_parent_components) if sanitized_parent_components else ''
+            
+            if parent_folder_path:
+                folder_path = os.path.join(saved_notes_dir, parent_folder_path, folder_name)
+            else:
+                folder_path = os.path.join(saved_notes_dir, folder_name)
+        else:
+            folder_path = os.path.join(saved_notes_dir, folder_name)
+        
+        # Security check
+        if not is_path_within_directory(saved_notes_dir, folder_path):
+            return jsonify({"error": "Invalid folder path"}), 400
+        
+        # If creating a subfolder, ensure parent folder exists (create if necessary)
+        if parent_folder and parent_folder_path:
+            parent_full_path = os.path.join(saved_notes_dir, parent_folder_path)
+            if not os.path.exists(parent_full_path):
+                # Create parent directories if they don't exist
+                os.makedirs(parent_full_path, exist_ok=True)
+        
+        # Check if folder already exists
+        if os.path.exists(folder_path):
+            return jsonify({"error": "Folder already exists"}), 409
+        
+        # Create the folder
+        os.makedirs(folder_path, exist_ok=True)
+        
+        # Return the relative path from the user's notes directory
+        relative_path = os.path.relpath(folder_path, saved_notes_dir)
+        
+        return jsonify({
+            "success": True,
+            "folder": {
+                "name": folder_name,
+                "path": relative_path,
+                "created": datetime.now().isoformat(),
+                "modified": datetime.now().isoformat()
+            }
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Error creating folder: {str(e)}"}), 500
+
+@app.route('/api/folders/<path:folder_path>', methods=['DELETE'])
+def delete_folder(folder_path):
+    """Delete a folder (must be empty)"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        full_folder_path = os.path.join(saved_notes_dir, folder_path)
+        
+        # Security check
+        if not is_path_within_directory(saved_notes_dir, full_folder_path):
+            return jsonify({"error": "Invalid folder path"}), 400
+        
+        if not os.path.exists(full_folder_path):
+            return jsonify({"error": "Folder not found"}), 404
+        
+        if not os.path.isdir(full_folder_path):
+            return jsonify({"error": "Path is not a folder"}), 400
+        
+        # Check if folder is empty
+        if os.listdir(full_folder_path):
+            return jsonify({"error": "Folder must be empty before deletion"}), 409
+        
+        # Delete the folder
+        os.rmdir(full_folder_path)
+        
+        return jsonify({"success": True, "message": "Folder deleted successfully"})
+    
+    except Exception as e:
+        return jsonify({"error": f"Error deleting folder: {str(e)}"}), 500
+
+@app.route('/api/move-note', methods=['POST'])
+def move_note_to_folder():
+    """Move a note to a different folder"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        data = request.get_json()
+        if not data or 'note_id' not in data:
+            return jsonify({"error": "Note ID is required"}), 400
+        
+        note_id = data['note_id']
+        target_folder = data.get('folder', '').strip()  # Empty string means root
+        
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        
+        # Find the current note file
+        current_filepath = find_existing_note_file(saved_notes_dir, note_id)
+        if not current_filepath:
+            return jsonify({"error": "Note not found"}), 404
+        
+        # Get the filename
+        filename = os.path.basename(current_filepath)
+        
+        # Build target path
+        if target_folder:
+            # Handle nested folder paths - sanitize each component separately
+            folder_components = target_folder.split('/')
+            sanitized_components = [sanitize_filename(component) for component in folder_components if component]
+            target_folder_path = os.path.join(*sanitized_components) if sanitized_components else ''
+            
+            if target_folder_path:
+                target_dir = os.path.join(saved_notes_dir, target_folder_path)
+            else:
+                target_dir = saved_notes_dir
+            target_filepath = os.path.join(target_dir, filename)
+        else:
+            target_dir = saved_notes_dir
+            target_filepath = os.path.join(target_dir, filename)
+        
+        # Security check
+        if not is_path_within_directory(saved_notes_dir, target_filepath):
+            return jsonify({"error": "Invalid target path"}), 400
+        
+        # Check if target directory exists
+        if not os.path.exists(target_dir):
+            return jsonify({"error": "Target folder does not exist"}), 404
+        
+        # Check if file already exists at target location
+        if os.path.exists(target_filepath) and target_filepath != current_filepath:
+            return jsonify({"error": "A note with this name already exists in the target folder"}), 409
+        
+        # Move the note file and its metadata
+        if target_filepath != current_filepath:
+            shutil.move(current_filepath, target_filepath)
+            
+            # Move metadata file if it exists
+            current_meta = f"{current_filepath}.meta"
+            target_meta = f"{target_filepath}.meta"
+            if os.path.exists(current_meta):
+                shutil.move(current_meta, target_meta)
+        
+        return jsonify({
+            "success": True,
+            "message": "Note moved successfully",
+            "new_path": os.path.relpath(target_filepath, saved_notes_dir)
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Error moving note: {str(e)}"}), 500
+
+@app.route('/api/folder-structure', methods=['GET'])
+def get_folder_structure():
+    """Get the complete folder structure with notes"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+        
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        
+        def build_folder_structure(directory, relative_path=""):
+            """Recursively build folder structure"""
+            items = []
+            
+            if not os.path.exists(directory):
+                return items
+            
+            for item in os.listdir(directory):
+                if item.startswith('.'):
+                    continue
+                
+                item_path = os.path.join(directory, item)
+                item_relative_path = os.path.join(relative_path, item) if relative_path else item
+                
+                if os.path.isdir(item_path):
+                    # It's a folder
+                    folder_info = {
+                        "type": "folder",
+                        "name": item,
+                        "path": item_relative_path,
+                        "children": build_folder_structure(item_path, item_relative_path)
+                    }
+                    items.append(folder_info)
+                
+                elif item.endswith('.md'):
+                    # It's a note file
+                    try:
+                        stat = os.stat(item_path)
+                        note_id = None
+                        tags = []
+                        
+                        # Try to get metadata
+                        meta_path = f"{item_path}.meta"
+                        if os.path.exists(meta_path):
+                            try:
+                                with open(meta_path, 'r', encoding='utf-8') as meta_file:
+                                    meta = json.load(meta_file)
+                                note_id = meta.get('id')
+                                tags = meta.get('tags', [])
+                                if isinstance(tags, list):
+                                    tags = [t.lower() for t in tags if isinstance(t, str)]
+                            except Exception:
+                                pass
+                        
+                        if not note_id:
+                            note_id = generate_note_id_from_filename(item)
+                        
+                        note_info = {
+                            "type": "note",
+                            "name": item.replace('.md', ''),
+                            "filename": item,
+                            "path": item_relative_path,
+                            "id": note_id,
+                            "size": stat.st_size,
+                            "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            "tags": tags
+                        }
+                        items.append(note_info)
+                    
+                    except Exception as e:
+                        print(f"Error processing note {item}: {e}")
+                        continue
+            
+            # Sort items: folders first, then notes, both alphabetically
+            items.sort(key=lambda x: (x["type"] != "folder", x["name"].lower()))
+            
+            return items
+        
+        structure = build_folder_structure(saved_notes_dir)
+        
+        return jsonify({
+            "structure": structure,
+            "directory": saved_notes_dir
+        })
+    
+    except Exception as e:
+        return jsonify({"error": f"Error getting folder structure: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('BACKEND_PORT', 8000))

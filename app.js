@@ -26,11 +26,12 @@ function safeSetInnerHTML(element, html) {
 }
 
 function authFetch(url, options = {}) {
-    options.headers = options.headers || {};
+    // Merge Authorization header with any provided headers
+    const mergedHeaders = { ...(options.headers || {}) };
     if (authToken) {
-        options.headers['Authorization'] = authToken;
+        mergedHeaders['Authorization'] = authToken;
     }
-    return fetch(url, options);
+    return fetch(url, { ...options, headers: mergedHeaders });
 }
 
 // Example data and configuration
@@ -128,7 +129,12 @@ const configuracionMejoras = {
 class NotesApp {
     constructor() {
         this.notes = [];
+        this.folders = [];
+        this.folderStructure = [];
         this.currentNote = null;
+        this.noteToDelete = null;
+        this.currentViewMode = 'folder'; // 'folder' or 'list'
+        this.expandedFolders = new Set();
         this.isRecording = false;
         this.autoSaveTimeout = null;
         this.autoSaveInterval = null;
@@ -227,6 +233,10 @@ class NotesApp {
         await this.setupDefaultNote();
         this.updateAIButtons();
         
+        // Load view mode preference and initialize folders
+        this.loadViewModePreference();
+        await this.loadFolderStructure();
+        
         // Verificar estado del backend
         await this.checkBackendStatus();
         // Sidebar responsive: cerrar en móvil por defecto
@@ -298,12 +308,38 @@ class NotesApp {
         const buttons = Array.from(headerActions.querySelectorAll('button')).filter(btn => btn !== hamburger);
 
         const moveButtons = () => {
+            // Re-check if elements still exist in DOM
+            const currentHeaderActions = document.querySelector('.header-actions');
+            const currentMobileContainer = document.querySelector('.mobile-header-actions');
+            const currentHamburger = document.getElementById('hamburger-menu');
+            
+            if (!currentHeaderActions || !currentMobileContainer || !currentHamburger) {
+                console.warn('Required DOM elements not found during button move operation');
+                return;
+            }
+            
             if (window.innerWidth <= 900) {
-                buttons.forEach(btn => mobileContainer.appendChild(btn));
-                mobileContainer.style.display = 'flex';
+                buttons.forEach(btn => {
+                    if (btn && btn.parentNode !== currentMobileContainer && document.body.contains(btn)) {
+                        currentMobileContainer.appendChild(btn);
+                    }
+                });
+                currentMobileContainer.style.display = 'flex';
             } else {
-                buttons.forEach(btn => headerActions.insertBefore(btn, hamburger));
-                mobileContainer.style.display = 'none';
+                buttons.forEach(btn => {
+                    if (btn && btn.parentNode !== currentHeaderActions && document.body.contains(btn) && currentHeaderActions.contains(currentHamburger)) {
+                        try {
+                            currentHeaderActions.insertBefore(btn, currentHamburger);
+                        } catch (error) {
+                            console.warn('Could not move button back to header:', error);
+                            // Fallback: append to header actions if insertBefore fails
+                            if (btn.parentNode !== currentHeaderActions) {
+                                currentHeaderActions.appendChild(btn);
+                            }
+                        }
+                    }
+                });
+                currentMobileContainer.style.display = 'none';
             }
         };
 
@@ -325,7 +361,11 @@ class NotesApp {
         // Search
         document.getElementById('search-input').addEventListener('input', (e) => {
             this.searchTerm = e.target.value.toLowerCase();
-            this.renderNotesList();
+            if (this.currentViewMode === 'list') {
+                this.renderNotesList();
+            } else {
+                this.renderFolderTree();
+            }
         });
         
         // Recording
@@ -531,7 +571,14 @@ class NotesApp {
         });
         
         document.getElementById('confirm-delete').addEventListener('click', async () => {
-            await this.deleteCurrentNote();
+            if (this.noteToDelete) {
+                // Deleting a specific note
+                await this.deleteSpecificNote(this.noteToDelete);
+                this.noteToDelete = null;
+            } else {
+                // Deleting the current note
+                await this.deleteCurrentNote();
+            }
         });
 
         const cancelDeleteAudio = document.getElementById('cancel-delete-audio');
@@ -771,6 +818,38 @@ class NotesApp {
             conceptGraphClose.addEventListener('click', () => { this.hideConceptGraphModal(); });
         }
 
+        // View mode toggle buttons
+        document.getElementById('folder-view-btn').addEventListener('click', () => {
+            this.setViewMode('folder');
+        });
+
+        document.getElementById('list-view-btn').addEventListener('click', () => {
+            this.setViewMode('list');
+        });
+
+        // New folder button
+        document.getElementById('new-folder-btn').addEventListener('click', () => {
+            this.showCreateFolderModal();
+        });
+
+        // Create folder modal
+        document.getElementById('cancel-create-folder').addEventListener('click', () => {
+            this.hideCreateFolderModal();
+        });
+
+        document.getElementById('confirm-create-folder').addEventListener('click', async () => {
+            await this.createFolder();
+        });
+
+        // Move note modal
+        document.getElementById('cancel-move-note').addEventListener('click', () => {
+            this.hideMoveNoteModal();
+        });
+
+        document.getElementById('confirm-move-note').addEventListener('click', async () => {
+            await this.moveNoteToFolder();
+        });
+
         // Auto-guardado cada 30 segundos
         this.autoSaveInterval = setInterval(() => {
             if (this.currentNote) {
@@ -896,6 +975,13 @@ class NotesApp {
                 loaded: false
             }));
             this.renderTagFilter();
+            
+            // Refresh the current view
+            if (this.currentViewMode === 'folder') {
+                await this.loadFolderStructure();
+            } else {
+                this.renderNotesList();
+            }
        } catch (error) {
             console.error('Error loading notes from server:', error);
             this.notes = [];
@@ -1455,6 +1541,524 @@ class NotesApp {
         const storageKey = `notes-app-data-${currentUser}`;
         localStorage.setItem(storageKey, JSON.stringify(this.notes));
     }
+
+    // === FOLDER MANAGEMENT FUNCTIONS ===
+    
+    loadViewModePreference() {
+        const storageKey = `notes-app-view-mode-${currentUser}`;
+        const savedMode = localStorage.getItem(storageKey);
+        const mode = savedMode || 'folder'; // Default to folder view
+        
+        this.setViewMode(mode);
+    }
+    
+    async loadFolderStructure() {
+        try {
+            const response = await authFetch('/api/folder-structure');
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.folderStructure = data.structure || [];
+            
+            if (this.currentViewMode === 'folder') {
+                this.renderFolderTree();
+                // Update tag filter to include tags from folder structure
+                this.renderTagFilter();
+            }
+        } catch (error) {
+            console.error('Error loading folder structure:', error);
+            this.folderStructure = [];
+        }
+    }
+    
+    setViewMode(mode) {
+        this.currentViewMode = mode;
+        
+        // Update button states
+        document.querySelectorAll('.view-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.mode === mode);
+        });
+        
+        // Toggle visibility of views
+        const notesList = document.getElementById('notes-list');
+        const folderTree = document.getElementById('folder-tree');
+        
+        if (mode === 'folder') {
+            notesList.style.display = 'none';
+            folderTree.style.display = 'block';
+            this.loadFolderStructure();
+        } else {
+            notesList.style.display = 'block';
+            folderTree.style.display = 'none';
+            this.renderNotesList();
+        }
+        
+        // Save preference
+        const storageKey = `notes-app-view-mode-${currentUser}`;
+        localStorage.setItem(storageKey, mode);
+    }
+    
+    renderFolderTree() {
+        const container = document.getElementById('folder-tree');
+        if (!container) return;
+        
+        // Only render folder view if we're in folder mode
+        if (this.currentViewMode !== 'folder') {
+            return;
+        }
+        
+        if (!this.folderStructure.length) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📁</div>
+                    <h3>No notes yet</h3>
+                    <p>Create your first note to get started</p>
+                </div>
+            `;
+            return;
+        }
+        
+        // Apply search and tag filtering
+        let filteredStructure = this.folderStructure;
+        if (this.searchTerm || this.selectedTags.size > 0) {
+            filteredStructure = this.filterFolderStructure(this.folderStructure);
+        }
+        
+        container.innerHTML = this.renderFolderItems(filteredStructure);
+        this.attachFolderEventListeners();
+    }
+    
+    // Refresh the current view based on view mode
+    refreshCurrentView() {
+        if (this.currentViewMode === 'folder') {
+            this.renderFolderTree();
+        } else {
+            this.renderNotesList();
+        }
+    }
+
+    filterFolderStructure(items) {
+        return items.map(item => {
+            if (item.type === 'folder') {
+                // Recursively filter children
+                const filteredChildren = this.filterFolderStructure(item.children || []);
+                
+                // Include folder if it has matching children or if folder name matches search
+                if (filteredChildren.length > 0 || 
+                    (this.searchTerm && item.name.toLowerCase().includes(this.searchTerm))) {
+                    return {
+                        ...item,
+                        children: filteredChildren
+                    };
+                }
+                return null;
+            } else {
+                // It's a note - check if it matches search and tag filters
+                let matchesSearch = true;
+                let matchesTags = true;
+                
+                // Apply search filter
+                if (this.searchTerm) {
+                    matchesSearch = item.name.toLowerCase().includes(this.searchTerm) || 
+                                   (item.content && item.content.toLowerCase().includes(this.searchTerm));
+                }
+                
+                // Apply tag filter
+                if (this.selectedTags.size > 0) {
+                    const noteTags = item.tags || [];
+                    matchesTags = [...this.selectedTags].every(selectedTag => 
+                        noteTags.some(noteTag => noteTag.toLowerCase() === selectedTag.toLowerCase())
+                    );
+                }
+                
+                if (matchesSearch && matchesTags) {
+                    return item;
+                }
+                return null;
+            }
+        }).filter(item => item !== null);
+    }
+    
+    renderFolderItems(items, level = 0) {
+        return items.map(item => {
+            if (item.type === 'folder') {
+                const isExpanded = this.expandedFolders.has(item.path);
+                const hasChildren = item.children && item.children.length > 0;
+                
+                return `
+                    <div class="folder-item" data-path="${item.path}" data-level="${level}">
+                        <div class="folder-toggle ${isExpanded ? 'expanded' : ''}" ${hasChildren ? '' : 'style="visibility: hidden;"'}>
+                            <i class="fas fa-chevron-right"></i>
+                        </div>
+                        <div class="folder-icon">
+                            <i class="fas fa-folder${isExpanded ? '-open' : ''}"></i>
+                        </div>
+                        <div class="folder-name">${item.name}</div>
+                        <div class="folder-actions">
+                            <button class="folder-action-btn" data-action="create-note" title="Create note in this folder">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                            <button class="folder-action-btn" data-action="delete" title="Delete folder">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    ${isExpanded && hasChildren ? `
+                        <div class="folder-children">
+                            ${this.renderFolderItems(item.children, level + 1)}
+                        </div>
+                    ` : ''}
+                `;
+            } else {
+                // It's a note
+                const isActive = this.currentNote && this.currentNote.id === item.id;
+                return `
+                    <div class="folder-note-item ${isActive ? 'active' : ''}" data-id="${item.id}" data-level="${level}">
+                        <div class="folder-note-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="folder-note-title">${item.name}</div>
+                        <div class="folder-note-actions">
+                            <button class="folder-note-action-btn" data-action="move" title="Move note">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
+                            <button class="folder-note-action-btn note-delete-btn" data-note-id="${item.id}" data-action="delete" title="Delete note">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+    
+    attachFolderEventListeners() {
+        const container = document.getElementById('folder-tree');
+        if (!container) return;
+        
+        // Folder toggle events
+        container.querySelectorAll('.folder-toggle').forEach(toggle => {
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const folderItem = toggle.closest('.folder-item');
+                const path = folderItem.dataset.path;
+                this.toggleFolder(path);
+            });
+        });
+        
+        // Folder click events
+        container.querySelectorAll('.folder-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const path = item.dataset.path;
+                this.toggleFolder(path);
+            });
+        });
+        
+        // Note click events
+        container.querySelectorAll('.folder-note-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const noteId = parseInt(item.dataset.id);
+                await this.selectNoteFromFolder(noteId);
+            });
+        });
+        
+        // Folder action events
+        container.querySelectorAll('.folder-action-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                const folderItem = btn.closest('.folder-item');
+                const path = folderItem.dataset.path;
+                
+                if (action === 'delete') {
+                    await this.deleteFolder(path);
+                } else if (action === 'create-note') {
+                    await this.createNoteInFolder(path);
+                }
+            });
+        });
+        
+        // Note action events
+        container.querySelectorAll('.folder-note-action-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                const noteItem = btn.closest('.folder-note-item');
+                const noteId = parseInt(noteItem.dataset.id);
+                
+                if (action === 'move') {
+                    this.showMoveNoteModal(noteId);
+                } else if (action === 'delete') {
+                    this.showDeleteNoteModal(noteId);
+                }
+            });
+        });
+    }
+    
+    toggleFolder(path) {
+        if (this.expandedFolders.has(path)) {
+            this.expandedFolders.delete(path);
+        } else {
+            this.expandedFolders.add(path);
+        }
+        this.renderFolderTree();
+    }
+    
+    async selectNoteFromFolder(noteId) {
+        // Find the note in folder structure
+        const note = this.findNoteInStructure(noteId, this.folderStructure);
+        if (!note) return;
+        
+        // Add to notes array if not already there (for compatibility)
+        if (!this.notes.find(n => n.id === noteId)) {
+            this.notes.push({
+                id: note.id,
+                filename: note.filename,
+                title: note.name,
+                content: '',
+                createdAt: note.created,
+                updatedAt: note.modified,
+                tags: note.tags || [],
+                loaded: false
+            });
+        }
+        
+        await this.selectNote(noteId);
+    }
+    
+    findNoteInStructure(noteId, items) {
+        for (const item of items) {
+            if (item.type === 'note' && item.id === noteId) {
+                return item;
+            } else if (item.type === 'folder' && item.children) {
+                const found = this.findNoteInStructure(noteId, item.children);
+                if (found) return found;
+            }
+        }
+        return null;
+    }
+    
+    showCreateFolderModal() {
+        const modal = document.getElementById('create-folder-modal');
+        const nameInput = document.getElementById('folder-name-input');
+        const parentSelect = document.getElementById('parent-folder-select');
+        
+        // Clear previous values
+        nameInput.value = '';
+        
+        // Populate parent folder options
+        this.populateFolderOptions(parentSelect);
+        
+        modal.classList.add('active');
+        nameInput.focus();
+    }
+    
+    hideCreateFolderModal() {
+        const modal = document.getElementById('create-folder-modal');
+        modal.classList.remove('active');
+    }
+    
+    populateFolderOptions(select) {
+        select.innerHTML = '<option value="">Root (No parent)</option>';
+        this.addFolderOptions(select, this.folderStructure);
+    }
+    
+    addFolderOptions(select, items, prefix = '') {
+        items.forEach(item => {
+            if (item.type === 'folder') {
+                const option = document.createElement('option');
+                option.value = item.path;
+                option.textContent = prefix + item.name;
+                select.appendChild(option);
+                
+                if (item.children) {
+                    this.addFolderOptions(select, item.children, prefix + item.name + '/');
+                }
+            }
+        });
+    }
+    
+    async createFolder() {
+        const nameInput = document.getElementById('folder-name-input');
+        const parentSelect = document.getElementById('parent-folder-select');
+        
+        const name = nameInput.value.trim();
+        const parent = parentSelect.value;
+        
+        if (!name) {
+            this.showNotification('Please enter a folder name', 'error');
+            return;
+        }
+        
+        try {
+            const response = await authFetch('/api/folders', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    parent: parent
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to create folder');
+            }
+            
+            this.showNotification('Folder created successfully');
+            this.hideCreateFolderModal();
+            await this.loadFolderStructure();
+            
+        } catch (error) {
+            console.error('Error creating folder:', error);
+            this.showNotification(`Error creating folder: ${error.message}`, 'error');
+        }
+    }
+    
+    async deleteFolder(path) {
+        if (!confirm('Are you sure you want to delete this folder? It must be empty.')) {
+            return;
+        }
+        
+        try {
+            const response = await authFetch(`/api/folders/${encodeURIComponent(path)}`, {
+                method: 'DELETE'
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to delete folder');
+            }
+            
+            this.showNotification('Folder deleted successfully');
+            await this.loadFolderStructure();
+            
+        } catch (error) {
+            console.error('Error deleting folder:', error);
+            this.showNotification(`Error deleting folder: ${error.message}`, 'error');
+        }
+    }
+    
+    async createNoteInFolder(folderPath) {
+        const now = new Date();
+        const newNote = {
+            id: Date.now(),
+            title: `Note ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
+            content: '',
+            createdAt: now.toISOString(),
+            updatedAt: now.toISOString(),
+            loaded: true
+        };
+        
+        this.notes.unshift(newNote);
+        this.saveToStorage();
+        
+        // Select the note first so currentNote is set
+        this.currentNote = newNote;
+        
+        try {
+            // Create the note directly in the target folder
+            const response = await authFetch('/api/create-note-in-folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: newNote.id,
+                    title: newNote.title,
+                    content: newNote.content,
+                    folder_path: folderPath,
+                    tags: newNote.tags || []
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to create note in folder');
+            }
+            
+            // Expand the folder to show the new note
+            if (!this.expandedFolders.has(folderPath)) {
+                this.expandedFolders.add(folderPath);
+            }
+            
+            // Refresh folder structure to show the new note
+            await this.loadFolderStructure();
+            this.renderFolderTree();
+            
+            // Update selection UI
+            this.updateNoteSelection();
+            this.loadNoteToEditor();
+            
+            // Focus the title for editing
+            setTimeout(() => {
+                document.getElementById('note-title').focus();
+                document.getElementById('note-title').select();
+            }, 100);
+            
+            this.showNotification('Note created in folder successfully');
+            
+        } catch (error) {
+            console.error('Error creating note in folder:', error);
+            this.showNotification(`Error creating note in folder: ${error.message}`, 'error');
+        }
+    }
+    
+    showMoveNoteModal(noteId) {
+        this.noteToMove = noteId;
+        const modal = document.getElementById('move-note-modal');
+        const targetSelect = document.getElementById('target-folder-select');
+        
+        // Populate folder options
+        this.populateFolderOptions(targetSelect);
+        
+        modal.classList.add('active');
+    }
+    
+    hideMoveNoteModal() {
+        const modal = document.getElementById('move-note-modal');
+        modal.classList.remove('active');
+        this.noteToMove = null;
+    }
+    
+    async moveNoteToFolder() {
+        if (!this.noteToMove) return;
+        
+        const targetSelect = document.getElementById('target-folder-select');
+        const targetFolder = targetSelect.value;
+        
+        try {
+            const response = await authFetch('/api/move-note', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    note_id: this.noteToMove,
+                    folder: targetFolder
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to move note');
+            }
+            
+            this.showNotification('Note moved successfully');
+            this.hideMoveNoteModal();
+            await this.loadFolderStructure();
+            
+        } catch (error) {
+            console.error('Error moving note:', error);
+            this.showNotification(`Error moving note: ${error.message}`, 'error');
+        }
+    }
+    
+    // === END FOLDER MANAGEMENT FUNCTIONS ===
     
     async createNewNote() {
         const now = new Date();
@@ -1469,8 +2073,42 @@ class NotesApp {
         
         this.notes.unshift(newNote);
         this.saveToStorage();
-        this.renderNotesList();
-        await this.selectNote(newNote.id);
+        
+        // Select the note first so currentNote is set
+        this.currentNote = newNote;
+        
+        // If in folder view, add the note to the root of the folder structure immediately
+        if (this.currentViewMode === 'folder') {
+            // Add the new note to the root of the folder structure for immediate display
+            const folderNote = {
+                id: newNote.id,
+                type: 'note',
+                name: newNote.title,
+                filename: `${newNote.id}.md`,
+                created: newNote.createdAt,
+                modified: newNote.updatedAt,
+                tags: []
+            };
+            this.folderStructure.unshift(folderNote);
+            this.renderFolderTree();
+        } else {
+            this.renderNotesList();
+        }
+        
+        // Update selection UI immediately
+        this.updateNoteSelection();
+        this.loadNoteToEditor();
+        
+        // Save the new note to the server in the background
+        this.saveNoteToServer(true).then(() => {
+            // After saving to server, reload folder structure to get the correct server state
+            if (this.currentViewMode === 'folder') {
+                this.loadFolderStructure().then(() => {
+                    this.renderFolderTree();
+                    this.updateNoteSelection();
+                });
+            }
+        });
         
         // Enfocar el título para edición
         setTimeout(() => {
@@ -1534,12 +2172,14 @@ class NotesApp {
     }
     
     updateNoteSelection() {
-        document.querySelectorAll('.note-item').forEach(item => {
+        // Clear active state from both list view and folder view notes
+        document.querySelectorAll('.note-item, .folder-note-item').forEach(item => {
             item.classList.remove('active');
         });
         
         if (this.currentNote) {
-            const activeItem = document.querySelector(`[data-note-id="${this.currentNote.id}"]`);
+            // Try both selectors for list view and folder view
+            const activeItem = document.querySelector(`[data-note-id="${this.currentNote.id}"], [data-id="${this.currentNote.id}"]`);
             if (activeItem) {
                 activeItem.classList.add('active');
             }
@@ -1565,6 +2205,14 @@ class NotesApp {
 
         const title = document.getElementById('note-title').value.trim();
         if (title === this.currentNote.title) return;
+
+        // Immediate local update for folder view
+        if (this.currentView === 'folders' && title) {
+            const oldTitle = this.currentNote.title;
+            this.currentNote.title = title; // Temporarily update for UI
+            this.updateNoteInFolderStructure(this.currentNote.id, title);
+            this.currentNote.title = oldTitle; // Restore original title until save
+        }
 
         clearTimeout(this.autoSaveTimeout);
         this.autoSaveTimeout = setTimeout(() => {
@@ -1595,19 +2243,46 @@ class NotesApp {
             return;
         }
         
+        const titleChanged = this.currentNote.title !== (title || 'Untitled Note');
+        
         this.currentNote.title = title || 'Untitled Note';
         this.currentNote.content = content;
         this.currentNote.updatedAt = new Date().toISOString();
 
         // Save to local storage
         this.saveToStorage();
-        this.renderNotesList();
+        
+        // Refresh current view
+        if (this.currentViewMode === 'folder') {
+            // If title changed, update local folder structure immediately for instant feedback
+            if (titleChanged) {
+                this.updateNoteInFolderStructure(this.currentNote.id, this.currentNote.title);
+                this.renderFolderTree();
+                this.updateNoteSelection();
+                
+                // Then save to server and refresh from server to get the authoritative state
+                this.saveNoteToServer(true).then(() => {
+                    this.loadFolderStructure().then(() => {
+                        this.renderFolderTree();
+                        this.updateNoteSelection();
+                    });
+                });
+            } else {
+                this.renderFolderTree();
+            }
+        } else {
+            this.renderNotesList();
+        }
+        
         this.updateNoteSelection();
 
         this.currentNote.loaded = true;
         
         // Save to server as markdown file
-        this.saveNoteToServer(silent);
+        if (!titleChanged) {
+            // Only save if title didn't change (to avoid double save)
+            this.saveNoteToServer(silent);
+        }
         
         if (!silent) {
             this.showNotification('Note saved successfully');
@@ -1675,7 +2350,13 @@ class NotesApp {
         
         this.notes = this.notes.filter(note => note.id !== this.currentNote.id);
         this.saveToStorage();
-        this.renderNotesList();
+        
+        // Refresh current view
+        if (this.currentViewMode === 'folder') {
+            await this.loadFolderStructure();
+        } else {
+            this.renderNotesList();
+        }
         
         // Delete from server
         this.deleteNoteFromServer(noteIdToDelete);
@@ -2432,6 +3113,9 @@ class NotesApp {
         insightsEl.innerHTML = '';
         nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
         
+        // Clear any manual positions from previous graph
+        this.clearManualPositions();
+        
         // Get text length for better progress indication
         const noteText = await this.getNotesContentForConcept();
         if (!noteText) {
@@ -2527,21 +3211,21 @@ class NotesApp {
             <div class="insight-item">
                 <span class="insight-label">${dominantLabel}</span>
                 <div class="insight-tags">
-                    ${insights.dominant_topics.map(topic => `<span class="insight-tag">${topic}</span>`).join('')}
+                    ${insights.dominant_topics.map(topic => `<span class="insight-tag" data-node-label="${topic}">${topic}</span>`).join('')}
                 </div>
             </div>
             
             <div class="insight-item">
                 <span class="insight-label">Bridging Concepts</span>
                 <div class="insight-tags">
-                    ${insights.bridging_concepts.map(concept => `<span class="insight-tag insight-tag--secondary">${concept}</span>`).join('')}
+                    ${insights.bridging_concepts.map(concept => `<span class="insight-tag insight-tag--secondary" data-node-label="${concept}">${concept}</span>`).join('')}
                 </div>
             </div>
             
             <div class="insight-item">
                 <span class="insight-label">Knowledge Gaps</span>
                 <div class="insight-tags">
-                    ${insights.knowledge_gaps.map(gap => `<span class="insight-tag insight-tag--warning">${gap}</span>`).join('')}
+                    ${insights.knowledge_gaps.map(gap => `<span class="insight-tag insight-tag--warning" data-node-label="${gap}">${gap}</span>`).join('')}
                 </div>
             </div>
             
@@ -2552,6 +3236,9 @@ class NotesApp {
                 </div>
             ` : ''}
         `;
+        
+        // Add click handlers for insight tags
+        this.addInsightTagClickHandlers();
     }
 
     renderNodeDetails(node, connectedNodes = []) {
@@ -2613,7 +3300,7 @@ class NotesApp {
         const connectedNodeElements = nodeDetailsEl.querySelectorAll('.connected-node');
         connectedNodeElements.forEach(el => {
             el.addEventListener('click', () => {
-                const nodeId = parseInt(el.dataset.nodeId);
+                const nodeId = el.dataset.nodeId;
                 this.highlightNode(nodeId);
             });
         });
@@ -2642,12 +3329,42 @@ class NotesApp {
         // This will be called from connected node clicks
         // Find the node in the graph and simulate a click
         const nodeElement = d3.select('.concept-graph-container .nodes')
-            .selectAll('circle')
-            .filter(d => d.id === nodeId);
+            .selectAll('.node')
+            .filter(d => d.id == nodeId); // Use == to handle string/number comparison
         
         if (!nodeElement.empty()) {
             nodeElement.dispatch('click');
         }
+    }
+
+    highlightNodeByLabel(nodeLabel) {
+        // Find the node in the current graph data by label and select it
+        if (!this.currentGraphData || !this.currentGraphData.nodes) return;
+        
+        const node = this.currentGraphData.nodes.find(n => n.label === nodeLabel);
+        if (!node) return;
+        
+        // Find the corresponding DOM element and simulate a click
+        const nodeElement = d3.select('.concept-graph-container .nodes')
+            .selectAll('.node')
+            .filter(d => d.id === node.id);
+        
+        if (!nodeElement.empty()) {
+            nodeElement.dispatch('click');
+        }
+    }
+
+    addInsightTagClickHandlers() {
+        // Add click handlers to all insight tags to select corresponding nodes
+        const insightTags = document.querySelectorAll('.insight-tag[data-node-label]');
+        insightTags.forEach(tag => {
+            tag.addEventListener('click', (e) => {
+                const nodeLabel = e.target.dataset.nodeLabel;
+                if (nodeLabel) {
+                    this.highlightNodeByLabel(nodeLabel);
+                }
+            });
+        });
     }
 
     hideConceptGraphModal() {
@@ -2781,6 +3498,9 @@ class NotesApp {
         insightsEl.innerHTML = '';
         nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
         
+        // Clear any manual positions from previous graph
+        this.clearManualPositions();
+        
         this.showProcessingOverlay('Generating concept map...');
         
         try {
@@ -2838,7 +3558,7 @@ class NotesApp {
         }
 
         const width = container.clientWidth || 800;
-        const height = container.clientHeight - 80; // Account for bottom controls
+        const height = container.clientHeight || 600;
         
         // Create SVG with better styling
         const svg = d3.select(container)
@@ -2848,14 +3568,25 @@ class NotesApp {
             .style('background', '#fafafa')
             .style('border-radius', '8px');
         
-        // Add zoom and pan functionality
+        // Add zoom and pan functionality with rotation support
         const g = svg.append('g');
+        this.rotationAngle = 0; // Initialize rotation angle
+        this.rotationMode = false; // Initialize rotation mode
+        
         const zoom = d3.zoom()
             .scaleExtent([0.1, 3])
             .on('zoom', (event) => {
-                g.attr('transform', event.transform);
+                if (!this.rotationMode) {
+                    g.attr('transform', event.transform);
+                    // Update node and label visibility based on zoom level
+                    this.updateNodeVisibilityOnZoom(event.transform.k);
+                }
             });
+        
         svg.call(zoom);
+        
+        // Add rotation drag behavior
+        this.setupRotationDrag(svg, g, zoom);
         
         // Store references for filtering
         this.graphElements = {
@@ -2866,6 +3597,9 @@ class NotesApp {
             height: height,
             container: container
         };
+        
+        // Create integrated sliders inside the graph
+        this.createIntegratedSliders(container);
         
         // Initial render
         this.updateGraphVisualization();
@@ -2881,99 +3615,229 @@ class NotesApp {
         if (!this.graphElements || !this.currentGraphData) return;
         
         const { g, width, height } = this.graphElements;
-        const graph = this.currentGraphData;
+        let graph = this.currentGraphData;
         
         // Clear existing elements
         g.selectAll("*").remove();
         
-        // Create color scale for different clusters
-        const color = d3.scaleOrdinal()
-            .domain(graph.nodes.map(d => d.id))
-            .range(['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']);
+        // STEP 1: Calculate actual node degrees from the graph structure
+        const nodeDegrees = {};
+        graph.nodes.forEach(node => {
+            nodeDegrees[node.id] = 0;
+        });
+
+        graph.links.forEach(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            
+            if (nodeDegrees[sourceId] !== undefined) nodeDegrees[sourceId]++;
+            if (nodeDegrees[targetId] !== undefined) nodeDegrees[targetId]++;
+        });
+
+        // STEP 2: Get current slider values for dynamic filtering
+        const maxNodes = parseInt(document.getElementById('max-nodes-slider')?.value || '150');
+        const minDegree = parseInt(document.getElementById('node-degree-slider')?.value || '3');
+        const labelCount = parseInt(document.getElementById('label-count-slider')?.value || '50');
+
+        // STEP 3: Filter nodes with degree >= minDegree, sort by degree, keep top maxNodes
+        let filteredNodes = graph.nodes.filter(node => {
+            const degree = nodeDegrees[node.id] || 0;
+            return degree >= minDegree;
+        });
+
+        // Sort by degree (descending) and limit to maxNodes
+        filteredNodes.sort((a, b) => (nodeDegrees[b.id] || 0) - (nodeDegrees[a.id] || 0));
+        filteredNodes = filteredNodes.slice(0, maxNodes);
+
+        // STEP 4: Create set of filtered node IDs and filter links
+        const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
+        const filteredLinks = graph.links.filter(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
+        });
+
+        // Update graph with filtered data
+        graph = { nodes: filteredNodes, links: filteredLinks };
+
+        // STEP 5: Assign sizes based on degree and communities (with improved detection and fallback)
+        const maxFilteredDegree = Math.max(...filteredNodes.map(n => nodeDegrees[n.id] || 0));
+        const minFilteredDegree = Math.min(...filteredNodes.map(n => nodeDegrees[n.id] || 0));
         
-        // Create links with enhanced styling
+        // Community detection with fallback
+        let communities;
+        try {
+            communities = this.detectCommunities(graph);
+            
+            // Verify communities are properly distributed
+            const uniqueCommunities = new Set(Object.values(communities));
+            if (uniqueCommunities.size < 2) {
+                throw new Error('Insufficient community diversity');
+            }
+        } catch (error) {
+            console.warn('Community detection failed, using degree-based coloring:', error);
+            // Fallback: assign communities based on degree ranges for color variety
+            communities = {};
+            filteredNodes.forEach(node => {
+                const degree = nodeDegrees[node.id] || 0;
+                communities[node.id] = Math.min(Math.floor(degree / 3), 6); // Max 7 color groups
+            });
+        }
+        
+        // Enhanced color palette with better contrast
+        const communityColors = d3.scaleOrdinal()
+            .domain([...new Set(Object.values(communities))])
+            .range([
+                '#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6', 
+                '#1abc9c', '#e67e22', '#34495e', '#f1c40f', '#95a5a6',
+                '#8e44ad', '#16a085', '#27ae60', '#2980b9', '#c0392b'
+            ]);
+
+        // STEP 6: Determine which nodes get labels (multi-tier approach + all AI nodes)
+        const sortedNodesByDegree = [...filteredNodes]
+            .sort((a, b) => (nodeDegrees[b.id] || 0) - (nodeDegrees[a.id] || 0));
+        
+        const labeledNodeIds = new Set();
+        
+        // Tier 1: Top nodes (largest - get priority labels)
+        const tier1Count = Math.ceil(labelCount * 0.4); // 40% of label count for biggest nodes
+        sortedNodesByDegree.slice(0, tier1Count).forEach(n => labeledNodeIds.add(n.id));
+        
+        // Tier 2: 2nd biggest nodes 
+        const tier2Count = Math.ceil(labelCount * 0.3); // 30% for 2nd tier
+        sortedNodesByDegree.slice(tier1Count, tier1Count + tier2Count).forEach(n => labeledNodeIds.add(n.id));
+        
+        // Tier 3: 3rd biggest nodes
+        const tier3Count = Math.ceil(labelCount * 0.2); // 20% for 3rd tier
+        sortedNodesByDegree.slice(tier1Count + tier2Count, tier1Count + tier2Count + tier3Count).forEach(n => labeledNodeIds.add(n.id));
+        
+        // Tier 4: 4th biggest nodes
+        const tier4Count = labelCount - tier1Count - tier2Count - tier3Count; // Remaining for 4th tier
+        if (tier4Count > 0) {
+            sortedNodesByDegree.slice(tier1Count + tier2Count + tier3Count, tier1Count + tier2Count + tier3Count + tier4Count).forEach(n => labeledNodeIds.add(n.id));
+        }
+        
+        // Always show labels for AI nodes
+        filteredNodes.forEach(node => {
+            if (node.isAIGenerated) {
+                labeledNodeIds.add(node.id);
+            }
+        });
+
+        // Assign properties to nodes
+        filteredNodes.forEach(node => {
+            const degree = nodeDegrees[node.id] || 0;
+            // Size nodes by degree (range: 4-20), AI nodes get larger size
+            if (node.isAIGenerated) {
+                node.calculatedSize = Math.max(18, node.importance * 25);
+            } else {
+                node.calculatedSize = 4 + ((degree - minFilteredDegree) / (maxFilteredDegree - minFilteredDegree)) * 16;
+            }
+            node.community = communities[node.id] || 0;
+            node.showLabel = labeledNodeIds.has(node.id);
+            node.degree = degree;
+        });
+        
+        // STEP 7: Create enhanced links with variable width and special styling for AI connections
         const link = g.append('g')
             .attr('class', 'links')
             .selectAll('line')
             .data(graph.links)
             .enter().append('line')
-            .attr('stroke', '#999')
-            .attr('stroke-opacity', 0.4)
-            .attr('stroke-width', d => d.strength || Math.sqrt(d.weight || 1))
+            .attr('class', d => d.isAIGenerated ? 'ai-connection' : 'regular-connection')
+            .attr('stroke', d => d.isAIGenerated ? '#8b5cf6' : '#666')
+            .attr('stroke-opacity', d => d.isAIGenerated ? 0.8 : 0.3)
+            .attr('stroke-width', d => {
+                if (d.isAIGenerated) {
+                    return 2.5; // Thicker lines for AI connections
+                }
+                // Vary link width based on connected node degrees for regular connections
+                const sourceDegree = nodeDegrees[typeof d.source === 'object' ? d.source.id : d.source] || 0;
+                const targetDegree = nodeDegrees[typeof d.target === 'object' ? d.target.id : d.target] || 0;
+                return Math.max(0.5, Math.min(3, (sourceDegree + targetDegree) / 20));
+            })
+            .attr('stroke-dasharray', d => d.isAIGenerated ? '5,3' : 'none')
             .style('cursor', 'pointer');
         
-        // Create nodes with dynamic sizing based on importance
+        // STEP 8: Create nodes with community colors and degree-based sizing
         const node = g.append('g')
             .attr('class', 'nodes')
             .selectAll('g')
             .data(graph.nodes)
             .enter().append('g')
             .attr('class', 'node')
-            .style('cursor', 'pointer')
-            .call(d3.drag()
-                .on('start', dragstarted)
-                .on('drag', dragged)
-                .on('end', dragended));
+            .style('cursor', 'pointer');
         
-        // Add shapes to nodes - circles for regular nodes, pentagons for AI nodes
+        // Add shapes to nodes
         node.each(function(d) {
             const nodeGroup = d3.select(this);
-            const radius = d.size || 8;
+            const radius = d.calculatedSize;
             
             if (d.isAIGenerated) {
-                // Create pentagon path for AI nodes
-                const pentagon = [];
-                for (let i = 0; i < 5; i++) {
-                    const angle = (i * 2 * Math.PI / 5) - Math.PI / 2; // Start from top
-                    const x = radius * Math.cos(angle);
-                    const y = radius * Math.sin(angle);
-                    pentagon.push([x, y]);
-                }
-                
-                const pathData = `M${pentagon.map(p => p.join(',')).join('L')}Z`;
-                
-                nodeGroup.append('path')
-                    .attr('d', pathData)
-                    .attr('fill', '#8b5cf6') // Purple color for AI nodes
-                    .attr('stroke', '#fff')
-                    .attr('stroke-width', 2);
+                // Circle with AI styling for AI nodes
+                nodeGroup.append('circle')
+                    .attr('class', 'ai-node')
+                    .attr('r', radius)
+                    .attr('fill', '#e5e7ff')
+                    .attr('stroke', '#8b5cf6')
+                    .attr('stroke-width', 3);
             } else {
-                // Create circle for regular nodes
-                const col = color(graph.nodes.indexOf(d) % 10);
-                d._color = col; // store original color for later reference
+                // Circle for regular nodes, colored by community
+                const communityColor = communityColors(d.community);
+                d._color = communityColor;
                 
                 nodeGroup.append('circle')
                     .attr('r', radius)
-                    .attr('fill', col)
+                    .attr('fill', communityColor)
                     .attr('stroke', '#fff')
                     .attr('stroke-width', 2);
             }
         });
         
-        // Add hover effects
+        // STEP 8: Add enhanced hover effects
         node.on('mouseover', function(event, d) {
             const nodeGroup = d3.select(this);
             const shape = nodeGroup.select(d.isAIGenerated ? 'path' : 'circle');
             
             // Scale up the shape on hover
             nodeGroup.transition()
-                .duration(200)
-                .attr('transform', 'scale(1.3)');
+                .duration(150)
+                .attr('transform', `translate(${d.x},${d.y}) scale(1.4)`);
             
-            shape.attr('stroke-width', 3);
+            shape.attr('stroke-width', 4)
+                .attr('stroke', '#333');
             
             // Highlight connected nodes and links
-            const connectedNodes = new Set();
+            const connectedNodes = new Set([d.id]);
             link.style('stroke-opacity', l => {
-                if (l.source.id === d.id || l.target.id === d.id) {
-                    connectedNodes.add(l.source.id);
-                    connectedNodes.add(l.target.id);
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                if (sourceId === d.id || targetId === d.id) {
+                    connectedNodes.add(sourceId);
+                    connectedNodes.add(targetId);
                     return 0.8;
                 }
                 return 0.1;
+            }).style('stroke', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                return (sourceId === d.id || targetId === d.id) ? '#333' : '#666';
             });
             
-            node.style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
+            node.style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.2);
+            
+            // Show degree info in a tooltip-like manner
+            if (d.showLabel) {
+                const tooltip = g.append('text')
+                    .attr('class', 'tooltip')
+                    .attr('x', d.x + d.calculatedSize + 5)
+                    .attr('y', d.y - 5)
+                    .attr('font-size', '12px')
+                    .attr('font-weight', 'bold')
+                    .attr('fill', '#333')
+                    .style('pointer-events', 'none')
+                    .text(`${d.label} (degree: ${d.degree})`);
+            }
         })
         .on('mouseout', function(event, d) {
             const nodeGroup = d3.select(this);
@@ -2981,124 +3845,22 @@ class NotesApp {
             
             // Reset scale
             nodeGroup.transition()
-                .duration(200)
-                .attr('transform', 'scale(1)');
+                .duration(150)
+                .attr('transform', `translate(${d.x},${d.y}) scale(1)`);
             
-            shape.attr('stroke-width', 2);
+            shape.attr('stroke-width', 2)
+                .attr('stroke', '#fff');
             
             // Reset highlighting
-            link.style('stroke-opacity', 0.4);
+            link.style('stroke-opacity', 0.3)
+                .style('stroke', '#666');
             node.style('opacity', 1);
+            
+            // Remove tooltip
+            g.selectAll('.tooltip').remove();
         });
-        
-        // Add labels with better positioning and conditional visibility
-        const label = g.append('g')
-            .attr('class', 'labels')
-            .selectAll('text')
-            .data(graph.nodes)
-            .enter().append('text')
-            .attr('font-size', d => Math.max(10, Math.min(14, (d.size || 8) / 2 + 8)))
-            .attr('font-weight', d => d.importance > 0.5 ? 'bold' : 'normal')
-            .attr('dx', d => (d.size || 8) + 5)
-            .attr('dy', '0.35em')
-            .attr('fill', '#333')
-            .style('pointer-events', 'none')
-            .style('opacity', d => d.showText !== false ? 1 : 0)
-            .text(d => d.label);
-        
-        // Create force simulation with improved parameters
-        const simulation = d3.forceSimulation(graph.nodes)
-            .force('link', d3.forceLink(graph.links)
-                .id(d => d.id)
-                .distance(d => 80 + (d.weight || 1) * 20)
-                .strength(d => Math.min(1, (d.weight || 1) * 0.5))
-            )
-            .force('charge', d3.forceManyBody()
-                .strength(d => -300 - (d.size || 8) * 10)
-            )
-            .force('center', d3.forceCenter(width / 2, height / 2))
-            .force('collision', d3.forceCollide()
-                .radius(d => (d.size || 8) + 10)
-            );
-        
-        // Update positions on each tick
-        simulation.on('tick', () => {
-            link
-                .attr('x1', d => d.source.x)
-                .attr('y1', d => d.source.y)
-                .attr('x2', d => d.target.x)
-                .attr('y2', d => d.target.y);
-            
-            node
-                .attr('transform', d => `translate(${d.x},${d.y})`);
-            
-            label
-                .attr('x', d => d.x)
-                .attr('y', d => d.y);
-        });
-        
-        // Click to highlight connections and show node details
-        node.on('click', (event, d) => {
-            event.stopPropagation();
-            
-            // Find connected nodes
-            const connectedNodes = new Set([d.id]);
-            const connectedLinks = new Set();
-            const connectedNodeDetails = [];
-            
-            graph.links.forEach(l => {
-                if (l.source.id === d.id || l.target.id === d.id) {
-                    connectedNodes.add(l.source.id);
-                    connectedNodes.add(l.target.id);
-                    connectedLinks.add(l);
-                    
-                    // Add connected node details
-                    const connectedNode = l.source.id === d.id ? l.target : l.source;
-                    if (connectedNode.id !== d.id) {
-                        connectedNodeDetails.push(connectedNode);
-                    }
-                }
-            });
-            
-            // Determine highlight color based on the clicked node
-            const highlightColor = d._color || color(graph.nodes.indexOf(d) % 10);
 
-            // Update graph styling using the clicked node's color
-            node.attr('fill', n => connectedNodes.has(n.id) ? highlightColor : '#ccc')
-                .style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
-
-            link.attr('stroke', l => connectedLinks.has(l) ? highlightColor : '#ccc')
-                .attr('stroke-width', l => connectedLinks.has(l) ? (l.strength || 2) * 1.5 : l.strength || 1)
-                .style('opacity', l => connectedLinks.has(l) ? 1 : 0.2);
-
-            label.style('opacity', n => {
-                const shouldShow = connectedNodes.has(n.id) && n.showText !== false;
-                return shouldShow ? 1 : (n.showText !== false ? 0.3 : 0);
-            }).attr('fill', '#333');
-            
-            // Show node details in sidebar
-            this.renderNodeDetails(d, connectedNodeDetails);
-        });
-        
-        // Click on background to reset
-        this.graphElements.svg.on('click', (event) => {
-            if (event.target === this.graphElements.svg.node()) {
-                node.attr('fill', d => d._color || color(graph.nodes.indexOf(d) % 10))
-                    .style('opacity', 1);
-                link.attr('stroke', '#999')
-                    .attr('stroke-width', d => d.strength || Math.sqrt(d.weight || 1))
-                    .style('opacity', 0.4);
-                label.style('opacity', n => n.showText !== false ? 1 : 0)
-                    .attr('fill', '#333');
-                
-                // Reset node details panel
-                const nodeDetailsEl = document.getElementById('node-details');
-                if (nodeDetailsEl) {
-                    nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
-                }
-            }
-        });
-        
+        // STEP 9: Drag behavior functions
         function dragstarted(event, d) {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
@@ -3115,30 +3877,523 @@ class NotesApp {
             d.fx = null;
             d.fy = null;
         }
+
+        // Apply drag behavior to nodes
+        node.call(d3.drag()
+            .on("start", dragstarted)
+            .on("drag", dragged)
+            .on("end", dragended));
+        
+        // STEP 10: Add labels with white backgrounds (only for top nodes by degree or AI nodes)
+        const labelGroup = g.append('g').attr('class', 'labels');
+        
+        const labelData = graph.nodes.filter(d => d.showLabel);
+        
+        // Create label backgrounds (white rectangles)
+        const labelBg = labelGroup
+            .selectAll('.label-bg')
+            .data(labelData)
+            .enter().append('rect')
+            .attr('class', 'label-bg')
+            .attr('fill', 'rgba(255, 255, 255, 0.9)')
+            .attr('stroke', 'rgba(0, 0, 0, 0.1)')
+            .attr('stroke-width', 0.5)
+            .attr('rx', 2)
+            .attr('ry', 2)
+            .style('pointer-events', 'none');
+        
+        // Create label text with improved sizing
+        const label = labelGroup
+            .selectAll('text')
+            .data(labelData)
+            .enter().append('text')
+            .attr('class', d => d.isAIGenerated ? 'ai-node-label' : 'regular-node-label')
+            .attr('font-size', d => {
+                // Improved font sizing - capped and more reasonable
+                const baseSize = d.isAIGenerated ? 12 : 11;
+                const sizeBonus = Math.min(4, (d.calculatedSize - 8) * 0.2); // Much smaller bonus
+                return Math.max(9, Math.min(14, baseSize + sizeBonus)); // Capped between 9-14px
+            })
+            .attr('font-weight', d => d.isAIGenerated ? '700' : '600')
+            .attr('dx', d => d.calculatedSize + 8)
+            .attr('dy', '0.35em')
+            .attr('fill', d => d.isAIGenerated ? '#6b46c1' : '#333')
+            .attr('text-anchor', 'start')
+            .style('pointer-events', 'none')
+            .text(d => d.label);
+        
+        // Position label backgrounds after text is created
+        labelBg.each(function(d, i) {
+            const textElement = label.nodes()[i];
+            if (textElement) {
+                const bbox = textElement.getBBox();
+                d3.select(this)
+                    .attr('x', bbox.x - 2)
+                    .attr('y', bbox.y - 1)
+                    .attr('width', bbox.width + 4)
+                    .attr('height', bbox.height + 2);
+            }
+        });
+        
+        // STEP 11: Implement stable simulation with balanced forces
+        const simulation = d3.forceSimulation(graph.nodes)
+            .force('link', d3.forceLink(graph.links)
+                .id(d => d.id)
+                .distance(d => {
+                    // Moderate link distance based on node sizes
+                    const sourceSize = d.source.calculatedSize || 8;
+                    const targetSize = d.target.calculatedSize || 8;
+                    return 50 + (sourceSize + targetSize) * 1.5;
+                })
+                .strength(0.5)
+            )
+            .force('charge', d3.forceManyBody()
+                .strength(d => {
+                    // Moderate repulsion to prevent excessive vibration
+                    const baseDegree = d.degree || 1;
+                    return -300 - (baseDegree * 20); // Reduced repulsion for stability
+                })
+                .distanceMin(10)
+                .distanceMax(200)
+            )
+            .force('center', d3.forceCenter(width / 2, height / 2)
+                .strength(0.1) // Moderate centering force
+            )
+            .force('collision', d3.forceCollide()
+                .radius(d => d.calculatedSize + 8) // Reduced collision padding
+                .strength(0.7)
+                .iterations(2)
+            )
+            .alphaDecay(0.05) // Faster cooling to reduce vibration
+            .velocityDecay(0.6); // Higher velocity decay for stability
+        
+        // STEP 12: Update positions on each tick with stabilization
+        let tickCount = 0;
+        simulation.on('tick', () => {
+            tickCount++;
+            
+            // Update link positions
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            
+            // Update node positions
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+            
+            // Update label positions (both text and backgrounds)
+            label
+                .attr('x', d => d.x + (d.calculatedSize || 8) + 8)
+                .attr('y', d => d.y);
+            
+            // Update label background positions
+            labelBg.each(function(d, i) {
+                const textElement = label.nodes()[i];
+                if (textElement) {
+                    try {
+                        const bbox = textElement.getBBox();
+                        d3.select(this)
+                            .attr('x', bbox.x - 2)
+                            .attr('y', bbox.y - 1)
+                            .attr('width', bbox.width + 4)
+                            .attr('height', bbox.height + 2);
+                    } catch (e) {
+                        // Fallback positioning if getBBox fails
+                        d3.select(this)
+                            .attr('x', d.x + (d.calculatedSize || 8) + 6)
+                            .attr('y', d.y - 8)
+                            .attr('width', d.label ? d.label.length * 6 + 4 : 20)
+                            .attr('height', 16);
+                    }
+                }
+            });
+            
+            // Stabilize after initial layout
+            if (tickCount > 100) {
+                simulation.alphaTarget(0.01); // Very low target to minimize movement
+            }
+        });
+        
+        // STEP 13: Click to highlight connections and show node details
+        node.on('click', (event, d) => {
+            event.stopPropagation();
+            
+            // Find connected nodes for detailed display
+            const connectedNodes = [];
+            graph.links.forEach(link => {
+                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+                
+                if (sourceId === d.id) {
+                    const targetNode = graph.nodes.find(n => n.id === targetId);
+                    if (targetNode) connectedNodes.push(targetNode);
+                } else if (targetId === d.id) {
+                    const sourceNode = graph.nodes.find(n => n.id === sourceId);
+                    if (sourceNode) connectedNodes.push(sourceNode);
+                }
+            });
+            
+            this.renderNodeDetails(d, connectedNodes);
+            
+            // Visual feedback with community colors
+            const connectedNodeIds = new Set([d.id, ...connectedNodes.map(n => n.id)]);
+            
+            node.style('opacity', n => connectedNodeIds.has(n.id) ? 1 : 0.2);
+            link.style('stroke-opacity', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                return (sourceId === d.id || targetId === d.id) ? 0.8 : 0.1;
+            }).style('stroke-width', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+                return (sourceId === d.id || targetId === d.id) ? 3 : 1;
+            });
+            
+            // Only show labels and backgrounds for connected nodes
+            label.style('opacity', n => connectedNodeIds.has(n.id) ? 1 : 0.3);
+            labelBg.style('opacity', n => connectedNodeIds.has(n.id) ? 0.9 : 0.2);
+        });
+        
+        // STEP 14: Click on background to reset
+        this.graphElements.svg.on('click', (event) => {
+            if (event.target === this.graphElements.svg.node()) {
+                // Reset highlighting
+                node.style('opacity', 1);
+                link.style('stroke-opacity', 0.3)
+                    .style('stroke-width', d => {
+                        // Restore original width based on degree
+                        const sourceDegree = nodeDegrees[typeof d.source === 'object' ? d.source.id : d.source] || 0;
+                        const targetDegree = nodeDegrees[typeof d.target === 'object' ? d.target.id : d.target] || 0;
+                        return Math.max(0.5, Math.min(3, (sourceDegree + targetDegree) / 20));
+                    });
+                label.style('opacity', 1);
+                labelBg.style('opacity', 0.9);
+                
+                // Reset node details panel
+                const nodeDetailsEl = document.getElementById('node-details');
+                if (nodeDetailsEl) {
+                    nodeDetailsEl.innerHTML = '<p class="no-selection">Click on a node to view its details</p>';
+                }
+            }
+        });
         
         // Store simulation for later use
         this.graphElements.simulation = simulation;
+        this.graphElements.nodes = node;
+        this.graphElements.links = link;
+        this.graphElements.labels = label;
+        this.graphElements.labelBg = labelBg;
+        this.graphElements.labelGroup = labelGroup;
+        
+        // Update drag behavior based on current mode
+        this.updateNodeDragBehavior();
+        
+        // Initialize node visibility for default zoom level
+        this.updateNodeVisibilityOnZoom(1.0);
+    }
+
+    // Improved community detection using modularity-based clustering
+    detectCommunities(graph) {
+        const communities = {};
+        const adjacencyList = {};
+        
+        // Initialize each node in its own community and build adjacency list
+        graph.nodes.forEach(node => {
+            communities[node.id] = node.id;
+            adjacencyList[node.id] = new Set();
+        });
+        
+        // Build adjacency list from links
+        graph.links.forEach(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            
+            if (adjacencyList[sourceId] && adjacencyList[targetId]) {
+                adjacencyList[sourceId].add(targetId);
+                adjacencyList[targetId].add(sourceId);
+            }
+        });
+        
+        // Simple agglomerative clustering based on connectivity
+        let improved = true;
+        let iterations = 0;
+        const maxIterations = 10;
+        
+        while (improved && iterations < maxIterations) {
+            improved = false;
+            iterations++;
+            
+            Object.keys(communities).forEach(nodeId => {
+                const currentCommunity = communities[nodeId];
+                const neighbors = Array.from(adjacencyList[nodeId] || []);
+                
+                if (neighbors.length === 0) return;
+                
+                // Count connections to different communities
+                const communityConnections = {};
+                neighbors.forEach(neighborId => {
+                    const neighborCommunity = communities[neighborId];
+                    communityConnections[neighborCommunity] = (communityConnections[neighborCommunity] || 0) + 1;
+                });
+                
+                // Find the community with the most connections
+                let bestCommunity = currentCommunity;
+                let maxConnections = communityConnections[currentCommunity] || 0;
+                
+                Object.entries(communityConnections).forEach(([community, connections]) => {
+                    if (connections > maxConnections) {
+                        maxConnections = connections;
+                        bestCommunity = community;
+                    }
+                });
+                
+                // Move to better community if beneficial
+                if (bestCommunity !== currentCommunity && maxConnections > 1) {
+                    communities[nodeId] = bestCommunity;
+                    improved = true;
+                }
+            });
+        }
+        
+        // Renumber communities starting from 0
+        const uniqueCommunities = [...new Set(Object.values(communities))];
+        const communityMapping = {};
+        uniqueCommunities.forEach((community, index) => {
+            communityMapping[community] = index;
+        });
+        
+        // Apply new community numbers
+        const finalCommunities = {};
+        Object.entries(communities).forEach(([nodeId, community]) => {
+            finalCommunities[nodeId] = communityMapping[community];
+        });
+        
+        console.log(`Detected ${uniqueCommunities.length} communities`);
+        return finalCommunities;
+    }
+
+    createIntegratedSliders(container) {
+        // Create slider container inside the graph (like the top controls but at bottom)
+        const sliderContainer = d3.select(container)
+            .append('div')
+            .attr('class', 'graph-controls-bottom')
+            .style('position', 'absolute')
+            .style('bottom', '10px')
+            .style('left', '50%')
+            .style('transform', 'translateX(-50%)')
+            .style('background', 'rgba(255, 255, 255, 0.95)')
+            .style('border', '1px solid var(--color-border)')
+            .style('border-radius', 'var(--radius-md)')
+            .style('padding', 'var(--space-12) var(--space-16)')
+            .style('display', 'flex')
+            .style('gap', 'var(--space-20)')
+            .style('align-items', 'center')
+            .style('box-shadow', '0 4px 20px rgba(0, 0, 0, 0.1)')
+            .style('backdrop-filter', 'blur(10px)')
+            .style('z-index', '1000')
+            .style('flex-wrap', 'wrap')
+            .style('justify-content', 'center');
+
+        // Max Nodes slider - Updated for selective approach
+        const maxNodesControl = sliderContainer.append('div')
+            .attr('class', 'slider-control')
+            .style('display', 'flex')
+            .style('flex-direction', 'column')
+            .style('align-items', 'center')
+            .style('gap', 'var(--space-4)')
+            .style('min-width', '120px');
+        
+        maxNodesControl.append('label')
+            .attr('for', 'max-nodes-slider')
+            .style('font-size', 'var(--font-size-sm)')
+            .style('font-weight', '500')
+            .style('color', 'var(--color-text)')
+            .style('white-space', 'nowrap')
+            .html('Max Nodes: <span id="max-nodes-value">150</span>');
+            
+        maxNodesControl.append('input')
+            .attr('type', 'range')
+            .attr('id', 'max-nodes-slider')
+            .attr('min', '50')
+            .attr('max', '300')
+            .attr('value', '150')
+            .attr('step', '25')
+            .style('width', '100px')
+            .style('height', '4px')
+            .style('border-radius', '2px')
+            .style('background', 'var(--color-border)')
+            .style('outline', 'none')
+            .style('-webkit-appearance', 'none')
+            .style('appearance', 'none');
+
+        // Min Node Degree slider - Updated for selective filtering
+        const nodeDegreeControl = sliderContainer.append('div')
+            .attr('class', 'slider-control')
+            .style('display', 'flex')
+            .style('flex-direction', 'column')
+            .style('align-items', 'center')
+            .style('gap', 'var(--space-4)')
+            .style('min-width', '120px');
+        
+        nodeDegreeControl.append('label')
+            .attr('for', 'node-degree-slider')
+            .style('font-size', 'var(--font-size-sm)')
+            .style('font-weight', '500')
+            .style('color', 'var(--color-text)')
+            .style('white-space', 'nowrap')
+            .html('Min Node Degree: <span id="node-degree-value">3</span>');
+            
+        nodeDegreeControl.append('input')
+            .attr('type', 'range')
+            .attr('id', 'node-degree-slider')
+            .attr('min', '1')
+            .attr('max', '15')
+            .attr('value', '3')
+            .attr('step', '1')
+            .style('width', '100px')
+            .style('height', '4px')
+            .style('border-radius', '2px')
+            .style('background', 'var(--color-border)')
+            .style('outline', 'none')
+            .style('-webkit-appearance', 'none')
+            .style('appearance', 'none');
+
+        // Label Count slider - New control for top N labels
+        const labelCountControl = sliderContainer.append('div')
+            .attr('class', 'slider-control')
+            .style('display', 'flex')
+            .style('flex-direction', 'column')
+            .style('align-items', 'center')
+            .style('gap', 'var(--space-4)')
+            .style('min-width', '120px');
+        
+        labelCountControl.append('label')
+            .attr('for', 'label-count-slider')
+            .style('font-size', 'var(--font-size-sm)')
+            .style('font-weight', '500')
+            .style('color', 'var(--color-text)')
+            .style('white-space', 'nowrap')
+            .html('Label Count: <span id="label-count-value">50</span>');
+            
+        labelCountControl.append('input')
+            .attr('type', 'range')
+            .attr('id', 'label-count-slider')
+            .attr('min', '10')
+            .attr('max', '100')
+            .attr('value', '50')
+            .attr('step', '5')
+            .style('width', '100px')
+            .style('height', '4px')
+            .style('border-radius', '2px')
+            .style('background', 'var(--color-border)')
+            .style('outline', 'none')
+            .style('-webkit-appearance', 'none')
+            .style('appearance', 'none');
+
+        // Apply CSS custom properties for slider thumbs (since D3 doesn't handle pseudo-elements)
+        const style = document.createElement('style');
+        style.textContent = `
+            .graph-controls-bottom input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--color-primary);
+                cursor: pointer;
+                border: 2px solid white;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+            
+            .graph-controls-bottom input[type="range"]::-moz-range-thumb {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--color-primary);
+                cursor: pointer;
+                border: 2px solid white;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+            
+            .graph-controls-bottom input[type="range"]::-webkit-slider-track {
+                background: var(--color-border);
+                height: 4px;
+                border-radius: 2px;
+            }
+            
+            .graph-controls-bottom input[type="range"]::-moz-range-track {
+                background: var(--color-border);
+                height: 4px;
+                border-radius: 2px;
+                border: none;
+            }
+            
+            @media (prefers-color-scheme: dark) {
+                .graph-controls-bottom {
+                    background: rgba(38, 40, 40, 0.95) !important;
+                    border-color: var(--color-border) !important;
+                }
+            }
+            
+            [data-color-scheme="dark"] .graph-controls-bottom {
+                background: rgba(38, 40, 40, 0.95) !important;
+                border-color: var(--color-border) !important;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    setupRotationDrag(svg, g, zoom) {
+        let isDragging = false;
+        let startAngle = 0;
+        
+        const dragBehavior = d3.drag()
+            .on('start', (event) => {
+                if (!this.rotationMode) return;
+                isDragging = true;
+                const rect = svg.node().getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                startAngle = Math.atan2(event.y - centerY, event.x - centerX);
+            })
+            .on('drag', (event) => {
+                if (!this.rotationMode || !isDragging) return;
+                event.sourceEvent.preventDefault();
+                
+                const rect = svg.node().getBoundingClientRect();
+                const centerX = rect.width / 2;
+                const centerY = rect.height / 2;
+                const currentAngle = Math.atan2(event.y - centerY, event.x - centerX);
+                const deltaAngle = currentAngle - startAngle;
+                
+                this.rotationAngle += deltaAngle * (180 / Math.PI);
+                startAngle = currentAngle;
+                
+                // Apply rotation transform
+                const currentTransform = d3.zoomTransform(svg.node());
+                g.attr('transform', `${currentTransform} rotate(${this.rotationAngle}, ${centerX}, ${centerY})`);
+            })
+            .on('end', () => {
+                isDragging = false;
+            });
+        
+        svg.call(dragBehavior);
     }
 
     setupGraphSliders() {
-        // Get slider elements
+        // Get slider elements 
         const maxNodesSlider = document.getElementById('max-nodes-slider');
         const nodeDegreeSlider = document.getElementById('node-degree-slider');
-        const textSizeSlider = document.getElementById('text-size-slider');
+        const labelCountSlider = document.getElementById('label-count-slider');
         
         const maxNodesValue = document.getElementById('max-nodes-value');
         const nodeDegreeValue = document.getElementById('node-degree-value');
-        const textSizeValue = document.getElementById('text-size-value');
+        const labelCountValue = document.getElementById('label-count-value');
 
-        if (!maxNodesSlider || !nodeDegreeSlider || !textSizeSlider) return;
+        if (!maxNodesSlider || !nodeDegreeSlider || !labelCountSlider) return;
 
-        // Initialize values based on current graph
-        const nodeCount = this.originalGraphData.nodes.length;
-        maxNodesSlider.max = Math.max(50, nodeCount);
-        maxNodesSlider.value = Math.min(50, nodeCount);
-        maxNodesValue.textContent = maxNodesSlider.value;
-
-        // Set up event listeners
+        // Set up event listeners with new approach
         maxNodesSlider.addEventListener('input', (e) => {
             maxNodesValue.textContent = e.target.value;
             this.applyGraphFilters();
@@ -3149,64 +4404,26 @@ class NotesApp {
             this.applyGraphFilters();
         });
 
-        textSizeSlider.addEventListener('input', (e) => {
-            textSizeValue.textContent = e.target.value;
+        labelCountSlider.addEventListener('input', (e) => {
+            labelCountValue.textContent = e.target.value;
             this.applyGraphFilters();
         });
+        
+        // Set initial values to match the current selective approach
+        console.log('Concept Graph: Using selective filtering approach (degree ≥ 3, top ~150 nodes, labels for top 50)');
     }
 
     applyGraphFilters() {
+        // Since the filtering is now done directly in updateGraphVisualization,
+        // this method just triggers a re-render with new slider values
         if (!this.originalGraphData) return;
-
-        const maxNodes = parseInt(document.getElementById('max-nodes-slider')?.value || 50);
-        const minDegree = parseInt(document.getElementById('node-degree-slider')?.value || 1);
-        const minTextSize = parseInt(document.getElementById('text-size-slider')?.value || 8);
-
-        // Calculate node degrees from original data
-        const nodeDegrees = {};
-        this.originalGraphData.nodes.forEach(node => {
-            nodeDegrees[node.id] = 0;
-        });
-
-        this.originalGraphData.links.forEach(link => {
-            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-            
-            if (nodeDegrees[sourceId] !== undefined) nodeDegrees[sourceId]++;
-            if (nodeDegrees[targetId] !== undefined) nodeDegrees[targetId]++;
-        });
-
-        // Filter nodes by degree and sort by importance/size
-        let filteredNodes = this.originalGraphData.nodes.filter(node => {
-            return nodeDegrees[node.id] >= minDegree;
-        });
-
-        // Sort by importance/size and limit to maxNodes
-        filteredNodes.sort((a, b) => (b.importance || b.size || 0) - (a.importance || a.size || 0));
-        filteredNodes = filteredNodes.slice(0, maxNodes);
-
-        // Create set of filtered node IDs for quick lookup
-        const filteredNodeIds = new Set(filteredNodes.map(n => n.id));
-
-        // Filter links to only include connections between filtered nodes
-        const filteredLinks = this.originalGraphData.links.filter(link => {
-            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-            return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId);
-        });
-
-        // Apply text size filter
-        filteredNodes.forEach(node => {
-            node.showText = (node.size || 8) >= minTextSize;
-        });
-
-        // Create filtered graph
-        const filteredGraph = {
-            nodes: filteredNodes,
-            links: filteredLinks
-        };
-
-        this.currentGraphData = filteredGraph;
+        
+        // The filtering logic is now integrated into updateGraphVisualization
+        // which uses the slider values directly for:
+        // 1. maxNodes: limits the top N nodes by degree (default 150)
+        // 2. minDegree: minimum degree threshold (default 3)
+        // 3. labelCount: number of labels to show for highest-degree nodes (default 50)
+        
         this.updateGraphVisualization();
     }
     
@@ -3253,6 +4470,21 @@ class NotesApp {
         
         controls.append('br');
         
+        // Manual drag toggle button
+        const dragButton = controls.append('button')
+            .html('<i class="fas fa-arrows-alt"></i>')
+            .attr('title', 'Manual Drag Mode')
+            .attr('id', 'manual-drag-btn')
+            .style('margin', '2px')
+            .style('padding', '5px 8px')
+            .style('border', '1px solid #ccc')
+            .style('background', '#fff')
+            .style('cursor', 'pointer')
+            .style('border-radius', '3px')
+            .on('click', () => {
+                this.toggleManualDragMode(dragButton);
+            });
+        
         // Reset controls
         controls.append('button')
             .html('<i class="fas fa-compress-arrows-alt"></i>')
@@ -3277,8 +4509,309 @@ class NotesApp {
             .style('cursor', 'pointer')
             .style('border-radius', '3px')
             .on('click', () => {
-                simulation.alpha(1).restart();
+                if (this.graphElements && this.graphElements.simulation) {
+                    // Clear manual positions when restarting simulation
+                    this.clearManualPositions();
+                    this.graphElements.simulation.alpha(1).restart();
+                }
             });
+    }
+
+    toggleManualDragMode(dragButton) {
+        // Initialize manual drag mode if not set
+        if (this.manualDragMode === undefined) {
+            this.manualDragMode = false;
+        }
+        
+        // Toggle the mode
+        this.manualDragMode = !this.manualDragMode;
+        
+        // Update button appearance
+        if (this.manualDragMode) {
+            dragButton.style('background', '#007acc')
+                     .style('color', '#fff')
+                     .style('border-color', '#007acc');
+        } else {
+            dragButton.style('background', '#fff')
+                     .style('color', '#333')
+                     .style('border-color', '#ccc');
+        }
+        
+        // Update node drag behavior
+        this.updateNodeDragBehavior();
+    }
+
+    updateNodeDragBehavior() {
+        if (!this.graphElements || !this.graphElements.g) return;
+        
+        const nodes = this.graphElements.g.selectAll('.node');
+        
+        if (this.manualDragMode) {
+            // Enable manual drag mode - nodes and connections stay where dropped
+            nodes.call(d3.drag()
+                .on('start', (event, d) => {
+                    // Stop the simulation while dragging
+                    if (this.graphElements.simulation) {
+                        this.graphElements.simulation.stop();
+                    }
+                    
+                    // Store initial position
+                    d.startX = d.x;
+                    d.startY = d.y;
+                    
+                    // Mark node as being manually positioned
+                    d.isManuallyPositioned = true;
+                })
+                .on('drag', (event, d) => {
+                    // Update node position
+                    d.x = event.x;
+                    d.y = event.y;
+                    
+                    // Fix the position so simulation doesn't override it
+                    d.fx = event.x;
+                    d.fy = event.y;
+                    
+                    // Update visual position immediately
+                    this.updateNodePosition(d);
+                })
+                .on('end', (event, d) => {
+                    // Keep the node fixed at the dropped position
+                    d.fx = event.x;
+                    d.fy = event.y;
+                    
+                    // Update connected nodes if they should follow
+                    this.updateConnectedNodesPosition(d, event.x - d.startX, event.y - d.startY);
+                })
+            );
+        } else {
+            // Regular drag mode - simulation controls positions
+            nodes.call(d3.drag()
+                .on('start', (event, d) => {
+                    if (!event.active && this.graphElements.simulation) {
+                        this.graphElements.simulation.alphaTarget(0.3).restart();
+                    }
+                    d.fx = d.x;
+                    d.fy = d.y;
+                })
+                .on('drag', (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on('end', (event, d) => {
+                    if (!event.active && this.graphElements.simulation) {
+                        this.graphElements.simulation.alphaTarget(0);
+                    }
+                    d.fx = null;
+                    d.fy = null;
+                })
+            );
+        }
+    }
+
+    updateNodePosition(node) {
+        if (!this.graphElements || !this.graphElements.g) return;
+        
+        // Update node visual position
+        const nodeElements = this.graphElements.g.selectAll('.node');
+        nodeElements.each(function(d) {
+            if (d.id === node.id) {
+                d3.select(this).attr('transform', `translate(${d.x},${d.y}) scale(1)`);
+            }
+        });
+        
+        // Update connected links
+        const linkElements = this.graphElements.g.selectAll('.links line');
+        linkElements.each(function(l) {
+            const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+            const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+            
+            if (sourceId === node.id || targetId === node.id) {
+                d3.select(this)
+                    .attr('x1', l.source.x)
+                    .attr('y1', l.source.y)
+                    .attr('x2', l.target.x)
+                    .attr('y2', l.target.y);
+            }
+        });
+        
+        // Update labels and label backgrounds
+        const labelElements = this.graphElements.g.selectAll('.labels text');
+        const labelBgElements = this.graphElements.g.selectAll('.label-bg');
+        
+        labelElements.each(function(d, i) {
+            if (d.id === node.id) {
+                const labelElement = d3.select(this);
+                labelElement
+                    .attr('x', d.x + (d.calculatedSize || 8) + 8)
+                    .attr('y', d.y);
+                
+                // Update corresponding background
+                const bgElement = d3.select(labelBgElements.nodes()[i]);
+                if (!bgElement.empty()) {
+                    try {
+                        const bbox = labelElement.node().getBBox();
+                        bgElement
+                            .attr('x', bbox.x - 2)
+                            .attr('y', bbox.y - 1)
+                            .attr('width', bbox.width + 4)
+                            .attr('height', bbox.height + 2);
+                    } catch (e) {
+                        // Fallback positioning
+                        bgElement
+                            .attr('x', d.x + (d.calculatedSize || 8) + 6)
+                            .attr('y', d.y - 8)
+                            .attr('width', d.label ? d.label.length * 6 + 4 : 20)
+                            .attr('height', 16);
+                    }
+                }
+            }
+        });
+    }
+
+    updateConnectedNodesPosition(draggedNode, deltaX, deltaY) {
+        if (!this.currentGraphData || !this.manualDragMode) return;
+        
+        // Find connected nodes
+        const connectedNodeIds = new Set();
+        this.currentGraphData.links.forEach(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            
+            if (sourceId === draggedNode.id) {
+                connectedNodeIds.add(targetId);
+            }
+            if (targetId === draggedNode.id) {
+                connectedNodeIds.add(sourceId);
+            }
+        });
+        
+        // Move connected nodes by a fraction of the drag distance
+        const followFactor = 0.3; // 30% of the drag distance
+        
+        this.currentGraphData.nodes.forEach(node => {
+            if (connectedNodeIds.has(node.id) && !node.isManuallyPositioned) {
+                node.x += deltaX * followFactor;
+                node.y += deltaY * followFactor;
+                node.fx = node.x;
+                node.fy = node.y;
+                
+                this.updateNodePosition(node);
+            }
+        });
+    }
+
+    clearManualPositions() {
+        if (!this.currentGraphData) return;
+        
+        // Clear all manual positioning flags and fixed positions
+        this.currentGraphData.nodes.forEach(node => {
+            node.isManuallyPositioned = false;
+            node.fx = null;
+            node.fy = null;
+        });
+        
+        // Reset manual drag mode
+        this.manualDragMode = false;
+        
+        // Reset button appearance
+        const dragButton = d3.select('#manual-drag-btn');
+        if (!dragButton.empty()) {
+            dragButton.style('background', '#fff')
+                     .style('color', '#333')
+                     .style('border-color', '#ccc');
+        }
+    }
+
+    updateNodeVisibilityOnZoom(zoomScale) {
+        if (!this.graphElements || !this.graphElements.g) return;
+        
+        const nodes = this.graphElements.g.selectAll('.node');
+        const labels = this.graphElements.g.selectAll('.labels text');
+        
+        // Calculate minimum size multiplier based on zoom level
+        // At low zoom levels (0.1-0.5), make smaller nodes more visible
+        // At high zoom levels (1.5-3), maintain original sizes or slightly enhance them
+        const minSizeMultiplier = Math.max(1, Math.min(3, 1 / Math.pow(zoomScale, 0.7)));
+        
+        // Update node sizes based on zoom level
+        nodes.each(function(d) {
+            const nodeGroup = d3.select(this);
+            const originalRadius = d.size || 8;
+            const adjustedRadius = Math.max(4, originalRadius * minSizeMultiplier);
+            
+            if (d.isAIGenerated) {
+                // Update pentagon size for AI nodes
+                const pentagon = [];
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 2 * Math.PI / 5) - Math.PI / 2;
+                    const x = adjustedRadius * Math.cos(angle);
+                    const y = adjustedRadius * Math.sin(angle);
+                    pentagon.push([x, y]);
+                }
+                const pathData = `M${pentagon.map(p => p.join(',')).join('L')}Z`;
+                nodeGroup.select('path').attr('d', pathData);
+            } else {
+                // Update circle radius for regular nodes
+                nodeGroup.select('circle').attr('r', adjustedRadius);
+            }
+        });
+        
+        // Update label visibility and size based on zoom level
+        // Show more labels and make them larger at higher zoom levels
+        const labelVisibilityThreshold = Math.max(0.3, 1 / zoomScale);
+        const labelSizeMultiplier = Math.max(0.8, Math.min(1.5, zoomScale * 0.8));
+        
+        const labelBgs = this.graphElements.g.selectAll('.label-bg');
+        
+        labels.each(function(d, i) {
+            const label = d3.select(this);
+            // Use improved font sizing consistent with main rendering
+            const baseSize = d.isAIGenerated ? 12 : 11;
+            const sizeBonus = Math.min(4, (d.calculatedSize - 8) * 0.2);
+            const originalFontSize = Math.max(9, Math.min(14, baseSize + sizeBonus));
+            const adjustedFontSize = originalFontSize * labelSizeMultiplier;
+            const shouldShow = (d.showText !== false) && ((d.importance || 0.5) > labelVisibilityThreshold || zoomScale > 1.2);
+            
+            label
+                .attr('font-size', adjustedFontSize)
+                .style('opacity', shouldShow ? 1 : 0)
+                .attr('dx', (d.calculatedSize || 8) * minSizeMultiplier + 8);
+            
+            // Update corresponding label background
+            if (shouldShow) {
+                const labelBg = d3.select(labelBgs.nodes()[i]);
+                if (!labelBg.empty()) {
+                    labelBg.style('opacity', 1);
+                    // Update background size and position
+                    try {
+                        const bbox = label.node().getBBox();
+                        labelBg
+                            .attr('x', bbox.x - 2)
+                            .attr('y', bbox.y - 1)
+                            .attr('width', bbox.width + 4)
+                            .attr('height', bbox.height + 2);
+                    } catch (e) {
+                        // Fallback if getBBox fails
+                        labelBg.style('opacity', 1);
+                    }
+                }
+            } else {
+                // Hide background when label is hidden
+                const labelBg = d3.select(labelBgs.nodes()[i]);
+                if (!labelBg.empty()) {
+                    labelBg.style('opacity', 0);
+                }
+            }
+        });
+        
+        // Also adjust link stroke widths for better visibility at different zoom levels
+        const links = this.graphElements.g.selectAll('.links line');
+        const linkWidthMultiplier = Math.max(0.5, Math.min(2, 1 / Math.pow(zoomScale, 0.5)));
+        
+        links.style('stroke-width', d => {
+            const originalWidth = d.isHighlighted ? 1.0 : 0.5;
+            return Math.max(0.2, originalWidth * linkWidthMultiplier);
+        });
     }
 
     async reprocessGraphWithAI() {
@@ -3351,6 +4884,49 @@ class NotesApp {
         }
     }
 
+    filterNodesUpToLevel2(nodes) {
+        /**
+         * Filtra los nodos para proporcionar solo los más importantes (nivel 1 y 2)
+         * Los nodos se clasifican por una combinación de centralidad y importancia
+         */
+        if (!nodes || nodes.length === 0) return [];
+        
+        // Calcular un puntaje combinado para cada nodo
+        const nodesWithScore = nodes.map(node => {
+            const importance = node.importance || 0;
+            const degreeCentrality = node.degree_centrality || 0;
+            const betweennessCentrality = node.betweenness_centrality || 0;
+            const nodeSize = node.size || 1;
+            
+            // Puntaje combinado: importancia (40%) + degree centrality (30%) + betweenness centrality (20%) + tamaño normalizado (10%)
+            const combinedScore = (importance * 0.4) + (degreeCentrality * 0.3) + (betweennessCentrality * 0.2) + ((nodeSize - 1) / 20 * 0.1);
+            
+            return {
+                ...node,
+                combinedScore: combinedScore
+            };
+        });
+        
+        // Ordenar por puntaje combinado (mayor a menor)
+        nodesWithScore.sort((a, b) => b.combinedScore - a.combinedScore);
+        
+        // Determinar cuántos nodos incluir (hasta nivel 2)
+        // Nivel 1: Top 20% de los nodos (o mínimo 5, máximo 15)
+        // Nivel 2: Siguiente 30% de los nodos (o mínimo 10, máximo 25)
+        const totalNodes = nodes.length;
+        const level1Count = Math.min(Math.max(Math.ceil(totalNodes * 0.2), 5), 15);
+        const level2Count = Math.min(Math.max(Math.ceil(totalNodes * 0.3), 10), 25);
+        const maxNodesForAI = Math.min(level1Count + level2Count, 40); // Límite máximo de 40 nodos
+        
+        // Tomar solo los nodos hasta el nivel 2
+        const filteredNodes = nodesWithScore.slice(0, maxNodesForAI);
+        
+        console.log(`Filtered nodes for AI: ${filteredNodes.length} out of ${totalNodes} total nodes`);
+        console.log(`Level 1 nodes: ${level1Count}, Level 2 nodes: ${Math.min(level2Count, maxNodesForAI - level1Count)}`);
+        
+        return filteredNodes;
+    }
+
     async generateAINodes() {
         const aiBtn = document.getElementById('ai-generate-nodes-btn');
         if (!aiBtn || !this.currentGraphData) return;
@@ -3364,12 +4940,17 @@ class NotesApp {
             // Get current language from dropdown
             const language = document.getElementById('concept-language')?.value || 'en';
             
-            // Extract current nodes from graph
-            const currentNodes = this.currentGraphData.nodes.map(node => ({
+            // Filter nodes to only include level 1 and 2 (most important nodes)
+            const filteredNodes = this.filterNodesUpToLevel2(this.currentGraphData.nodes);
+            
+            // Extract filtered nodes for AI
+            const currentNodes = filteredNodes.map(node => ({
                 id: node.id,
                 label: node.label,
                 size: node.size,
-                importance: node.importance
+                importance: node.importance,
+                degree_centrality: node.degree_centrality,
+                betweenness_centrality: node.betweenness_centrality
             }));
             
             // Get current note text
@@ -3377,6 +4958,10 @@ class NotesApp {
             if (!noteText) {
                 return;
             }
+            
+            // Show notification about filtering
+            const totalNodes = this.currentGraphData.nodes.length;
+            this.showNotification(`Sending ${filteredNodes.length} of ${totalNodes} most important nodes to AI for analysis`, 'info');
             
             // Call AI node generation endpoint
             const resp = await authFetch('/api/concept-graph/ai-generate-nodes', {
@@ -3411,41 +4996,69 @@ class NotesApp {
             // Reset button state
             aiBtn.disabled = false;
             aiBtn.classList.remove('processing');
-            aiBtn.innerHTML = '<i class="fas fa-magic"></i> Generate AI Nodes';
+            aiBtn.innerHTML = '<i class="fas fa-magic"></i> Generate AI Organizers';
         }
     }
 
     addAINodesToConcept(aiNodes) {
         if (!this.currentGraphData || !aiNodes || aiNodes.length === 0) return;
         
-        // Add AI nodes to the graph data
+        // Create maps for efficient node lookup by ID and label
         const existingNodeIds = new Set(this.currentGraphData.nodes.map(n => n.id));
+        const labelToIdMap = new Map();
+        this.currentGraphData.nodes.forEach(node => {
+            labelToIdMap.set(node.label, node.id);
+            labelToIdMap.set(node.id, node.id); // Also map ID to ID for direct matches
+        });
+        
         const newNodes = [];
         const newEdges = [];
         
         aiNodes.forEach((aiNode, index) => {
             const nodeId = `ai_${Date.now()}_${index}`;
             
-            // Create AI node with special styling
+            // Create AI node with special styling and high importance
             const newNode = {
                 id: nodeId,
                 label: aiNode.label,
-                size: Math.max(15, Math.min(30, aiNode.importance * 20)), // Size based on importance
+                size: Math.max(18, Math.min(30, aiNode.importance * 25)), // Larger size for AI nodes
                 importance: aiNode.importance,
                 isAIGenerated: true, // Special flag for styling
-                group: 'ai_generated'
+                group: 'ai_generated',
+                // Ensure AI nodes have high centrality metrics for positioning
+                degree_centrality: 0.8,
+                betweenness_centrality: 0.7
             };
             
             newNodes.push(newNode);
             
-            // Create edges to related nodes
+            // Create edges to related nodes - match by both ID and label
             if (aiNode.related_nodes && Array.isArray(aiNode.related_nodes)) {
-                aiNode.related_nodes.forEach(relatedNodeId => {
-                    if (existingNodeIds.has(relatedNodeId)) {
+                const connectedTargets = new Set(); // Prevent duplicate connections
+                
+                aiNode.related_nodes.forEach(relatedNodeRef => {
+                    const relatedNodeRefStr = String(relatedNodeRef).trim();
+                    
+                    // Try to find the target node ID
+                    let targetNodeId = null;
+                    
+                    // First, try direct ID match
+                    if (existingNodeIds.has(relatedNodeRefStr)) {
+                        targetNodeId = relatedNodeRefStr;
+                    }
+                    // Then, try label match
+                    else if (labelToIdMap.has(relatedNodeRefStr)) {
+                        targetNodeId = labelToIdMap.get(relatedNodeRefStr);
+                    }
+                    
+                    // Create connection if target found and not already connected
+                    if (targetNodeId && !connectedTargets.has(targetNodeId)) {
+                        connectedTargets.add(targetNodeId);
                         newEdges.push({
                             source: nodeId,
-                            target: relatedNodeId,
-                            strength: 0.8, // AI connections have high strength
+                            target: targetNodeId,
+                            strength: 0.9, // AI connections have very high strength
+                            weight: 3, // High weight for important connections
                             isAIGenerated: true
                         });
                     }
@@ -3456,6 +5069,8 @@ class NotesApp {
         // Update graph data
         this.currentGraphData.nodes = [...this.currentGraphData.nodes, ...newNodes];
         this.currentGraphData.links = [...this.currentGraphData.links, ...newEdges];
+        
+        console.log(`Added ${newNodes.length} AI nodes and ${newEdges.length} AI connections to the graph`);
         
         // Re-render the graph with AI nodes
         this.renderConceptGraph(this.currentGraphData);
@@ -3598,7 +5213,7 @@ class NotesApp {
 
     async loadConceptExclusions() {
         try {
-            const response = await fetch('/api/concept-exclusions', {
+            const response = await authFetch('/api/concept-exclusions', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -3640,7 +5255,7 @@ class NotesApp {
         
         try {
             // Save exclusions
-            const exclusionsResponse = await fetch('/api/concept-exclusions', {
+            const exclusionsResponse = await authFetch('/api/concept-exclusions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -3649,7 +5264,7 @@ class NotesApp {
             });
             
             // Save inclusions
-            const inclusionsResponse = await fetch('/api/concept-inclusions', {
+            const inclusionsResponse = await authFetch('/api/concept-inclusions', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -3678,7 +5293,7 @@ class NotesApp {
 
     async loadConceptInclusions() {
         try {
-            const response = await fetch('/api/concept-inclusions', {
+            const response = await authFetch('/api/concept-inclusions', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -5029,8 +6644,43 @@ class NotesApp {
 
     gatherAllTags() {
         const set = new Set();
+        
+        // Gather tags from notes array
         this.notes.forEach(n => (n.tags || []).forEach(t => set.add(t)));
+        
+        // If in folder view, also gather tags from folder structure
+        if (this.currentViewMode === 'folder' && this.folderStructure) {
+            this.gatherTagsFromFolderStructure(this.folderStructure, set);
+        }
+        
         return Array.from(set).sort();
+    }
+    
+    gatherTagsFromFolderStructure(items, set) {
+        items.forEach(item => {
+            if (item.type === 'folder' && item.children) {
+                this.gatherTagsFromFolderStructure(item.children, set);
+            } else if (item.type === 'note' && item.tags) {
+                item.tags.forEach(tag => set.add(tag));
+            }
+        });
+    }
+    
+    // Update note title in local folder structure
+    updateNoteInFolderStructure(noteId, newTitle) {
+        const updateInItems = (items) => {
+            items.forEach(item => {
+                if (item.type === 'folder' && item.children) {
+                    updateInItems(item.children);
+                } else if (item.type === 'note' && item.id === noteId) {
+                    item.name = newTitle;
+                }
+            });
+        };
+        
+        if (this.folderStructure && this.folderStructure.length > 0) {
+            updateInItems(this.folderStructure);
+        }
     }
 
     renderTagFilter() {
@@ -5049,7 +6699,8 @@ class NotesApp {
                     this.selectedTags.add(tag);
                     badge.classList.add('active');
                 }
-                this.renderNotesList();
+                // Refresh current view based on view mode
+                this.refreshCurrentView();
             });
         });
         container.style.display = tags.length ? 'flex' : 'none';
@@ -5191,6 +6842,11 @@ class NotesApp {
     renderNotesList() {
         const container = document.getElementById('notes-list');
         
+        // Only render list view if we're in list mode
+        if (this.currentViewMode !== 'list') {
+            return;
+        }
+        
         let filteredNotes = this.notes;
         if (this.searchTerm) {
             filteredNotes = filteredNotes.filter(note =>
@@ -5210,8 +6866,8 @@ class NotesApp {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">📝</div>
-                    <h3>No chats yet</h3>
-                    <p>Create your first chat to get started</p>
+                    <h3>No notes yet</h3>
+                    <p>Create your first note to get started</p>
                 </div>
             `;
             return;
@@ -5224,18 +6880,38 @@ class NotesApp {
 
             return `
                 <div class="note-item fade-in${overwriteCls}" data-note-id="${note.id}">
-                    <div class="note-item-title">${note.title}</div>
-                    <div class="note-item-preview">${preview}</div>
-                    <div class="note-item-date">${date}</div>
+                    <div class="note-item-content">
+                        <div class="note-item-title">${note.title}</div>
+                        <div class="note-item-preview">${preview}</div>
+                        <div class="note-item-date">${date}</div>
+                    </div>
+                    <div class="note-item-actions">
+                        <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `;
         }).join(''));
         
         // Agregar event listeners a los items
         container.querySelectorAll('.note-item').forEach(item => {
-            item.addEventListener('click', async () => {
-                const noteId = parseInt(item.dataset.noteId);
-                await this.selectNote(noteId);
+            // Click event for the note content (not the delete button)
+            const noteContent = item.querySelector('.note-item-content');
+            if (noteContent) {
+                noteContent.addEventListener('click', async () => {
+                    const noteId = parseInt(item.dataset.noteId);
+                    await this.selectNote(noteId);
+                });
+            }
+        });
+
+        // Add event listeners for delete buttons
+        container.querySelectorAll('.note-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const noteId = parseInt(btn.dataset.noteId);
+                this.showDeleteNoteModal(noteId);
             });
         });
     }
@@ -7109,6 +8785,45 @@ class NotesApp {
         const modal = document.getElementById('delete-modal');
         modal.classList.remove('active');
         this.showMobileFab();
+    }
+
+    showDeleteNoteModal(noteId) {
+        this.noteToDelete = noteId;
+        const modal = document.getElementById('delete-modal');
+        this.hideMobileFab();
+        modal.classList.add('active');
+    }
+
+    async deleteSpecificNote(noteId) {
+        // Store the note to delete
+        const noteToDelete = this.notes.find(note => note.id === noteId);
+        if (!noteToDelete) {
+            console.error('Note not found');
+            return;
+        }
+
+        // Remove from notes array
+        this.notes = this.notes.filter(note => note.id !== noteId);
+        this.saveToStorage();
+
+        // If this was the current note, clear it
+        if (this.currentNote && this.currentNote.id === noteId) {
+            this.currentNote = null;
+            await this.setupDefaultNote();
+        }
+
+        // Refresh current view
+        if (this.currentViewMode === 'folder') {
+            await this.loadFolderStructure();
+        } else {
+            this.renderNotesList();
+        }
+
+        // Delete from server
+        this.deleteNoteFromServer(noteId);
+
+        this.hideDeleteModal();
+        this.showNotification('Note deleted');
     }
     
     showProcessingOverlay(text) {
