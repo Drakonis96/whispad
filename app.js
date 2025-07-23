@@ -9415,6 +9415,7 @@ class NotesApp {
         if (!input) return;
         const text = input.value.trim();
         if (!text) return;
+        
         const addFull = document.getElementById('chat-add-full').checked;
         const addSelected = document.getElementById('chat-add-selected').checked;
         let noteText = '';
@@ -9426,12 +9427,26 @@ class NotesApp {
 
         this.chatNote = noteText;
 
+        // Add user message to chat
         this.chatMessages.push({ role: 'user', content: text });
         this.renderChatMessages();
         input.value = '';
 
+        // Disable input while processing
+        input.disabled = true;
+        const sendBtn = document.getElementById('chat-send');
+        if (sendBtn) sendBtn.disabled = true;
+
         const provider = this.config.postprocessProvider;
         const model = this.config.postprocessModel;
+        
+        if (!provider || !model) {
+            this.showNotification('Please configure AI provider and model in settings', 'error');
+            input.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
+            return;
+        }
+
         const payload = { note: noteText, messages: this.chatMessages, stream: true, provider, model };
         if (provider === 'lmstudio') {
             payload.host = this.config.lmstudioHost;
@@ -9442,54 +9457,91 @@ class NotesApp {
             payload.port = this.config.ollamaPort;
         }
 
-        const response = await authFetch('/api/improve-text', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        try {
+            const response = await authFetch('/api/improve-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
 
-        if (!response.ok || !response.body) {
-            this.showNotification('Chat request failed', 'error');
-            return;
-        }
+            if (!response.ok || !response.body) {
+                this.showNotification('Chat request failed', 'error');
+                input.disabled = false;
+                if (sendBtn) sendBtn.disabled = false;
+                return;
+            }
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        const assistantMsg = { role: 'assistant', content: '' };
-        this.chatMessages.push(assistantMsg);
-        const container = document.getElementById('chat-messages');
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-message assistant';
-        container.appendChild(bubble);
-        container.scrollTop = container.scrollHeight;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            const assistantMsg = { role: 'assistant', content: '' };
+            this.chatMessages.push(assistantMsg);
+            const container = document.getElementById('chat-messages');
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-message assistant';
+            bubble.textContent = '...'; // Show typing indicator
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataStr = line.slice(6).trim();
-                    if (dataStr === '[DONE]') break;
-                    try {
-                        const data = JSON.parse(dataStr);
-                        if (data.content) {
-                            assistantMsg.content += data.content;
-                            bubble.textContent += data.content;
-                            container.scrollTop = container.scrollHeight;
-                        }
-                        if (data.done) {
-                            bubble.textContent = assistantMsg.content;
-                            container.scrollTop = container.scrollHeight;
-                            return;
-                        }
-                    } catch (e) { continue; }
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (dataStr === '[DONE]') break;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            // Handle error responses
+                            if (data.error) {
+                                this.showNotification(`Chat error: ${data.error}`, 'error');
+                                input.disabled = false;
+                                if (sendBtn) sendBtn.disabled = false;
+                                return;
+                            }
+                            // Handle OpenAI streaming format
+                            if (data.choices && data.choices[0] && data.choices[0].delta && data.choices[0].delta.content) {
+                                const content = data.choices[0].delta.content;
+                                // Clear typing indicator on first content
+                                if (!assistantMsg.content) {
+                                    bubble.textContent = '';
+                                }
+                                assistantMsg.content += content;
+                                bubble.textContent += content;
+                                container.scrollTop = container.scrollHeight;
+                            }
+                            // Handle direct content format (for compatibility)
+                            else if (data.content) {
+                                // Clear typing indicator on first content
+                                if (!assistantMsg.content) {
+                                    bubble.textContent = '';
+                                }
+                                assistantMsg.content += data.content;
+                                bubble.textContent += data.content;
+                                container.scrollTop = container.scrollHeight;
+                            }
+                            if (data.done) {
+                                bubble.textContent = assistantMsg.content;
+                                container.scrollTop = container.scrollHeight;
+                                input.disabled = false;
+                                if (sendBtn) sendBtn.disabled = false;
+                                return;
+                            }
+                        } catch (e) { continue; }
+                    }
                 }
             }
+            bubble.textContent = assistantMsg.content;
+            container.scrollTop = container.scrollHeight;
+        } catch (error) {
+            this.showNotification(`Chat error: ${error.message}`, 'error');
+            console.error('Chat error:', error);
+        } finally {
+            // Re-enable input
+            input.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
         }
-        bubble.textContent = assistantMsg.content;
-        container.scrollTop = container.scrollHeight;
     }
 
     setEditorReadOnly(readOnly) {
