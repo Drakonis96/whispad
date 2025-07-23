@@ -1683,6 +1683,193 @@ async def _call_groq_filtering_api(prompt, api_key, model=None):
         print(f"Groq API error: {e}")
     return []
 
+async def _call_groq_ai_nodes_api(prompt, api_key, model=None):
+    """Call Groq API for AI nodes generation."""
+    if not model:
+        model = "llama-3.3-70b-versatile"
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1500,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return content  # Return raw content for JSON parsing
+                else:
+                    print(f"Groq API error: {response.status}")
+                    return ""
+    except Exception as e:
+        print(f"Groq AI nodes API error: {e}")
+    return ""
+
+async def _call_openai_ai_nodes_api(prompt, api_key, model=None):
+    """Call OpenAI API for AI nodes generation (returns raw response)."""
+    if not model:
+        model = "gpt-4o-mini"
+    
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1500,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return content  # Return raw content for JSON parsing
+                else:
+                    print(f"OpenAI API error: {response.status}")
+                    return ""
+    except Exception as e:
+        print(f"OpenAI AI nodes API error: {e}")
+    return ""
+
+async def _call_openrouter_ai_nodes_api(prompt, api_key, model=None):
+    """Call OpenRouter API for AI nodes generation (returns raw response)."""
+    if not model:
+        model = "moonshotai/kimi-k2:free"
+    
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://whispad.local",
+        "X-Title": "WhisPad AI"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1500,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return content  # Return raw content for JSON parsing
+                else:
+                    print(f"OpenRouter API error: {response.status}")
+                    return ""
+    except Exception as e:
+        print(f"OpenRouter AI nodes API error: {e}")
+    return ""
+
+async def _call_google_ai_nodes_api(prompt, api_key, model=None):
+    """Call Google Gemini API for AI nodes generation (returns raw response)."""
+    if not model:
+        model = "gemini-2.0-flash"
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 1500
+        }
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["candidates"][0]["content"]["parts"][0]["text"]
+                    return content  # Return raw content for JSON parsing
+                else:
+                    print(f"Google API error: {response.status}")
+                    return ""
+    except Exception as e:
+        print(f"Google AI nodes API error: {e}")
+    return ""
+
+async def _call_lmstudio_ai_nodes_api(prompt, model, host, port):
+    """Call LM Studio API for AI nodes generation (returns raw response)."""
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model or "local-model",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 1500,
+        "temperature": 0.1
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["choices"][0]["message"]["content"]
+                    return content  # Return raw content for JSON parsing
+                else:
+                    print(f"LMStudio API error: {response.status}")
+                    return ""
+    except Exception as e:
+        print(f"LMStudio AI nodes API error: {e}")
+    return ""
+
+async def _call_ollama_ai_nodes_api(prompt, model, host, port):
+    """Call Ollama API for AI nodes generation (returns raw response)."""
+    url = f"http://{host}:{port}/api/chat"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model or "llama3",
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False
+    }
+    
+    try:
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=data, timeout=30) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    content = result["message"]["content"]
+                    return content  # Return raw content for JSON parsing
+                else:
+                    print(f"Ollama API error: {response.status}")
+                    return ""
+    except Exception as e:
+        print(f"Ollama AI nodes API error: {e}")
+    return ""
+
 async def _call_lmstudio_filtering_api(prompt, model, host, port):
     """Call LM Studio API for term filtering."""
     url = f"http://{host}:{port}/v1/chat/completions"
@@ -1768,7 +1955,7 @@ def _parse_filtering_response(content):
     
     return []
 
-async def enhance_terms_with_ai(terms, text, ai_provider=None, api_key=None, language='english'):
+async def enhance_terms_with_ai(terms, text, ai_provider=None, api_key=None, ai_model=None, language='english'):
     """Use AI to enhance term selection and extract semantic relationships."""
     if not ai_provider or not api_key:
         return terms, {}
@@ -1842,7 +2029,7 @@ async def enhance_terms_with_ai(terms, text, ai_provider=None, api_key=None, lan
                 "Content-Type": "application/json"
             }
             data = {
-                "model": "meta-llama/llama-3.1-8b-instruct:free",
+                "model": ai_model if ai_model else "meta-llama/llama-3.1-8b-instruct:free",
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 1000,
                 "temperature": 0.3
@@ -2001,12 +2188,12 @@ def select_important_nodes_by_centrality(G, analysis_type='bridges', max_nodes_f
         sorted_nodes = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)
         important_nodes = [node for node, _ in sorted_nodes[:min_nodes]]
     
-    # Limit the number of nodes for performance (increased for better quality)
-    max_final_nodes = min(40, max(15, n_nodes // 2))  # More flexible cap: 15-40 nodes
-    if len(important_nodes) > max_final_nodes:
-        sorted_nodes = sorted([(node, combined_scores[node]) for node in important_nodes], 
-                             key=lambda x: x[1], reverse=True)
-        important_nodes = [node for node, _ in sorted_nodes[:max_final_nodes]]
+    # No limit on final nodes - allow unlimited node generation
+    # max_final_nodes = min(60, max(20, n_nodes // 2))  # Commented out - no limit
+    # if len(important_nodes) > max_final_nodes:
+    #     sorted_nodes = sorted([(node, combined_scores[node]) for node in important_nodes], 
+    #                          key=lambda x: x[1], reverse=True)
+    #     important_nodes = [node for node, _ in sorted_nodes[:max_final_nodes]]
     
     # Preparar métricas detalladas para los nodos seleccionados
     detailed_metrics = {}
@@ -2024,7 +2211,7 @@ def select_important_nodes_by_centrality(G, analysis_type='bridges', max_nodes_f
     
     return important_nodes, detailed_metrics
 
-def tokenize(text, analysis_type='bridges', max_terms=50, language='english', enable_lemmatization=True, exclusions=None, inclusions=None):
+def tokenize(text, analysis_type='bridges', max_terms=None, language='english', enable_lemmatization=True, exclusions=None, inclusions=None):
     """Extract and rank the most important terms from text using centrality-based selection."""
     if exclusions is None:
         exclusions = []
@@ -2057,8 +2244,8 @@ def tokenize(text, analysis_type='bridges', max_terms=50, language='english', en
     else:
         all_important_terms = preserved_terms
     
-    # Limit the number of terms if needed
-    if len(all_important_terms) > max_terms:
+    # No limit on terms if max_terms is None
+    if max_terms is not None and len(all_important_terms) > max_terms:
         # Prioritize compound terms, then sort single terms by centrality
         final_terms = compound_terms.copy()
         
@@ -2251,7 +2438,7 @@ def build_enhanced_graph(text, important_terms, analysis_type='bridges', connect
     
     return G
 
-def build_graph(text, analysis_type='bridges', connection_threshold=0.5, language='english', enable_lemmatization=True, max_terms=25, exclusions=None, inclusions=None):
+def build_graph(text, analysis_type='bridges', connection_threshold=0.5, language='english', enable_lemmatization=True, max_terms=None, exclusions=None, inclusions=None):
     """Build a more intelligent concept graph with centrality-based node selection and performance optimizations."""
     if exclusions is None:
         exclusions = []
@@ -2264,10 +2451,11 @@ def build_graph(text, analysis_type='bridges', connection_threshold=0.5, languag
     if len(important_terms) < 2:
         # Fallback to basic approach if no important terms found
         all_terms = extract_high_quality_terms(text, language=language, enable_lemmatization=enable_lemmatization, exclusions=exclusions, inclusions=inclusions)
-        important_terms = list(set(all_terms))[:max_terms]
+        important_terms = list(set(all_terms))[:max_terms] if max_terms is not None else list(set(all_terms))
     
-    # Ensure we don't process too many terms for performance
-    important_terms = important_terms[:max_terms]
+    # No limit on terms processing if max_terms is None
+    if max_terms is not None:
+        important_terms = important_terms[:max_terms]
     
     # Build enhanced graph
     G = build_enhanced_graph(text, important_terms, analysis_type, connection_threshold)
@@ -2531,7 +2719,7 @@ def build_concept_graph(text, analysis_type='bridges', language='auto', exclusio
                 'insights': graph_insights(result, analysis_type=analysis_type)
             }
 
-async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_provider=None, api_key=None, language='english', enable_lemmatization=True, max_text_length=100000, exclusions=None):
+async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_provider=None, api_key=None, ai_model=None, language='english', enable_lemmatization=True, max_text_length=100000, exclusions=None, inclusions=None, max_terms=None):
     """Build concept graph with AI enhancement and improved term selection with performance optimizations."""
     
     if exclusions is None:
@@ -2578,7 +2766,7 @@ async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_pr
     if ai_provider and api_key:  # Remove text length restriction for consistent behavior
         try:
             enhanced_terms, ai_relationships = await enhance_terms_with_ai(
-                term_importance, note_text, ai_provider, api_key, language)
+                term_importance, note_text, ai_provider, api_key, ai_model, language)
             term_importance = enhanced_terms
         except Exception as e:
             print(f"AI enhancement failed: {e}")
@@ -2586,10 +2774,12 @@ async def build_enhanced_graph_with_ai(note_text, analysis_type='bridges', ai_pr
     # Step 4: Select top terms for graph construction
     sorted_terms = sorted(term_importance.items(), key=lambda x: x[1], reverse=True)
     
-    # Use consistent term selection regardless of text length (short text logic for all)
-    max_terms = min(35, len(sorted_terms))  # Always use the same limit
-    
-    important_terms = [term for term, score in sorted_terms[:max_terms]]
+    # Use all terms if max_terms is None, otherwise limit to max_terms
+    if max_terms is not None:
+        max_terms_limit = min(max_terms, len(sorted_terms))
+        important_terms = [term for term, score in sorted_terms[:max_terms_limit]]
+    else:
+        important_terms = [term for term, score in sorted_terms]  # Use all terms
     
     # Step 5: Build graph with consistent connection logic
     G = build_enhanced_graph(note_text, important_terms, analysis_type, max_sentences=200)
@@ -2789,19 +2979,19 @@ def build_concept_graph_legacy(note_text, analysis_type='bridges', max_text_leng
     if exclusions is None:
         exclusions = []
     
-    # Use consistent max_terms regardless of text length (short text logic for all)
-    max_terms = 120  # Always use the same limit for consistent behavior
+    # No limit on terms - allow unlimited node generation
+    max_terms = None  # Remove the hard-coded limit
     
     # Extract terms using HIGH-QUALITY method for 80-90% quality
     all_terms = extract_high_quality_terms(note_text, max_length=50, enable_lemmatization=True, max_text_length=200000, exclusions=exclusions)
     
     # Convert to the format expected by the rest of the function
     if isinstance(all_terms, list):
-        important_terms = all_terms[:max_terms]
+        important_terms = all_terms[:max_terms] if max_terms is not None else all_terms
     else:
         # If it returns a dict with frequencies, sort by frequency and take top terms
         sorted_terms = sorted(all_terms.items(), key=lambda x: x[1], reverse=True)
-        important_terms = [term for term, freq in sorted_terms[:max_terms]]
+        important_terms = [term for term, freq in sorted_terms[:max_terms]] if max_terms is not None else [term for term, freq in sorted_terms]
     
     if not important_terms:
         return {
@@ -2874,73 +3064,79 @@ async def generate_ai_nodes(note_text, current_nodes, ai_provider, api_key=None,
     
     # Prepare prompt based on language
     if language == 'es':
-        system_prompt = """Eres un asistente AI experto en análisis de conceptos y mapas mentales. Tu tarea es generar entre 1 y 5 nodos conceptuales de nivel superior que relacionen y organicen los conceptos existentes de manera significativa.
+        system_prompt = """Eres un asistente AI experto en análisis de conceptos y mapas mentales. Recibirás SOLAMENTE los nodos conceptuales más importantes (nivel 1 y 2) del mapa conceptual existente. Tu tarea es generar entre 1 y 5 nodos de IA de nivel superior que se conecten estratégicamente con estos nodos principales.
 
-Analiza el texto y los conceptos existentes, luego genera nodos AI que:
-1. Representen categorías, temas o ideas principales que conecten múltiples conceptos existentes
-2. Ayuden a organizar y estructurar el conocimiento de manera jerárquica
-3. Proporcionen contexto o perspectivas más amplias sobre los conceptos
-4. Sean relevantes y añadan valor al mapa conceptual
+Los nodos que recibes han sido pre-filtrados y representan los conceptos más centrales e importantes. Analiza estos nodos principales y genera nodos AI que:
+
+1. Actúen como categorías o temas organizadores que conecten múltiples nodos principales
+2. Proporcionen estructura jerárquica superior a los conceptos existentes
+3. Representen perspectivas, enfoques o dimensiones que unifiquen los nodos principales
+4. Añadan valor organizacional y faciliten la navegación del mapa conceptual
+
+IMPORTANTE: Los nodos que recibes ya son los más importantes. Los nodos de IA deben estar en un nivel conceptual SUPERIOR, actuando como organizadores principales.
 
 Responde SOLO con un JSON válido en este formato exacto:
 {
   "ai_nodes": [
     {
-      "label": "Nombre del concepto AI",
-      "importance": 0.8,
-      "related_nodes": ["concepto1", "concepto2"]
+      "label": "Categoría Principal",
+      "importance": 0.9,
+      "related_nodes": ["nodo1", "nodo2", "nodo3"]
     }
   ]
 }
 
 Cada nodo AI debe tener:
-- label: Nombre claro y conciso del concepto (máximo 3 palabras)
-- importance: Valor entre 0.1 y 1.0 basado en relevancia
-- related_nodes: Lista de IDs de conceptos existentes que este nodo relaciona
+- label: Nombre claro y conciso del concepto organizador (máximo 3 palabras)
+- importance: Valor entre 0.7 y 1.0 (alto, ya que son nodos organizadores principales)
+- related_nodes: Lista de IDs de los nodos principales que este nodo AI organiza
 
-Genera entre 1-5 nodos AI que aporten valor organizacional al mapa."""
+Genera entre 1-5 nodos AI organizadores de alto nivel."""
         
-        user_prompt = f"""Texto original:
+        user_prompt = f"""Texto original del contenido:
 {note_text}
 
-Conceptos existentes:
-{chr(10).join([f"- {node.get('label', node.get('id', ''))}" for node in current_nodes])}
+Nodos principales pre-filtrados (nivel 1 y 2 - más importantes):
+{chr(10).join([f"- {node.get('label', node.get('id', ''))} (importancia: {node.get('importance', 0):.2f})" for node in current_nodes])}
 
-Genera nodos AI conceptuales que organicen y relacionen estos conceptos de manera significativa."""
+Genera nodos AI organizadores de alto nivel que estructuren y conecten estos nodos principales de manera estratégica."""
     else:
-        system_prompt = """You are an AI assistant expert in concept analysis and mind mapping. Your task is to generate between 1 and 5 high-level conceptual nodes that meaningfully relate and organize existing concepts.
+        system_prompt = """You are an AI assistant expert in concept analysis and mind mapping. You will receive ONLY the most important conceptual nodes (level 1 and 2) from the existing concept map. Your task is to generate between 1 and 5 high-level AI nodes that strategically connect with these main nodes.
 
-Analyze the text and existing concepts, then generate AI nodes that:
-1. Represent categories, themes, or main ideas that connect multiple existing concepts
-2. Help organize and structure knowledge hierarchically
-3. Provide broader context or perspectives on the concepts
-4. Are relevant and add value to the concept map
+The nodes you receive have been pre-filtered and represent the most central and important concepts. Analyze these main nodes and generate AI nodes that:
+
+1. Act as organizational categories or themes that connect multiple main nodes
+2. Provide superior hierarchical structure to existing concepts
+3. Represent perspectives, approaches, or dimensions that unify the main nodes
+4. Add organizational value and facilitate concept map navigation
+
+IMPORTANT: The nodes you receive are already the most important. The AI nodes should be at a SUPERIOR conceptual level, acting as main organizers.
 
 Respond ONLY with valid JSON in this exact format:
 {
   "ai_nodes": [
     {
-      "label": "AI Concept Name",
-      "importance": 0.8,
-      "related_nodes": ["concept1", "concept2"]
+      "label": "Main Category",
+      "importance": 0.9,
+      "related_nodes": ["node1", "node2", "node3"]
     }
   ]
 }
 
 Each AI node must have:
-- label: Clear, concise concept name (max 3 words)
-- importance: Value between 0.1 and 1.0 based on relevance
-- related_nodes: List of existing concept IDs this node relates to
+- label: Clear, concise organizational concept name (max 3 words)
+- importance: Value between 0.7 and 1.0 (high, since they are main organizational nodes)
+- related_nodes: List of main node IDs that this AI node organizes
 
-Generate 1-5 AI nodes that add organizational value to the map."""
+Generate 1-5 high-level organizational AI nodes."""
         
-        user_prompt = f"""Original text:
+        user_prompt = f"""Original content text:
 {note_text}
 
-Existing concepts:
-{chr(10).join([f"- {node.get('label', node.get('id', ''))}" for node in current_nodes])}
+Pre-filtered main nodes (level 1 and 2 - most important):
+{chr(10).join([f"- {node.get('label', node.get('id', ''))} (importance: {node.get('importance', 0):.2f})" for node in current_nodes])}
 
-Generate AI conceptual nodes that organize and relate these concepts meaningfully."""
+Generate high-level AI organizational nodes that strategically structure and connect these main nodes."""
     
     # Combine system and user prompts for providers that expect a single prompt
     combined_prompt = f"{system_prompt}\n\n{user_prompt}"
@@ -2950,17 +3146,19 @@ Generate AI conceptual nodes that organize and relate these concepts meaningfull
         response_text = None
         
         if ai_provider == 'openai':
-            response_text = await _call_openai_api(combined_prompt, api_key, ai_model)
+            response_text = await _call_openai_ai_nodes_api(combined_prompt, api_key, ai_model)
         elif ai_provider == 'openrouter':
-            response_text = await _call_openrouter_api(combined_prompt, api_key, ai_model)
+            print(f"🔍 Debug: Calling OpenRouter with model: {ai_model}")
+            response_text = await _call_openrouter_ai_nodes_api(combined_prompt, api_key, ai_model)
+            print(f"🔍 Debug: OpenRouter response type: {type(response_text)}, content: {str(response_text)[:200]}...")
         elif ai_provider == 'google':
-            response_text = await _call_google_api(combined_prompt, api_key, ai_model)
+            response_text = await _call_google_ai_nodes_api(combined_prompt, api_key, ai_model)
         elif ai_provider == 'groq':
-            response_text = await _call_groq_api(combined_prompt, api_key, ai_model)
+            response_text = await _call_groq_ai_nodes_api(combined_prompt, api_key, ai_model)
         elif ai_provider == 'lmstudio':
-            response_text = await _call_lmstudio_api(combined_prompt, ai_model, host, port)
+            response_text = await _call_lmstudio_ai_nodes_api(combined_prompt, ai_model, host, port)
         elif ai_provider == 'ollama':
-            response_text = await _call_ollama_api(combined_prompt, ai_model, host, port)
+            response_text = await _call_ollama_ai_nodes_api(combined_prompt, ai_model, host, port)
         else:
             raise ValueError(f"Unsupported AI provider: {ai_provider}")
         
@@ -2998,7 +3196,7 @@ def _parse_ai_nodes_response(response_text, current_nodes):
         current_node_ids = {node.get('id', node.get('label', '')) for node in current_nodes}
         current_node_labels = {node.get('label', node.get('id', '')) for node in current_nodes}
         
-        for node in ai_nodes[:5]:  # Limit to 5 nodes
+        for node in ai_nodes:  # No limit - process all AI generated nodes
             if not isinstance(node, dict):
                 continue
             
@@ -3006,12 +3204,14 @@ def _parse_ai_nodes_response(response_text, current_nodes):
             if not label or len(label) > 50:  # Reasonable length limit
                 continue
             
-            # Validate importance
+            # Validate importance - AI nodes should have high importance (0.7-1.0)
+            # since they are organizational nodes connecting main concepts
             try:
-                importance = float(node.get('importance', 0.5))
-                importance = max(0.1, min(1.0, importance))
+                importance = float(node.get('importance', 0.8))
+                # Ensure AI nodes have high importance as organizational nodes
+                importance = max(0.7, min(1.0, importance))
             except (ValueError, TypeError):
-                importance = 0.5
+                importance = 0.8  # Default high importance for AI organizational nodes
             
             # Validate related nodes
             related_nodes = node.get('related_nodes', [])

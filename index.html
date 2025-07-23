@@ -90,9 +90,23 @@
                 <div class="header-top">
                     <h2>My Notes</h2>
                 </div>
+                
+                <!-- View mode toggle -->
+                <div class="view-mode-toggle">
+                    <button class="btn btn--outline btn--xs view-mode-btn active" id="folder-view-btn" data-mode="folder">
+                        <i class="fas fa-folder"></i>&nbsp;Folders
+                    </button>
+                    <button class="btn btn--outline btn--xs view-mode-btn" id="list-view-btn" data-mode="list">
+                        <i class="fas fa-list"></i>&nbsp;List
+                    </button>
+                </div>
+                
                 <div class="notes-actions">
                     <button class="btn btn--primary btn--sm notes-action-btn" id="new-note-btn">
                         <i class="fas fa-plus"></i>&nbsp;New Note
+                    </button>
+                    <button class="btn btn--outline btn--sm notes-action-btn" id="new-folder-btn">
+                        <i class="fas fa-folder-plus"></i>&nbsp;New Folder
                     </button>
                     <button class="btn btn--outline btn--sm notes-action-btn" id="download-all-btn" title="Backup all notes">
                         <i class="fas fa-file-zipper"></i>&nbsp;Backup
@@ -115,6 +129,10 @@
 
             <div class="notes-list" id="notes-list">
                 <!-- Notes will be inserted here dynamically -->
+            </div>
+            
+            <div class="folder-tree" id="folder-tree" style="display: none;">
+                <!-- Folder tree will be inserted here dynamically -->
             </div>
         </div>
         
@@ -379,20 +397,6 @@
                 </div>
                 <div class="concept-graph-main">
                     <div class="concept-graph-container" id="concept-graph-container"></div>
-                    <div class="graph-controls-bottom" id="graph-controls-bottom">
-                        <div class="slider-control">
-                            <label for="max-nodes-slider">Max Nodes: <span id="max-nodes-value">50</span></label>
-                            <input type="range" id="max-nodes-slider" min="10" max="100" value="50" step="5">
-                        </div>
-                        <div class="slider-control">
-                            <label for="node-degree-slider">Min Node Degree: <span id="node-degree-value">1</span></label>
-                            <input type="range" id="node-degree-slider" min="1" max="10" value="1" step="1">
-                        </div>
-                        <div class="slider-control">
-                            <label for="text-size-slider">Min Text Size: <span id="text-size-value">8</span></label>
-                            <input type="range" id="text-size-slider" min="6" max="20" value="8" step="1">
-                        </div>
-                    </div>
                 </div>
                 <div class="concept-graph-sidebar">
                     <div class="analysis-controls">
@@ -445,8 +449,9 @@
                         <button class="btn btn--tertiary btn--sm ai-suggestions-btn" id="ai-suggestions-btn">
                             <i class="fas fa-lightbulb"></i>&nbsp;AI Suggestions
                         </button>
-                        <button class="btn btn--purple btn--sm ai-generate-nodes-btn" id="ai-generate-nodes-btn">
-                            <i class="fas fa-magic"></i>&nbsp;Generate AI Nodes
+                        <button class="btn btn--purple btn--sm ai-generate-nodes-btn" id="ai-generate-nodes-btn" 
+                                title="Generate AI organizational nodes from top-level concepts (Level 1-2 only)">
+                            <i class="fas fa-magic"></i>&nbsp;Generate AI Organizers
                         </button>
                         <button class="btn btn--outline btn--sm concept-removal-btn" id="concept-removal-btn">
                             <i class="fas fa-filter"></i>&nbsp;Node filter
@@ -1081,6 +1086,44 @@
             <div class="modal-actions">
                 <button class="btn btn--outline" id="cancel-upload-pdf">Cancel</button>
                 <button class="btn btn--primary" id="confirm-upload-pdf" disabled>Upload & Replace Content</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Folder Modal -->
+    <div class="modal" id="create-folder-modal">
+        <div class="modal-content">
+            <h3>Create New Folder</h3>
+            <div class="form-group">
+                <label for="folder-name-input">Folder Name:</label>
+                <input type="text" class="form-control" id="folder-name-input" placeholder="Enter folder name" maxlength="100">
+            </div>
+            <div class="form-group">
+                <label for="parent-folder-select">Parent Folder:</label>
+                <select class="form-control" id="parent-folder-select">
+                    <option value="">Root (No parent)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-create-folder">Cancel</button>
+                <button class="btn btn--primary" id="confirm-create-folder">Create Folder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Note Modal -->
+    <div class="modal" id="move-note-modal">
+        <div class="modal-content">
+            <h3>Move Note to Folder</h3>
+            <div class="form-group">
+                <label for="target-folder-select">Select Target Folder:</label>
+                <select class="form-control" id="target-folder-select">
+                    <option value="">Root (No folder)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-move-note">Cancel</button>
+                <button class="btn btn--primary" id="confirm-move-note">Move Note</button>
             </div>
         </div>
     </div>

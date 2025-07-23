@@ -261,10 +261,10 @@ def build_concept_graph_improved(text: str, analysis_type: str = 'community') ->
         total_score = freq_score + degree_score + between_score + close_score + compound_boost
         node_scores[node] = total_score
     
-    # Keep more nodes for better quality (top 40 instead of top 15)
-    max_nodes = min(40, max(15, len(terms) // 3))
-    selected_nodes = sorted(node_scores.items(), key=lambda x: x[1], reverse=True)[:max_nodes]
-    selected_node_names = [node for node, score in selected_nodes]
+    # No limit on nodes - allow unlimited node generation
+    # max_nodes = min(60, max(20, len(terms) // 3))  # Commented out - no limit
+    selected_nodes = sorted(node_scores.items(), key=lambda x: x[1], reverse=True)  # Keep all nodes
+    selected_node_names = [node for node, score in selected_nodes]  # Use all nodes
     
     # Create subgraph with selected nodes
     if selected_node_names:

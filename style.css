@@ -952,6 +952,209 @@ select.form-control {
     font-size: var(--font-size-sm);
 }
 
+/* View mode toggle */
+.view-mode-toggle {
+    display: flex;
+    gap: var(--space-4);
+    margin-bottom: var(--space-12);
+    padding: 0 var(--space-16);
+}
+
+.view-mode-btn {
+    flex: 1;
+    font-size: var(--font-size-xs);
+    padding: var(--space-6) var(--space-8);
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.view-mode-btn.active {
+    background-color: var(--color-primary);
+    color: var(--color-btn-primary-text);
+    border-color: var(--color-primary);
+}
+
+.notes-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-8);
+}
+
+/* Folder tree styles */
+.folder-tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-8);
+}
+
+.folder-item {
+    display: flex;
+    align-items: center;
+    padding: var(--space-8) var(--space-12);
+    margin-bottom: var(--space-4);
+    cursor: pointer;
+    border-radius: var(--radius-base);
+    transition: all var(--duration-fast) var(--ease-standard);
+    user-select: none;
+}
+
+.folder-item:hover {
+    background-color: var(--color-secondary);
+}
+
+.folder-item.expanded {
+    background-color: var(--color-secondary-soft);
+}
+
+.folder-toggle {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: var(--space-8);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.folder-toggle.expanded {
+    transform: rotate(90deg);
+}
+
+.folder-icon {
+    margin-right: var(--space-8);
+    color: var(--color-warning);
+    font-size: var(--font-size-sm);
+}
+
+.folder-name {
+    flex: 1;
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-sm);
+}
+
+.folder-actions {
+    display: none;
+    gap: var(--space-4);
+    margin-left: var(--space-8);
+}
+
+.folder-item:hover .folder-actions {
+    display: flex;
+}
+
+.folder-action-btn {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.folder-action-btn:hover {
+    background-color: var(--color-border);
+    color: var(--color-text);
+}
+
+.folder-children {
+    margin-left: var(--space-24);
+    border-left: 1px solid var(--color-border-secondary);
+    padding-left: var(--space-12);
+}
+
+.folder-note-item {
+    display: flex;
+    align-items: center;
+    padding: var(--space-8) var(--space-12);
+    margin-bottom: var(--space-4);
+    cursor: pointer;
+    border-radius: var(--radius-base);
+    transition: all var(--duration-fast) var(--ease-standard);
+    border: 1px solid transparent;
+    position: relative;
+}
+
+.folder-note-item:hover {
+    background-color: var(--color-secondary);
+    border-color: var(--color-border);
+}
+
+.folder-note-item.active {
+    background-color: var(--color-primary);
+    color: var(--color-btn-primary-text);
+    border-color: var(--color-primary);
+}
+
+.folder-note-icon {
+    margin-right: var(--space-8);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.folder-note-item.active .folder-note-icon {
+    color: var(--color-btn-primary-text);
+}
+
+.folder-note-title {
+    flex: 1;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.folder-note-actions {
+    display: none;
+    gap: var(--space-4);
+    margin-left: var(--space-8);
+}
+
+.folder-note-item:hover .folder-note-actions {
+    display: flex;
+}
+
+.folder-note-action-btn {
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.folder-note-action-btn:hover {
+    background-color: var(--color-border);
+    color: var(--color-text);
+}
+
+.folder-note-action-btn[data-action="delete"]:hover {
+    background-color: var(--color-error);
+    color: white;
+}
+
+.empty-folder {
+    padding: var(--space-16);
+    text-align: center;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-style: italic;
+}
+
 .notes-list {
     flex: 1;
     overflow-y: auto;
@@ -959,12 +1162,50 @@ select.form-control {
 }
 
 .note-item {
+    display: flex;
+    align-items: flex-start;
     padding: var(--space-16);
     margin-bottom: var(--space-8);
     border-radius: var(--radius-base);
     cursor: pointer;
     transition: all var(--duration-fast) var(--ease-standard);
     border: 1px solid transparent;
+    position: relative;
+}
+
+.note-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.note-item-actions {
+    display: none;
+    margin-left: var(--space-8);
+    flex-shrink: 0;
+}
+
+.note-item:hover .note-item-actions {
+    display: flex;
+}
+
+.note-delete-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    transition: all var(--duration-fast) var(--ease-standard);
+}
+
+.note-delete-btn:hover {
+    background-color: var(--color-error);
+    color: white;
 }
 
 .note-item:hover {
@@ -3174,6 +3415,8 @@ select.form-control {
     overflow-y: auto;
     height: 100%;
     flex-shrink: 0;
+    /* Ensure content is not cut off */
+    padding-bottom: var(--space-16);
 }
 
 .concept-graph-container {
@@ -3189,6 +3432,58 @@ select.form-control {
 .concept-graph-container svg {
     width: 100%;
     height: 100%;
+}
+
+/* AI Generated Node Styles */
+.concept-graph-container svg circle.ai-node {
+    stroke: #8b5cf6 !important;
+    stroke-width: 3px !important;
+    fill: #e5e7ff !important;
+    opacity: 0.95 !important;
+    filter: drop-shadow(0px 2px 4px rgba(139, 92, 246, 0.3));
+}
+
+.concept-graph-container svg circle.ai-node:hover {
+    stroke: #7c3aed !important;
+    stroke-width: 4px !important;
+    fill: #ddd6fe !important;
+    filter: drop-shadow(0px 3px 6px rgba(139, 92, 246, 0.5));
+}
+
+/* AI Node labels styling */
+.concept-graph-container svg text.ai-node-label {
+    font-weight: 700 !important;
+    fill: #6b46c1 !important;
+    font-size: 14px !important;
+    text-shadow: 0px 1px 2px rgba(255, 255, 255, 0.8);
+}
+
+/* AI Generated connection lines */
+.concept-graph-container svg line.ai-connection {
+    stroke: #8b5cf6 !important;
+    stroke-width: 2.5px !important;
+    stroke-opacity: 0.8 !important;
+    stroke-dasharray: 5,3 !important;
+}
+
+/* Dark theme adjustments */
+[data-color-scheme="dark"] .concept-graph-container svg circle.ai-node {
+    fill: #4c1d95 !important;
+    stroke: #a78bfa !important;
+}
+
+[data-color-scheme="dark"] .concept-graph-container svg circle.ai-node:hover {
+    fill: #581c87 !important;
+    stroke: #8b5cf6 !important;
+}
+
+[data-color-scheme="dark"] .concept-graph-container svg text.ai-node-label {
+    fill: #c4b5fd !important;
+    text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+[data-color-scheme="dark"] .concept-graph-container svg line.ai-connection {
+    stroke: #a78bfa !important;
 }
 
 .graph-controls-bottom {
@@ -3404,8 +3699,9 @@ select.form-control {
 /* Graph info panel should expand to show all content */
 .graph-info-panel {
     flex: 2;
-    min-height: 300px;
+    min-height: 400px; /* Increased to ensure all sections are visible */
     overflow-y: visible;
+    height: auto; /* Allow natural height expansion */
 }
 
 /* Node info panel gets reasonable space */
@@ -3443,6 +3739,7 @@ select.form-control {
 .ai-reprocess-btn {
     background: #10b981 !important;
     border-color: #10b981 !important;
+    color: white !important;
     margin-top: var(--space-8);
 }
 
@@ -3480,7 +3777,6 @@ select.form-control {
     background: #8b5cf6 !important;
     border-color: #8b5cf6 !important;
     color: white !important;
-    font-size: 0.75rem !important;
     margin-top: 4px !important;
 }
 
@@ -3752,6 +4048,9 @@ select.form-control {
     padding: var(--space-12);
     background: var(--color-background);
     border-radius: var(--radius-sm);
+    /* Ensure each insight item is fully visible */
+    flex-shrink: 0;
+    width: 100%;
 }
 
 .insight-label {
@@ -3786,10 +4085,17 @@ select.form-control {
     border-radius: var(--radius-sm);
     font-size: 0.75rem;
     font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.insight-tag:hover {
+    opacity: 0.8;
+    transform: translateY(-1px);
 }
 
 .insight-tag--secondary {
-    background: var(--color-secondary);
+    background: #6c5ce7; /* Purple color for bridging concepts */
 }
 
 .insight-tag--warning {
@@ -3960,6 +4266,9 @@ select.form-control {
     .graph-info-panel,
     .node-info-panel {
         min-width: 250px;
+        /* Ensure content is fully visible on mobile */
+        min-height: 350px;
+        max-height: none;
     }
 }
 
@@ -3975,6 +4284,9 @@ select.form-control {
     color: var(--color-text);
     line-height: 1.6;
     padding-bottom: var(--space-16);
+    /* Ensure full content is visible */
+    height: auto;
+    overflow: visible;
 }
 
 /* Smaller dropdown for graph type */

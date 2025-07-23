@@ -276,10 +276,10 @@ def build_graph_with_selected_nodes(note_text, selected_concepts, analysis_type=
     """Build a new concept graph using only the AI-selected concepts."""
     if not selected_concepts:
         # Fallback to original build_graph
-        return build_graph(note_text, analysis_type)
+        return build_graph(note_text, analysis_type, max_terms=60)
     
     # Use the original build_graph function but filter results
-    full_result = build_graph(note_text, analysis_type)
+    full_result = build_graph(note_text, analysis_type, max_terms=60)
     
     if not full_result or 'nodes' not in full_result:
         return full_result

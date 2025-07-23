@@ -62,6 +62,7 @@ class NotesApp {
     constructor() {
         this.notes = [];
         this.currentNote = null;
+        this.noteToDelete = null;
         this.isRecording = false;
         this.autoSaveTimeout = null;
         this.searchTerm = '';
@@ -170,7 +171,14 @@ class NotesApp {
         });
         
         document.getElementById('confirm-delete').addEventListener('click', () => {
-            this.deleteCurrentNote();
+            if (this.noteToDelete) {
+                // Deleting a specific note
+                this.deleteSpecificNote(this.noteToDelete);
+                this.noteToDelete = null;
+            } else {
+                // Deleting the current note
+                this.deleteCurrentNote();
+            }
         });
         
         // Auto-guardado cada 30 segundos
@@ -430,8 +438,8 @@ class NotesApp {
             container.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">📝</div>
-                    <h3>No chats yet</h3>
-                    <p>Create your first chat to get started</p>
+                    <h3>No notes yet</h3>
+                    <p>Create your first note to get started</p>
                 </div>
             `;
             return;
@@ -443,18 +451,38 @@ class NotesApp {
             
             return `
                 <div class="note-item fade-in" data-note-id="${note.id}">
-                    <div class="note-item-title">${note.title}</div>
-                    <div class="note-item-preview">${preview}</div>
-                    <div class="note-item-date">${date}</div>
+                    <div class="note-item-content">
+                        <div class="note-item-title">${note.title}</div>
+                        <div class="note-item-preview">${preview}</div>
+                        <div class="note-item-date">${date}</div>
+                    </div>
+                    <div class="note-item-actions">
+                        <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             `;
         }).join(''));
         
         // Agregar event listeners a los items
         container.querySelectorAll('.note-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const noteId = parseInt(item.dataset.noteId);
-                this.selectNote(noteId);
+            // Click event for the note content (not the delete button)
+            const noteContent = item.querySelector('.note-item-content');
+            if (noteContent) {
+                noteContent.addEventListener('click', () => {
+                    const noteId = parseInt(item.dataset.noteId);
+                    this.selectNote(noteId);
+                });
+            }
+        });
+
+        // Add event listeners for delete buttons
+        container.querySelectorAll('.note-delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const noteId = parseInt(btn.dataset.noteId);
+                this.showDeleteNoteModal(noteId);
             });
         });
     }
@@ -695,6 +723,40 @@ class NotesApp {
     hideDeleteModal() {
         const modal = document.getElementById('delete-modal');
         modal.classList.remove('active');
+    }
+
+    showDeleteNoteModal(noteId) {
+        this.noteToDelete = noteId;
+        const modal = document.getElementById('delete-modal');
+        modal.classList.add('active');
+    }
+
+    async deleteSpecificNote(noteId) {
+        // Store the note to delete
+        const noteToDelete = this.notes.find(note => note.id === noteId);
+        if (!noteToDelete) {
+            console.error('Note not found');
+            return;
+        }
+
+        // Remove from notes array
+        this.notes = this.notes.filter(note => note.id !== noteId);
+        this.saveToStorage();
+
+        // If this was the current note, clear it
+        if (this.currentNote && this.currentNote.id === noteId) {
+            this.currentNote = null;
+            this.setupDefaultNote();
+        }
+
+        // Refresh current view
+        this.renderNotesList();
+
+        // Delete from server
+        this.deleteNoteFromServer(noteId);
+
+        this.hideDeleteModal();
+        this.showNotification('Note deleted');
     }
     
     showProcessingOverlay(text) {
