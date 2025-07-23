@@ -122,7 +122,7 @@ def get_spanish_stopwords():
 
 def lemmatize_spanish_word(word, use_spacy=True):
     """
-    Lemmatize Spanish word using spaCy if available, otherwise use rule-based approach.
+    Enhanced Spanish lemmatization focusing on nouns and infinitive verbs.
     
     Args:
         word (str): Spanish word to lemmatize
@@ -138,56 +138,107 @@ def lemmatize_spanish_word(word, use_spacy=True):
         try:
             doc = SPACY_ES(word)
             if doc and len(doc) > 0:
-                return doc[0].lemma_
+                lemma = doc[0].lemma_
+                # For verbs, ensure we get infinitive form
+                if doc[0].pos_ == 'VERB' and not lemma.endswith(('ar', 'er', 'ir')):
+                    # Try to get infinitive form if spaCy didn't provide it
+                    pass  # Fall through to rule-based approach
+                else:
+                    return lemma
         except Exception:
             pass  # Fall back to rule-based approach
     
-    # Rule-based Spanish lemmatization
-    # Common verb endings
-    verb_endings = {
-        # Present tense
-        'amos': 'ar', 'áis': 'ar', 'emos': 'er', 'éis': 'er', 'imos': 'ir', 'ís': 'ir',
-        # Past tense
-        'aste': 'ar', 'aron': 'ar', 'iste': 'er', 'ieron': 'er', 'iste': 'ir', 'ieron': 'ir',
+    # Enhanced rule-based Spanish lemmatization
+    # Common verb endings to infinitive mapping
+    verb_patterns = {
+        # Present tense indicative
+        'o': ['ar', 'er', 'ir'],     # first person singular
+        'as': ['ar'],               # second person singular -ar
+        'es': ['er', 'ir'],         # second person singular -er/-ir
+        'a': ['ar'],                # third person singular -ar
+        'e': ['er', 'ir'],          # third person singular -er/-ir
+        'amos': ['ar'],             # first person plural -ar
+        'áis': ['ar'],              # second person plural -ar
+        'emos': ['er'],             # first person plural -er
+        'éis': ['er'],              # second person plural -er
+        'imos': ['ir'],             # first person plural -ir
+        'ís': ['ir'],               # second person plural -ir
+        'an': ['ar'],               # third person plural -ar
+        'en': ['er', 'ir'],         # third person plural -er/-ir
+        
+        # Past tense (preterite)
+        'é': ['ar'],                # first person singular -ar
+        'aste': ['ar'],             # second person singular -ar
+        'ó': ['ar'],                # third person singular -ar
+        'amos': ['ar'],             # first person plural -ar (same as present)
+        'asteis': ['ar'],           # second person plural -ar
+        'aron': ['ar'],             # third person plural -ar
+        'í': ['er', 'ir'],          # first person singular -er/-ir
+        'iste': ['er', 'ir'],       # second person singular -er/-ir
+        'ió': ['er', 'ir'],         # third person singular -er/-ir
+        'imos': ['er', 'ir'],       # first person plural -er/-ir (same as present)
+        'isteis': ['er', 'ir'],     # second person plural -er/-ir
+        'ieron': ['er', 'ir'],      # third person plural -er/-ir
+        
         # Imperfect
-        'aba': 'ar', 'abas': 'ar', 'aban': 'ar', 'ía': 'er', 'ías': 'er', 'ían': 'er',
-        # Participles
-        'ado': 'ar', 'idos': 'ir', 'idas': 'ir',
-        # Gerunds
-        'ando': 'ar', 'iendo': 'er', 'iendo': 'ir',
+        'aba': ['ar'],              # first/third person singular -ar
+        'abas': ['ar'],             # second person singular -ar
+        'ábamos': ['ar'],           # first person plural -ar
+        'abais': ['ar'],            # second person plural -ar
+        'aban': ['ar'],             # third person plural -ar
+        'ía': ['er', 'ir'],         # first/third person singular -er/-ir
+        'ías': ['er', 'ir'],        # second person singular -er/-ir
+        'íamos': ['er', 'ir'],      # first person plural -er/-ir
+        'íais': ['er', 'ir'],       # second person plural -er/-ir
+        'ían': ['er', 'ir'],        # third person plural -er/-ir
+        
+        # Participles and gerunds (convert to infinitive)
+        'ado': ['ar'],              # past participle -ar
+        'ido': ['er', 'ir'],        # past participle -er/-ir
+        'ando': ['ar'],             # gerund -ar
+        'iendo': ['er', 'ir'],      # gerund -er/-ir
     }
     
-    # Try verb lemmatization
-    for ending, infinitive_ending in verb_endings.items():
-        if word.endswith(ending):
+    # Try verb conjugation to infinitive conversion
+    for ending, infinitive_endings in verb_patterns.items():
+        if word.endswith(ending) and len(word) > len(ending) + 2:
             stem = word[:-len(ending)]
-            if len(stem) > 2:  # Ensure we have a meaningful stem
-                return stem + infinitive_ending
+            # Try each possible infinitive ending
+            for inf_ending in infinitive_endings:
+                infinitive = stem + inf_ending
+                # Basic validation - infinitive should be longer than 3 chars
+                if len(infinitive) > 3:
+                    return infinitive
+            break
     
-    # Noun/adjective plural to singular
+    # Noun/adjective plural to singular conversion
     if word.endswith('s') and len(word) > 3:
-        # Check if it's likely a plural
         if word.endswith('es'):
-            # Remove 'es' ending
+            # Remove 'es' ending for words ending in consonant
             singular = word[:-2]
-        elif word.endswith('as') or word.endswith('os'):
-            # Remove 's' and change 'a'/'o' to 'o'/'a' pattern
+            if len(singular) > 2:
+                return singular
+        elif word.endswith(('as', 'os')):
+            # Remove 's' for words ending in vowel
             singular = word[:-1]
+            if len(singular) > 2:
+                return singular
         else:
             # Simple 's' removal
             singular = word[:-1]
-        
-        # Validate that singular form makes sense
-        if len(singular) > 2:
-            return singular
+            if len(singular) > 2:
+                return singular
     
-    # Gender variations (feminine to masculine base form)
+    # Gender variations (standardize to masculine form when appropriate)
     if word.endswith('a') and len(word) > 3:
-        # Try changing 'a' to 'o' for potential masculine form
-        masculine = word[:-1] + 'o'
-        # This is a simple heuristic - in real applications you'd want a dictionary
-        return word  # Keep original for now, but could be improved with word lists
+        # Don't change words that are naturally feminine or end in -ía, -ura, -ción, etc.
+        if not word.endswith(('ía', 'ura', 'ción', 'sión', 'dad', 'tad', 'tud')):
+            # Try changing 'a' to 'o' for potential masculine form
+            masculine = word[:-1] + 'o'
+            # This is a heuristic - in a production system you'd want a dictionary
+            return masculine
     
+    # Return original word if no lemmatization rules apply
     return word
 
 def get_stopwords(language='english'):
@@ -407,7 +458,7 @@ def detect_language(text):
 
 def lemmatize_word(word, language='english', enable_lemmatization=True):
     """
-    Lemmatize a word based on detected language.
+    Enhanced lemmatization focusing on nouns and infinitive verbs.
     
     Args:
         word (str): Word to lemmatize
@@ -415,7 +466,7 @@ def lemmatize_word(word, language='english', enable_lemmatization=True):
         enable_lemmatization (bool): Whether to enable lemmatization
     
     Returns:
-        str: Lemmatized word
+        str: Lemmatized word (noun form or infinitive for verbs)
     """
     if not enable_lemmatization:
         return word
@@ -436,14 +487,33 @@ def lemmatize_word(word, language='english', enable_lemmatization=True):
             if tokens:
                 pos_tags = nltk.pos_tag(tokens)
                 if pos_tags:
-                    _, pos = pos_tags[0]
+                    word_token, pos = pos_tags[0]
+                    
+                    # Convert POS tag to WordNet format
                     wordnet_pos = get_wordnet_pos(pos)
-                    return lemmatizer.lemmatize(word.lower(), pos=wordnet_pos)
+                    
+                    # Special handling for verbs - always lemmatize to infinitive (base form)
+                    if pos.startswith('VB'):
+                        # For verbs, use noun lemmatization first, then verb
+                        lemma = lemmatizer.lemmatize(word.lower(), pos='v')  # verb infinitive
+                        return lemma
+                    
+                    # For nouns, use noun lemmatization
+                    elif pos.startswith('NN'):
+                        lemma = lemmatizer.lemmatize(word.lower(), pos='n')  # noun singular
+                        return lemma
+                    
+                    # For other parts of speech, default to noun lemmatization
+                    else:
+                        lemma = lemmatizer.lemmatize(word.lower(), pos=wordnet_pos)
+                        return lemma
         except:
             # Fallback to simple noun lemmatization
             pass
         
+        # Simple lemmatization as fallback
         return lemmatizer.lemmatize(word.lower())
+        
     except Exception as e:
         # If lemmatization fails for any reason, return original word
         return word
@@ -1260,9 +1330,23 @@ def is_meaningful_word(word, language='english'):
     return True
 
 def is_content_word(term, language='english'):
-    """Check if a term is a content word (noun, verb, adjective, adverb with semantic meaning)."""
+    """Check if a term is a content word (AGGRESSIVE: only nouns, proper names, and infinitive verbs allowed)."""
     term = normalize_word(term)
-    # Language-specific generic terms
+    
+    # Skip empty terms or too short
+    if not term or len(term) < 2:
+        return False
+    
+    # Skip terms that are clearly not semantic (numbers, single letters, etc.)
+    if term.isdigit() or len(term) == 1:
+        return False
+    
+    # Check if term is in stopwords
+    stopwords = get_stopwords(language)
+    if term in stopwords:
+        return False
+    
+    # Language-specific generic terms (more comprehensive)
     if language.lower() in ['spanish', 'es', 'español']:
         generic_terms = {
             'cosa', 'cosas', 'algo', 'nada', 'todo', 'alguien', 'nadie', 'todos', 'alguno', 'ninguno',
@@ -1275,7 +1359,11 @@ def is_content_word(term, language='english'):
             'información', 'datos', 'resultado', 'resultados', 'cambio', 'cambios',
             'nivel', 'niveles', 'número', 'números', 'cantidad', 'cantidades',
             'grupo', 'grupos', 'equipo', 'equipos', 'miembro', 'miembros',
-            'individuo', 'individuos', 'humano', 'humanos'
+            'individuo', 'individuos', 'humano', 'humanos',
+            # Additional generic Spanish terms
+            'proceso', 'procesos', 'método', 'métodos', 'sistema', 'sistemas',
+            'trabajo', 'trabajos', 'estudio', 'estudios', 'investigación', 'investigaciones',
+            'análisis', 'desarrollo', 'desarrollos', 'uso', 'usos', 'aplicación', 'aplicaciones'
         }
     else:
         generic_terms = {
@@ -1290,7 +1378,11 @@ def is_content_word(term, language='english'):
             'information', 'data', 'result', 'results', 'change', 'changes',
             'level', 'levels', 'number', 'numbers', 'amount', 'amounts',
             'group', 'groups', 'team', 'teams', 'member', 'members',
-            'person', 'people', 'individual', 'individuals', 'human', 'humans'
+            'person', 'people', 'individual', 'individuals', 'human', 'humans',
+            # Additional generic English terms
+            'process', 'processes', 'method', 'methods', 'system', 'systems',
+            'work', 'works', 'study', 'studies', 'research', 'analysis',
+            'development', 'use', 'uses', 'application', 'applications'
         }
     
     if term in generic_terms:
@@ -1341,9 +1433,7 @@ def is_content_word(term, language='english'):
     if term in meta_terms:
         return False
 
-    # Additional POS-based filtering to remove pronouns, prepositions,
-    # verbs and adjectives that offer little semantic value. Apply only
-    # to single-word terms to avoid breaking multi-word concepts.
+    # AGGRESSIVE FILTERING: Only allow nouns, proper names, and infinitive verbs
     if ' ' not in term and term.isalpha():
         lang = language.lower()
         if lang in ['english', 'en'] and NLTK_AVAILABLE:
@@ -1351,14 +1441,52 @@ def is_content_word(term, language='english'):
                 tokens = nltk.word_tokenize(term)
                 if tokens:
                     tags = nltk.pos_tag(tokens)
-                    # Keep nouns and proper nouns only
-                    if not all(pos.startswith('NN') for _, pos in tags):
-                        return False
+                    for word, pos in tags:
+                        # Only allow: NN* (nouns), NNP* (proper nouns), VB (base form/infinitive)
+                        if not (pos.startswith('NN') or pos == 'VB'):
+                            return False
+                        # Additional check: reject common auxiliary verbs even if tagged as VB
+                        if pos == 'VB' and word.lower() in {'be', 'have', 'do', 'will', 'would', 'could', 'should', 'may', 'might', 'can', 'shall', 'must'}:
+                            return False
             except Exception:
-                pass
+                # If NLTK fails, apply basic heuristics
+                # Reject obvious adjectives, adverbs, etc.
+                if term.endswith(('ly', 'ing', 'ed', 'er', 'est', 'ful', 'less', 'ous', 'ive', 'able', 'ible')):
+                    return False
+                
         elif lang in ['spanish', 'es', 'español']:
-            # Filter common verb/adverb endings in Spanish
-            if re.search(r'(?:ando|iendo|ado|ada|ados|adas|ido|ida|idos|idas|mente|\b(?:ar|er|ir))$', term):
+            # More aggressive Spanish filtering
+            # Reject conjugated verbs, participles, gerunds, and adverbs
+            if re.search(r'(?:ando|iendo|ado|ada|ados|adas|ido|ida|idos|idas|mente)$', term):
+                return False
+            
+            # Reject conjugated verb forms (present, past, imperfect, subjunctive)
+            if re.search(r'(?:amos|áis|éis|imos|ís|aste|aron|iste|ieron|aba|abas|aban|ía|ías|ían|emos|en|es|an)$', term):
+                return False
+            
+            # Reject common adjective endings
+            if re.search(r'(?:ivo|iva|oso|osa|able|ible|ante|ente|ador|adora|edor|edora|ista)$', term):
+                return False
+                
+            # Reject diminutives and augmentatives
+            if re.search(r'(?:ito|ita|illo|illa|ín|ina|ón|ona|azo|aza|ote|ota|uelo|uela)$', term):
+                return False
+            
+            # Reject common adjectival/adverbial endings
+            if re.search(r'(?:mente|ísimo|ísima|ísimos|ísimas)$', term):
+                return False
+            
+            # Only allow if it looks like a noun or infinitive verb
+            # Infinitive verbs end in -ar, -er, -ir
+            is_infinitive = re.search(r'(?:ar|er|ir)$', term) and len(term) > 3
+            
+            # Check if it's likely a noun (doesn't match problematic verb/adjective patterns)
+            is_likely_noun = not re.search(r'(?:ar|er|ir|ando|iendo|ado|ada|idos|idas|mente|ivo|iva|oso|osa)$', term)
+            
+            # Allow technical/domain-specific terms that might end in -ar, -er, -ir but are nouns
+            technical_noun_patterns = re.search(r'(?:algoritmo|sistema|método|proceso|análisis|síntesis|técnica|estrategia|estructura|arquitectura|plataforma|interfaz|framework|software|hardware|database|servidor|cliente|protocolo|estándar|formato|modelo|patrón|librería|biblioteca|aplicación|programa|código|script|función|variable|parámetro|argumento|objeto|clase|instancia|método|atributo|propiedad|evento|excepción|error|bug|test|prueba|versión|release|deploy|build|compile|debug|optimize|refactor|migrate|backup|restore|update|upgrade|install|configure|setup|init|start|stop|run|execute|process|thread|task|job|queue|stack|heap|memory|cache|buffer|pointer|reference|index|key|value|hash|tree|graph|node|edge|vertex|matrix|array|list|vector|tuple|dictionary|map|set|collection|iterator|generator|lambda|closure|callback|promise|async|await|sync|lock|mutex|semaphore|thread|parallel|concurrent|distributed|cluster|node|server|client|peer|network|socket|port|url|uri|http|https|tcp|udp|ip|dns|ssl|tls|api|rest|soap|json|xml|yaml|csv|sql|nosql|database|table|column|row|record|field|schema|index|query|transaction|commit|rollback|backup|restore)$', term)
+            
+            if not (is_infinitive or is_likely_noun or technical_noun_patterns):
                 return False
 
     return True

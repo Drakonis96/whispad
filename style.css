@@ -1113,9 +1113,10 @@ select.form-control {
 }
 
 .folder-note-actions {
-    display: none;
+    display: flex;
     gap: var(--space-4);
     margin-left: var(--space-8);
+    align-items: center;
 }
 
 .folder-note-item:hover .folder-note-actions {
@@ -1125,6 +1126,8 @@ select.form-control {
 .folder-note-action-btn {
     width: 18px;
     height: 18px;
+    min-width: 18px;
+    min-height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1135,6 +1138,7 @@ select.form-control {
     border-radius: var(--radius-sm);
     font-size: var(--font-size-xs);
     transition: all var(--duration-fast) var(--ease-standard);
+    flex-shrink: 0;
 }
 
 .folder-note-action-btn:hover {
@@ -1143,6 +1147,20 @@ select.form-control {
 }
 
 .folder-note-action-btn[data-action="delete"]:hover {
+    background-color: var(--color-error);
+    color: white;
+}
+
+.folder-note-item.active .folder-note-action-btn {
+    color: var(--color-btn-primary-text);
+}
+
+.folder-note-item.active .folder-note-action-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: var(--color-btn-primary-text);
+}
+
+.folder-note-item.active .folder-note-action-btn[data-action="delete"]:hover {
     background-color: var(--color-error);
     color: white;
 }
@@ -1204,6 +1222,15 @@ select.form-control {
 }
 
 .note-delete-btn:hover {
+    background-color: var(--color-error);
+    color: white;
+}
+
+.note-item.active .note-delete-btn {
+    color: var(--color-btn-primary-text);
+}
+
+.note-item.active .note-delete-btn:hover {
     background-color: var(--color-error);
     color: white;
 }
@@ -4187,6 +4214,80 @@ select.form-control {
     background: var(--color-primary);
     color: white;
     border-color: var(--color-primary);
+}
+
+/* Level-based styling for multi-level connections */
+.level-group {
+    margin-bottom: var(--space-12);
+}
+
+.level-title {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    margin-bottom: var(--space-6);
+    padding-left: var(--space-2);
+    border-left: 3px solid var(--color-border);
+}
+
+.connected-node.level-1 {
+    background: #e3f2fd;
+    border-color: #2196f3;
+    color: #1565c0;
+}
+
+.connected-node.level-1:hover {
+    background: #2196f3;
+    color: white;
+    border-color: #1976d2;
+}
+
+.connected-node.level-2 {
+    background: #f3e5f5;
+    border-color: #9c27b0;
+    color: #7b1fa2;
+}
+
+.connected-node.level-2:hover {
+    background: #9c27b0;
+    color: white;
+    border-color: #8e24aa;
+}
+
+.connected-node.level-3 {
+    background: #fff8e1;
+    border-color: #ff9800;
+    color: #e65100;
+}
+
+.connected-node.level-3:hover {
+    background: #ff9800;
+    color: white;
+    border-color: #f57c00;
+}
+
+/* Dark theme adjustments for level styles */
+[data-color-scheme="dark"] .connected-node.level-1 {
+    background: rgba(33, 150, 243, 0.2);
+    border-color: #42a5f5;
+    color: #90caf9;
+}
+
+[data-color-scheme="dark"] .connected-node.level-2 {
+    background: rgba(156, 39, 176, 0.2);
+    border-color: #ab47bc;
+    color: #ce93d8;
+}
+
+[data-color-scheme="dark"] .connected-node.level-3 {
+    background: rgba(255, 152, 0, 0.2);
+    border-color: #ffa726;
+    color: #ffcc02;
+}
+
+[data-color-scheme="dark"] .level-title {
+    color: var(--color-text-tertiary);
+    border-left-color: var(--color-border-subtle);
 }
 
 .graph-controls {
