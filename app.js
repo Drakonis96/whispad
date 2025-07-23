@@ -2353,7 +2353,9 @@ class NotesApp {
         
         // Refresh current view
         if (this.currentViewMode === 'folder') {
-            await this.loadFolderStructure();
+            // Remove the note from current folder structure for immediate UI update
+            this.removeNoteFromFolderStructure(noteIdToDelete);
+            this.renderFolderTree();
         } else {
             this.renderNotesList();
         }
@@ -3251,16 +3253,23 @@ class NotesApp {
         const diversity = node.diversity || 0;
         const degree = node.degree || 0;
         
+        // Group nodes by level for better display
+        const nodesByLevel = {
+            1: connectedNodes.filter(n => n.level === 1),
+            2: connectedNodes.filter(n => n.level === 2),
+            3: connectedNodes.filter(n => n.level === 3)
+        };
+        
         nodeDetailsEl.innerHTML = `
             <div class="node-title">${node.label}</div>
             
             <div class="node-metric">
-                <span class="node-metric-label">Connections</span>
+                <span class="node-metric-label">Total Connections (3 levels)</span>
                 <span class="node-metric-value">${connections}</span>
             </div>
             
             <div class="node-metric">
-                <span class="node-metric-label">Degree</span>
+                <span class="node-metric-label">Direct Degree</span>
                 <span class="node-metric-value">${degree}</span>
             </div>
             
@@ -3286,12 +3295,40 @@ class NotesApp {
             
             ${connections > 0 ? `
                 <div class="connected-nodes">
-                    <h5>Connected to (${connections})</h5>
-                    <div class="connected-list">
-                        ${connectedNodes.map(connectedNode => 
-                            `<span class="connected-node" data-node-id="${connectedNode.id}">${connectedNode.label}</span>`
-                        ).join('')}
-                    </div>
+                    <h5>Connected Nodes (3 levels deep)</h5>
+                    
+                    ${nodesByLevel[1].length > 0 ? `
+                        <div class="level-group">
+                            <h6 class="level-title">Level 1 - Direct (${nodesByLevel[1].length})</h6>
+                            <div class="connected-list">
+                                ${nodesByLevel[1].map(connectedNode => 
+                                    `<span class="connected-node level-1" data-node-id="${connectedNode.id}">${connectedNode.label}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${nodesByLevel[2].length > 0 ? `
+                        <div class="level-group">
+                            <h6 class="level-title">Level 2 - Secondary (${nodesByLevel[2].length})</h6>
+                            <div class="connected-list">
+                                ${nodesByLevel[2].map(connectedNode => 
+                                    `<span class="connected-node level-2" data-node-id="${connectedNode.id}">${connectedNode.label}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${nodesByLevel[3].length > 0 ? `
+                        <div class="level-group">
+                            <h6 class="level-title">Level 3 - Tertiary (${nodesByLevel[3].length})</h6>
+                            <div class="connected-list">
+                                ${nodesByLevel[3].map(connectedNode => 
+                                    `<span class="connected-node level-3" data-node-id="${connectedNode.id}">${connectedNode.label}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
             ` : ''}
         `;
@@ -3578,7 +3615,7 @@ class NotesApp {
             .on('zoom', (event) => {
                 if (!this.rotationMode) {
                     g.attr('transform', event.transform);
-                    // Update node and label visibility based on zoom level
+                    // Update node and label visibility based on zoom level with consistent label sizing
                     this.updateNodeVisibilityOnZoom(event.transform.k);
                 }
             });
@@ -3609,6 +3646,91 @@ class NotesApp {
         
         // Setup sliders
         this.setupGraphSliders();
+    }
+
+    findConnectedNodesUpTo3Levels(centralNode, graph) {
+        // Create adjacency list for efficient traversal
+        const adjacencyList = {};
+        graph.nodes.forEach(node => {
+            adjacencyList[node.id] = [];
+        });
+        
+        graph.links.forEach(link => {
+            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+            
+            if (adjacencyList[sourceId] && adjacencyList[targetId]) {
+                adjacencyList[sourceId].push(targetId);
+                adjacencyList[targetId].push(sourceId);
+            }
+        });
+        
+        // BFS to find nodes up to 3 levels deep
+        const visited = new Set();
+        const levelNodes = {
+            0: [centralNode.id], // Central node (level 0)
+            1: [], // First level connections
+            2: [], // Second level connections
+            3: []  // Third level connections
+        };
+        
+        visited.add(centralNode.id);
+        
+        // Level 1: Direct connections
+        const directConnections = adjacencyList[centralNode.id] || [];
+        directConnections.forEach(nodeId => {
+            if (!visited.has(nodeId)) {
+                levelNodes[1].push(nodeId);
+                visited.add(nodeId);
+            }
+        });
+        
+        // Level 2: Connections of level 1 nodes
+        levelNodes[1].forEach(nodeId => {
+            const connections = adjacencyList[nodeId] || [];
+            connections.forEach(connectedNodeId => {
+                if (!visited.has(connectedNodeId)) {
+                    levelNodes[2].push(connectedNodeId);
+                    visited.add(connectedNodeId);
+                }
+            });
+        });
+        
+        // Level 3: Connections of level 2 nodes
+        levelNodes[2].forEach(nodeId => {
+            const connections = adjacencyList[nodeId] || [];
+            connections.forEach(connectedNodeId => {
+                if (!visited.has(connectedNodeId)) {
+                    levelNodes[3].push(connectedNodeId);
+                    visited.add(connectedNodeId);
+                }
+            });
+        });
+        
+        // Convert node IDs back to node objects
+        const allConnectedNodes = [];
+        const nodeMap = {};
+        graph.nodes.forEach(node => {
+            nodeMap[node.id] = node;
+        });
+        
+        // Add all levels (excluding central node)
+        [1, 2, 3].forEach(level => {
+            levelNodes[level].forEach(nodeId => {
+                if (nodeMap[nodeId]) {
+                    allConnectedNodes.push({
+                        ...nodeMap[nodeId],
+                        level: level // Add level information for potential UI differentiation
+                    });
+                }
+            });
+        });
+        
+        return {
+            allConnectedNodes,
+            levelNodes,
+            centralNode
+        };
     }
 
     updateGraphVisualization() {
@@ -4015,31 +4137,30 @@ class NotesApp {
             }
         });
         
-        // STEP 13: Click to highlight connections and show node details
+        // STEP 13: Click to highlight connections and show node details (with 3-level deep analysis)
         node.on('click', (event, d) => {
             event.stopPropagation();
             
-            // Find connected nodes for detailed display
-            const connectedNodes = [];
-            graph.links.forEach(link => {
-                const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-                const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-                
-                if (sourceId === d.id) {
-                    const targetNode = graph.nodes.find(n => n.id === targetId);
-                    if (targetNode) connectedNodes.push(targetNode);
-                } else if (targetId === d.id) {
-                    const sourceNode = graph.nodes.find(n => n.id === sourceId);
-                    if (sourceNode) connectedNodes.push(sourceNode);
-                }
+            // Find connected nodes up to 3 levels deep for node details
+            const connectionResult = this.findConnectedNodesUpTo3Levels(d, graph);
+            const allConnectedNodes = connectionResult.allConnectedNodes;
+            
+            // For visual highlighting, only show direct connections (level 1)
+            const connectedNodes = new Set([d.id]);
+            const directlyConnectedNodes = allConnectedNodes.filter(n => n.level === 1);
+            
+            // Add direct connection IDs to the set for visual highlighting
+            directlyConnectedNodes.forEach(node => {
+                connectedNodes.add(node.id);
             });
             
-            this.renderNodeDetails(d, connectedNodes);
+            // Render node details with all 3 levels of connections
+            this.renderNodeDetails(d, allConnectedNodes);
             
-            // Visual feedback with community colors
-            const connectedNodeIds = new Set([d.id, ...connectedNodes.map(n => n.id)]);
+            // Visual feedback - highlight only directly connected nodes (same as hover)
+            node.style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.2);
             
-            node.style('opacity', n => connectedNodeIds.has(n.id) ? 1 : 0.2);
+            // Highlight only links that connect to the clicked node
             link.style('stroke-opacity', l => {
                 const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
                 const targetId = typeof l.target === 'object' ? l.target.id : l.target;
@@ -4051,8 +4172,8 @@ class NotesApp {
             });
             
             // Only show labels and backgrounds for connected nodes
-            label.style('opacity', n => connectedNodeIds.has(n.id) ? 1 : 0.3);
-            labelBg.style('opacity', n => connectedNodeIds.has(n.id) ? 0.9 : 0.2);
+            label.style('opacity', n => connectedNodes.has(n.id) ? 1 : 0.3);
+            labelBg.style('opacity', n => connectedNodes.has(n.id) ? 0.9 : 0.2);
         });
         
         // STEP 14: Click on background to reset
@@ -4756,20 +4877,22 @@ class NotesApp {
             }
         });
         
-        // Update label visibility and size based on zoom level
-        // Show more labels and make them larger at higher zoom levels
+        // Update label visibility based on zoom level - KEEP CONSISTENT SIZE
+        // Show more labels at higher zoom levels but don't scale font size
         const labelVisibilityThreshold = Math.max(0.3, 1 / zoomScale);
-        const labelSizeMultiplier = Math.max(0.8, Math.min(1.5, zoomScale * 0.8));
+        // Remove label size scaling - keep original size
+        const labelSizeMultiplier = 1.0; // Always 1.0 to maintain consistent size
         
         const labelBgs = this.graphElements.g.selectAll('.label-bg');
         
         labels.each(function(d, i) {
             const label = d3.select(this);
-            // Use improved font sizing consistent with main rendering
+            // Use improved font sizing consistent with main rendering - NO SCALING
             const baseSize = d.isAIGenerated ? 12 : 11;
             const sizeBonus = Math.min(4, (d.calculatedSize - 8) * 0.2);
             const originalFontSize = Math.max(9, Math.min(14, baseSize + sizeBonus));
-            const adjustedFontSize = originalFontSize * labelSizeMultiplier;
+            // Keep original font size - no scaling with zoom
+            const adjustedFontSize = originalFontSize; // No multiplication by labelSizeMultiplier
             const shouldShow = (d.showText !== false) && ((d.importance || 0.5) > labelVisibilityThreshold || zoomScale > 1.2);
             
             label
@@ -8812,9 +8935,11 @@ class NotesApp {
             await this.setupDefaultNote();
         }
 
-        // Refresh current view
+        // Refresh current view immediately
         if (this.currentViewMode === 'folder') {
-            await this.loadFolderStructure();
+            // Remove the note from current folder structure for immediate UI update
+            this.removeNoteFromFolderStructure(noteId);
+            this.renderFolderTree();
         } else {
             this.renderNotesList();
         }
@@ -8824,6 +8949,22 @@ class NotesApp {
 
         this.hideDeleteModal();
         this.showNotification('Note deleted');
+    }
+
+    removeNoteFromFolderStructure(noteId) {
+        // Recursively remove note from folder structure
+        const removeFromItems = (items) => {
+            return items.filter(item => {
+                if (item.type === 'note' && item.id === noteId) {
+                    return false; // Remove this note
+                } else if (item.type === 'folder' && item.children) {
+                    item.children = removeFromItems(item.children);
+                }
+                return true;
+            });
+        };
+        
+        this.folderStructure = removeFromItems(this.folderStructure);
     }
     
     showProcessingOverlay(text) {
