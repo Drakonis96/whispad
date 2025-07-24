@@ -5397,6 +5397,72 @@ def delete_folder(folder_path):
     except Exception as e:
         return jsonify({"error": f"Error deleting folder: {str(e)}"}), 500
 
+@app.route('/api/move-folder', methods=['POST'])
+def move_folder():
+    """Move a folder to a different parent folder"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data received"}), 400
+
+        folder_path = data.get('folder_path', '').strip()
+        target_folder = data.get('target_folder', '').strip()
+
+        if not folder_path:
+            return jsonify({"error": "Folder path is required"}), 400
+
+        saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
+        source_path = os.path.join(saved_notes_dir, folder_path)
+
+        # Security checks
+        if not is_path_within_directory(saved_notes_dir, source_path):
+            return jsonify({"error": "Invalid folder path"}), 400
+
+        if not os.path.exists(source_path) or not os.path.isdir(source_path):
+            return jsonify({"error": "Folder not found"}), 404
+
+        if target_folder:
+            components = target_folder.split('/')
+            sanitized = [sanitize_filename(c) for c in components if c]
+            target_folder_path = os.path.join(*sanitized) if sanitized else ''
+            target_dir = os.path.join(saved_notes_dir, target_folder_path)
+        else:
+            target_dir = saved_notes_dir
+
+        if not is_path_within_directory(saved_notes_dir, target_dir):
+            return jsonify({"error": "Invalid target path"}), 400
+
+        if not os.path.exists(target_dir):
+            return jsonify({"error": "Target folder does not exist"}), 404
+
+        # Prevent moving into itself or subfolder
+        abs_source = os.path.abspath(source_path)
+        abs_target_parent = os.path.abspath(target_dir)
+        if abs_target_parent.startswith(abs_source):
+            return jsonify({"error": "Cannot move a folder inside itself"}), 400
+
+        folder_name = os.path.basename(source_path)
+        target_path = os.path.join(target_dir, folder_name)
+
+        if os.path.exists(target_path):
+            return jsonify({"error": "Folder already exists at target location"}), 409
+
+        shutil.move(source_path, target_path)
+
+        relative_new_path = os.path.relpath(target_path, saved_notes_dir)
+        return jsonify({
+            "success": True,
+            "message": "Folder moved successfully",
+            "new_path": relative_new_path
+        })
+
+    except Exception as e:
+        return jsonify({"error": f"Error moving folder: {str(e)}"}), 500
+
 @app.route('/api/move-note', methods=['POST'])
 def move_note_to_folder():
     """Move a note to a different folder"""

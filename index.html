@@ -1128,6 +1128,23 @@
         </div>
     </div>
 
+    <!-- Move Folder Modal -->
+    <div class="modal" id="move-folder-modal">
+        <div class="modal-content">
+            <h3>Move Folder</h3>
+            <div class="form-group">
+                <label for="target-parent-folder-select">Select Target Folder:</label>
+                <select class="form-control" id="target-parent-folder-select">
+                    <option value="">Root (No parent)</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-move-folder">Cancel</button>
+                <button class="btn btn--primary" id="confirm-move-folder">Move Folder</button>
+            </div>
+        </div>
+    </div>
+
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
