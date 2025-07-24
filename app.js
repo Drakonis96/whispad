@@ -133,6 +133,7 @@ class NotesApp {
         this.folderStructure = [];
         this.currentNote = null;
         this.noteToDelete = null;
+        this.folderToMove = null;
         this.currentViewMode = 'folder'; // 'folder' or 'list'
         this.expandedFolders = new Set();
         this.isRecording = false;
@@ -849,6 +850,21 @@ class NotesApp {
         document.getElementById('confirm-move-note').addEventListener('click', async () => {
             await this.moveNoteToFolder();
         });
+
+        // Move folder modal
+        const cancelMoveFolder = document.getElementById('cancel-move-folder');
+        if (cancelMoveFolder) {
+            cancelMoveFolder.addEventListener('click', () => {
+                this.hideMoveFolderModal();
+            });
+        }
+
+        const confirmMoveFolder = document.getElementById('confirm-move-folder');
+        if (confirmMoveFolder) {
+            confirmMoveFolder.addEventListener('click', async () => {
+                await this.moveFolderToFolder();
+            });
+        }
 
         // Auto-guardado cada 30 segundos
         this.autoSaveInterval = setInterval(() => {
@@ -1700,6 +1716,9 @@ class NotesApp {
                             <button class="folder-action-btn" data-action="create-note" title="Create note in this folder">
                                 <i class="fas fa-plus"></i>
                             </button>
+                            <button class="folder-action-btn" data-action="move" title="Move folder">
+                                <i class="fas fa-folder-open"></i>
+                            </button>
                             <button class="folder-action-btn" data-action="delete" title="Delete folder">
                                 <i class="fas fa-trash"></i>
                             </button>
@@ -1776,6 +1795,8 @@ class NotesApp {
                     await this.deleteFolder(path);
                 } else if (action === 'create-note') {
                     await this.createNoteInFolder(path);
+                } else if (action === 'move') {
+                    this.showMoveFolderModal(path);
                 }
             });
         });
@@ -1860,21 +1881,24 @@ class NotesApp {
         modal.classList.remove('active');
     }
     
-    populateFolderOptions(select) {
+    populateFolderOptions(select, excludePath = null) {
         select.innerHTML = '<option value="">Root (No parent)</option>';
-        this.addFolderOptions(select, this.folderStructure);
+        this.addFolderOptions(select, this.folderStructure, '', excludePath);
     }
-    
-    addFolderOptions(select, items, prefix = '') {
+
+    addFolderOptions(select, items, prefix = '', excludePath = null) {
         items.forEach(item => {
             if (item.type === 'folder') {
-                const option = document.createElement('option');
-                option.value = item.path;
-                option.textContent = prefix + item.name;
-                select.appendChild(option);
-                
+                const shouldExclude = excludePath && item.path.startsWith(excludePath);
+                if (!shouldExclude) {
+                    const option = document.createElement('option');
+                    option.value = item.path;
+                    option.textContent = prefix + item.name;
+                    select.appendChild(option);
+                }
+
                 if (item.children) {
-                    this.addFolderOptions(select, item.children, prefix + item.name + '/');
+                    this.addFolderOptions(select, item.children, prefix + item.name + '/', excludePath);
                 }
             }
         });
@@ -2055,6 +2079,57 @@ class NotesApp {
         } catch (error) {
             console.error('Error moving note:', error);
             this.showNotification(`Error moving note: ${error.message}`, 'error');
+        }
+    }
+
+    showMoveFolderModal(folderPath) {
+        this.folderToMove = folderPath;
+        const modal = document.getElementById('move-folder-modal');
+        const targetSelect = document.getElementById('target-parent-folder-select');
+
+        // Populate folder options excluding the folder being moved
+        targetSelect.innerHTML = '<option value="">Root (No parent)</option>';
+        this.addFolderOptions(targetSelect, this.folderStructure, '', folderPath);
+
+        modal.classList.add('active');
+    }
+
+    hideMoveFolderModal() {
+        const modal = document.getElementById('move-folder-modal');
+        modal.classList.remove('active');
+        this.folderToMove = null;
+    }
+
+    async moveFolderToFolder() {
+        if (!this.folderToMove) return;
+
+        const targetSelect = document.getElementById('target-parent-folder-select');
+        const targetFolder = targetSelect.value;
+
+        try {
+            const response = await authFetch('/api/move-folder', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    folder_path: this.folderToMove,
+                    target_folder: targetFolder
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Failed to move folder');
+            }
+
+            this.showNotification('Folder moved successfully');
+            this.hideMoveFolderModal();
+            await this.loadFolderStructure();
+
+        } catch (error) {
+            console.error('Error moving folder:', error);
+            this.showNotification(`Error moving folder: ${error.message}`, 'error');
         }
     }
     
