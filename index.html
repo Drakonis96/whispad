@@ -181,6 +181,9 @@
                         <button class="btn btn--outline btn--sm" id="concept-graph-btn" title="Concept map">
                             <i class="fas fa-network-wired"></i>&nbsp;Concept
                         </button>
+                        <button class="btn btn--outline btn--sm" id="study-btn" title="Study mode - Quiz and Flashcards">
+                            <i class="fas fa-graduation-cap"></i>&nbsp;Study
+                        </button>
                     </div>
                     </div>
                 </div>
@@ -1145,6 +1148,182 @@
         </div>
     </div>
 
+    <!-- Study Modal -->
+    <div class="modal" id="study-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>Study Mode</h3>
+            <div class="modal-body">
+                <div class="tab-buttons">
+                    <button class="btn btn--outline btn--sm" data-tab="quiz-tab">Quiz</button>
+                    <button class="btn btn--outline btn--sm" data-tab="flashcards-tab">Flashcards</button>
+                    <button class="btn btn--outline btn--sm" data-tab="saved-tab">Saved Items</button>
+                </div>
+                
+                <!-- Quiz Tab -->
+                <div class="tab-content" id="quiz-tab">
+                    <div class="study-options" id="quiz-options">
+                        <h4>Choose Quiz Option</h4>
+                        <div class="study-choice-buttons">
+                            <button class="btn btn--primary btn--large" id="study-saved-quiz-btn">
+                                <i class="fas fa-folder-open"></i>
+                                Study Saved Quizzes
+                            </button>
+                            <button class="btn btn--secondary btn--large" id="generate-new-quiz-btn">
+                                <i class="fas fa-plus-circle"></i>
+                                Generate New Quiz
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="study-setup hidden" id="quiz-setup">
+                        <div class="form-group">
+                            <label for="quiz-language">Language:</label>
+                            <select class="form-control" id="quiz-language">
+                                <option value="english">English</option>
+                                <option value="spanish">Spanish</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="quiz-level">Difficulty Level:</label>
+                            <select class="form-control" id="quiz-level">
+                                <option value="basic">Basic</option>
+                                <option value="medium">Medium</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
+                        </div>
+                        <button class="btn btn--primary" id="start-quiz-btn">Generate Quiz</button>
+                    </div>
+                    
+                    <div class="quiz-interface hidden" id="quiz-interface">
+                        <div class="quiz-progress">
+                            <span id="quiz-question-counter">Question 1 of 10</span>
+                        </div>
+                        <div class="quiz-question">
+                            <h4 id="quiz-question-text"></h4>
+                            <div class="quiz-answers" id="quiz-answers"></div>
+                        </div>
+                        <div class="quiz-actions">
+                            <button class="btn btn--outline" id="prev-question-btn" disabled>Previous</button>
+                            <button class="btn btn--primary" id="next-question-btn" disabled>Next</button>
+                            <button class="btn btn--secondary hidden" id="finish-quiz-btn">Finish Quiz</button>
+                        </div>
+                        <div class="quiz-results hidden" id="quiz-results">
+                            <h4>Quiz Complete!</h4>
+                            <p>Score: <span id="quiz-score"></span></p>
+                            <button class="btn btn--primary" id="save-quiz-btn">Save Quiz</button>
+                            <button class="btn btn--outline" id="new-quiz-btn">New Quiz</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Flashcards Tab -->
+                <div class="tab-content" id="flashcards-tab" style="display:none;">
+                    <div class="study-options" id="flashcards-options">
+                        <h4>Choose Flashcards Option</h4>
+                        <div class="study-choice-buttons">
+                            <button class="btn btn--primary btn--large" id="study-saved-flashcards-btn">
+                                <i class="fas fa-folder-open"></i>
+                                Study Saved Flashcards
+                            </button>
+                            <button class="btn btn--secondary btn--large" id="generate-new-flashcards-btn">
+                                <i class="fas fa-plus-circle"></i>
+                                Generate New Flashcards
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="study-setup hidden" id="flashcards-setup">
+                        <div class="form-group">
+                            <label for="flashcards-language">Language:</label>
+                            <select class="form-control" id="flashcards-language">
+                                <option value="english">English</option>
+                                <option value="spanish">Spanish</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="flashcards-level">Difficulty Level:</label>
+                            <select class="form-control" id="flashcards-level">
+                                <option value="basic">Basic</option>
+                                <option value="medium">Medium</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
+                        </div>
+                        <button class="btn btn--primary" id="start-flashcards-btn">Generate Flashcards</button>
+                    </div>
+                    
+                    <div class="flashcards-interface hidden" id="flashcards-interface">
+                        <div class="flashcard-header">
+                            <div class="flashcard-progress">
+                                <span id="flashcard-counter">Card 1 of 10</span>
+                            </div>
+                            <div class="flashcard-global-controls">
+                                <button class="btn btn--icon" id="global-show-answers-btn" title="Show/Hide all answers">
+                                    <i class="fas fa-eye" id="global-eye-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flashcard" id="current-flashcard">
+                            <div class="flashcard-content">
+                                <div class="flashcard-question">
+                                    <h4 id="flashcard-concept"></h4>
+                                </div>
+                                <div class="flashcard-answer hidden" id="flashcard-answer">
+                                    <p id="flashcard-description"></p>
+                                </div>
+                            </div>
+                            <div class="flashcard-toggle">
+                                <button class="btn btn--icon" id="toggle-answer-btn" title="Show/Hide answer">
+                                    <i class="fas fa-eye" id="card-eye-icon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flashcard-actions">
+                            <button class="btn btn--outline" id="prev-flashcard-btn" disabled>Previous</button>
+                            <button class="btn btn--primary" id="next-flashcard-btn" disabled>Next</button>
+                            <button class="btn btn--secondary hidden" id="finish-flashcards-btn">Finish</button>
+                        </div>
+                        <div class="flashcards-results hidden" id="flashcards-results">
+                            <h4>Flashcards Complete!</h4>
+                            <button class="btn btn--primary" id="save-flashcards-btn">Save Flashcards</button>
+                            <button class="btn btn--outline" id="new-flashcards-btn">New Flashcards</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Saved Items Tab -->
+                <div class="tab-content" id="saved-tab" style="display:none;">
+                    <div class="saved-items">
+                        <div class="saved-section">
+                            <div class="saved-section-header">
+                                <h4>Saved Quizzes</h4>
+                                <button class="btn btn--danger btn--sm" id="delete-all-quizzes-btn" title="Delete all saved quizzes">
+                                    <i class="fas fa-trash"></i> Delete All
+                                </button>
+                            </div>
+                            <div class="saved-list" id="saved-quiz-list">
+                                <p class="no-items">No saved quizzes yet.</p>
+                            </div>
+                        </div>
+                        <div class="saved-section">
+                            <div class="saved-section-header">
+                                <h4>Saved Flashcards</h4>
+                                <button class="btn btn--danger btn--sm" id="delete-all-flashcards-btn" title="Delete all saved flashcards">
+                                    <i class="fas fa-trash"></i> Delete All
+                                </button>
+                            </div>
+                            <div class="saved-list" id="saved-flashcards-list">
+                                <p class="no-items">No saved flashcards yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-study-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
     <button id="mobile-record-fab" class="mobile-fab" aria-label="Record">
         <i class="fas fa-microphone"></i>
     </button>
@@ -1172,6 +1351,9 @@
         </button>
         <button class="mobile-tool-btn" data-target="files-btn" aria-label="Files">
             <i class="fas fa-folder"></i>
+        </button>
+        <button class="mobile-tool-btn" data-target="study-btn" aria-label="Study">
+            <i class="fas fa-graduation-cap"></i>
         </button>
     </div>
     </div> <!-- end app-content -->

@@ -10153,6 +10153,2034 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('user-btn').classList.remove('hidden');
 });
 
+// Study Modal Functionality
+class StudyManager {
+    constructor() {
+        this.currentQuiz = null;
+        this.currentFlashcards = null;
+        this.currentQuestionIndex = 0;
+        this.currentFlashcardIndex = 0;
+        this.userAnswers = [];
+        this.selectedProvider = null;
+        this.selectedModel = null;
+        this.currentNote = null;
+        
+        // New properties for improved functionality
+        this.quizScore = { correct: 0, total: 0 };
+        this.isQuizFinished = false;
+        this.isGeneratingMore = false;
+        this.allQuizQuestions = [];  // Store all generated questions
+        this.allFlashcards = [];     // Store all generated flashcards
+        this.answeredQuestions = []; // Track if question has been answered
+        
+        // Study item tracking for continuous updates
+        this.currentQuizStudyId = null;    // Track current quiz study item ID
+        this.currentFlashcardsStudyId = null; // Track current flashcards study item ID
+        
+        // Flashcard state variables
+        this.globalShowAnswers = false; // Global toggle for showing all answers
+        this.currentCardShowAnswer = false; // Current card answer visibility
+        
+        // Token chunking properties
+        this.tokenChunkSize = 50000; // 50k tokens per chunk
+        this.currentQuizChunkIndex = 0; // Current chunk for quiz generation
+        this.currentFlashcardsChunkIndex = 0; // Current chunk for flashcards generation
+        this.noteChunks = []; // Store pre-calculated chunks
+        this.chunkPositions = {}; // Store chunk positions per note
+        
+        this.initializeEventListeners();
+    }
+
+    initializeEventListeners() {
+        // Study button
+        document.getElementById('study-btn').addEventListener('click', () => {
+            this.openStudyModal();
+        });
+
+        // Modal close
+        document.getElementById('close-study-modal').addEventListener('click', () => {
+            this.closeStudyModal();
+        });
+
+        // Tab switching
+        document.querySelectorAll('[data-tab]').forEach(button => {
+            button.addEventListener('click', (e) => {
+                this.switchTab(e.target.getAttribute('data-tab'));
+            });
+        });
+
+        // Quiz functionality
+        document.getElementById('generate-new-quiz-btn').addEventListener('click', () => {
+            this.showQuizSetup();
+        });
+
+        document.getElementById('study-saved-quiz-btn').addEventListener('click', () => {
+            this.startRandomQuiz();
+        });
+
+        document.getElementById('start-quiz-btn').addEventListener('click', () => {
+            this.generateQuiz();
+        });
+
+        document.getElementById('next-question-btn').addEventListener('click', () => {
+            this.nextQuestion();
+        });
+
+        document.getElementById('prev-question-btn').addEventListener('click', () => {
+            this.prevQuestion();
+        });
+
+        document.getElementById('finish-quiz-btn').addEventListener('click', () => {
+            this.finishQuiz();
+        });
+
+        document.getElementById('save-quiz-btn').addEventListener('click', () => {
+            this.saveQuiz();
+        });
+
+        document.getElementById('new-quiz-btn').addEventListener('click', () => {
+            this.newQuiz();
+        });
+
+        // Flashcards functionality
+        document.getElementById('generate-new-flashcards-btn').addEventListener('click', () => {
+            this.showFlashcardsSetup();
+        });
+
+        document.getElementById('study-saved-flashcards-btn').addEventListener('click', () => {
+            this.startRandomFlashcards();
+        });
+
+        document.getElementById('start-flashcards-btn').addEventListener('click', () => {
+            this.generateFlashcards();
+        });
+
+        document.getElementById('toggle-answer-btn').addEventListener('click', () => {
+            this.toggleAnswer();
+        });
+
+        document.getElementById('global-show-answers-btn').addEventListener('click', () => {
+            this.toggleGlobalAnswers();
+        });
+
+        document.getElementById('next-flashcard-btn').addEventListener('click', () => {
+            this.nextFlashcard();
+        });
+
+        document.getElementById('prev-flashcard-btn').addEventListener('click', () => {
+            this.prevFlashcard();
+        });
+
+        document.getElementById('finish-flashcards-btn').addEventListener('click', () => {
+            this.finishFlashcards();
+        });
+
+        document.getElementById('save-flashcards-btn').addEventListener('click', () => {
+            this.saveFlashcards();
+        });
+
+        document.getElementById('new-flashcards-btn').addEventListener('click', () => {
+            this.newFlashcards();
+        });
+
+        // Global delete buttons
+        document.getElementById('delete-all-quizzes-btn').addEventListener('click', () => {
+            this.deleteAllQuizzes();
+        });
+
+        document.getElementById('delete-all-flashcards-btn').addEventListener('click', () => {
+            this.deleteAllFlashcards();
+        });
+    }
+
+    openStudyModal() {
+        console.log('Opening study modal...');
+        
+        // Get current note content and config
+        this.currentNote = window.notesApp?.currentNote || null;
+        
+        if (!this.currentNote) {
+            alert('Please open a note first to generate study materials.');
+            return;
+        }
+
+        console.log('Current note:', this.currentNote?.title);
+
+        this.getConfiguredProvider();
+        
+        if (!this.selectedProvider) {
+            alert('Please configure a post-processing AI provider in settings first (Configuration → Post-process Provider).');
+            return;
+        }
+        
+        if (!this.selectedModel) {
+            alert(`Please select a model for ${this.selectedProvider} provider in settings first.`);
+            return;
+        }
+
+        console.log('Provider and model configured successfully');
+        document.getElementById('study-modal').style.display = 'flex';
+        
+        // Set quiz tab as default
+        this.switchTab('quiz-tab');
+        
+        // Initialize chunking for the current note
+        this.initializeNoteChunking();
+        
+        this.loadSavedItems();
+    }
+
+    // Token estimation and chunking methods
+    estimateTokens(text) {
+        // Rough estimation: 1 token ≈ 4 characters for most languages
+        // This is a conservative estimate that works reasonably well
+        return Math.ceil(text.length / 4);
+    }
+
+    initializeNoteChunking() {
+        if (!this.currentNote || !this.currentNote.content) {
+            this.noteChunks = [];
+            return;
+        }
+
+        const noteId = this.currentNote.id || this.currentNote.title || 'untitled';
+        const content = this.currentNote.content;
+        
+        // Load saved chunk positions for this note
+        this.loadChunkPositions();
+        
+        // Initialize chunk positions if not exists
+        if (!this.chunkPositions[noteId]) {
+            this.chunkPositions[noteId] = {
+                quiz: 0,
+                flashcards: 0
+            };
+        }
+        
+        this.currentQuizChunkIndex = this.chunkPositions[noteId].quiz;
+        this.currentFlashcardsChunkIndex = this.chunkPositions[noteId].flashcards;
+        
+        // Split content into chunks based on token estimation
+        this.noteChunks = this.createTokenChunks(content);
+        
+        console.log(`Note chunked into ${this.noteChunks.length} chunks of ~${this.tokenChunkSize} tokens each`);
+        console.log(`Quiz will start from chunk ${this.currentQuizChunkIndex + 1}`);
+        console.log(`Flashcards will start from chunk ${this.currentFlashcardsChunkIndex + 1}`);
+    }
+
+    createTokenChunks(content) {
+        const chunks = [];
+        const words = content.split(/\s+/);
+        let currentChunk = '';
+        let currentTokens = 0;
+        
+        for (const word of words) {
+            const wordTokens = this.estimateTokens(word + ' ');
+            
+            // If adding this word would exceed the limit, start a new chunk
+            if (currentTokens + wordTokens > this.tokenChunkSize && currentChunk.length > 0) {
+                chunks.push(currentChunk.trim());
+                currentChunk = word + ' ';
+                currentTokens = wordTokens;
+            } else {
+                currentChunk += word + ' ';
+                currentTokens += wordTokens;
+            }
+        }
+        
+        // Add the last chunk if it has content
+        if (currentChunk.trim().length > 0) {
+            chunks.push(currentChunk.trim());
+        }
+        
+        return chunks;
+    }
+
+    getCurrentQuizChunk() {
+        if (this.currentQuizChunkIndex >= this.noteChunks.length) {
+            // Reset to beginning if we've gone through all chunks
+            this.currentQuizChunkIndex = 0;
+            this.updateChunkPosition('quiz', 0);
+        }
+        
+        return this.noteChunks[this.currentQuizChunkIndex] || '';
+    }
+
+    getCurrentFlashcardsChunk() {
+        if (this.currentFlashcardsChunkIndex >= this.noteChunks.length) {
+            // Reset to beginning if we've gone through all chunks
+            this.currentFlashcardsChunkIndex = 0;
+            this.updateChunkPosition('flashcards', 0);
+        }
+        
+        return this.noteChunks[this.currentFlashcardsChunkIndex] || '';
+    }
+
+    advanceQuizChunk() {
+        this.currentQuizChunkIndex++;
+        this.updateChunkPosition('quiz', this.currentQuizChunkIndex);
+    }
+
+    advanceFlashcardsChunk() {
+        this.currentFlashcardsChunkIndex++;
+        this.updateChunkPosition('flashcards', this.currentFlashcardsChunkIndex);
+    }
+
+    updateChunkPosition(type, position) {
+        const noteId = this.currentNote.id || this.currentNote.title || 'untitled';
+        if (!this.chunkPositions[noteId]) {
+            this.chunkPositions[noteId] = { quiz: 0, flashcards: 0 };
+        }
+        this.chunkPositions[noteId][type] = position;
+        this.saveChunkPositions();
+    }
+
+    saveChunkPositions() {
+        const key = `study-chunk-positions-${currentUser || 'default'}`;
+        localStorage.setItem(key, JSON.stringify(this.chunkPositions));
+    }
+
+    loadChunkPositions() {
+        const key = `study-chunk-positions-${currentUser || 'default'}`;
+        const saved = localStorage.getItem(key);
+        if (saved) {
+            try {
+                this.chunkPositions = JSON.parse(saved);
+            } catch (error) {
+                console.error('Error loading chunk positions:', error);
+                this.chunkPositions = {};
+            }
+        } else {
+            this.chunkPositions = {};
+        }
+    }
+
+    closeStudyModal() {
+        document.getElementById('study-modal').style.display = 'none';
+        this.resetState();
+    }
+
+    getConfiguredProvider() {
+        // Get the configured provider and model from the notesApp config
+        if (!window.notesApp || !window.notesApp.config) {
+            console.log('NotesApp config not available');
+            return;
+        }
+        
+        const provider = window.notesApp.config.postprocessProvider;
+        const model = window.notesApp.config.postprocessModel;
+        
+        this.selectedProvider = provider;
+        this.selectedModel = model;
+        
+        console.log('Selected provider:', provider, 'model:', model);
+    }
+
+    switchTab(tabId) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Remove active class from all buttons
+        document.querySelectorAll('[data-tab]').forEach(button => {
+            button.classList.remove('btn--primary');
+            button.classList.add('btn--outline');
+        });
+
+        // Show selected tab
+        document.getElementById(tabId).style.display = 'block';
+
+        // Add active class to clicked button
+        const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
+        activeButton.classList.remove('btn--outline');
+        activeButton.classList.add('btn--primary');
+    }
+
+    async generateQuiz() {
+        const language = document.getElementById('quiz-language').value;
+        const level = document.getElementById('quiz-level').value;
+        
+        if (this.noteChunks.length === 0) {
+            alert('The current note is empty. Add some content first.');
+            return;
+        }
+
+        const currentChunk = this.getCurrentQuizChunk();
+        const chunkInfo = `(Chunk ${this.currentQuizChunkIndex + 1} of ${this.noteChunks.length})`;
+        
+        console.log('Generating quiz with:', { 
+            language, 
+            level, 
+            chunkIndex: this.currentQuizChunkIndex + 1,
+            totalChunks: this.noteChunks.length,
+            chunkTokens: this.estimateTokens(currentChunk)
+        });
+
+        // Show loading with chunk information
+        const startBtn = document.getElementById('start-quiz-btn');
+        startBtn.textContent = `Generating... ${chunkInfo}`;
+        startBtn.disabled = true;
+
+        try {
+            // Use the robust backend endpoint like the concept graph
+            const response = await authFetch('/api/generate-quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: currentChunk,
+                    difficulty: level,
+                    num_questions: 10
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Quiz generation failed');
+            }
+
+            const data = await response.json();
+            
+            if (data.questions && data.questions.length > 0) {
+                // Shuffle questions and answers for randomization
+                this.currentQuiz = this.shuffleQuiz(data.questions);
+                console.log('Successfully generated quiz with', this.currentQuiz.length, 'questions');
+                
+                // Advance to next chunk for next generation
+                this.advanceQuizChunk();
+                
+                // Update button to show next chunk info
+                const nextChunkIndex = this.currentQuizChunkIndex >= this.noteChunks.length ? 1 : this.currentQuizChunkIndex + 1;
+                const nextChunkInfo = `(Next: Chunk ${nextChunkIndex} of ${this.noteChunks.length})`;
+                startBtn.textContent = `Generate Quiz ${nextChunkInfo}`;
+                
+                // If quiz was saved to database (has study_id), refresh saved items if user is viewing them
+                if (data.study_id) {
+                    console.log('Quiz saved to database with ID:', data.study_id);
+                    this.currentQuizStudyId = data.study_id; // Store the study ID for future updates
+                    // Check if user is currently viewing saved items tab
+                    const savedTab = document.getElementById('saved-tab');
+                    if (savedTab && !savedTab.style.display.includes('none')) {
+                        // Refresh saved items list to show the new quiz
+                        this.loadSavedItems();
+                    }
+                }
+                
+                this.startQuiz();
+            } else {
+                throw new Error('No quiz questions were generated');
+            }
+        } catch (error) {
+            console.error('Error generating quiz:', error);
+            alert(`Error generating quiz: ${error.message}. Please check the console for details and try again.`);
+        } finally {
+            if (!this.currentQuiz) {
+                // Only reset if quiz generation failed
+                const nextChunkIndex = this.currentQuizChunkIndex >= this.noteChunks.length ? 1 : this.currentQuizChunkIndex + 1;
+                const nextChunkInfo = `(Next: Chunk ${nextChunkIndex} of ${this.noteChunks.length})`;
+                startBtn.textContent = `Generate Quiz ${nextChunkInfo}`;
+            }
+            startBtn.disabled = false;
+        }
+    }
+
+    async generateFlashcards() {
+        const language = document.getElementById('flashcards-language').value;
+        const level = document.getElementById('flashcards-level').value;
+        
+        if (this.noteChunks.length === 0) {
+            alert('The current note is empty. Add some content first.');
+            return;
+        }
+
+        const currentChunk = this.getCurrentFlashcardsChunk();
+        const chunkInfo = `(Chunk ${this.currentFlashcardsChunkIndex + 1} of ${this.noteChunks.length})`;
+        
+        console.log('Generating flashcards with:', { 
+            language, 
+            level, 
+            chunkIndex: this.currentFlashcardsChunkIndex + 1,
+            totalChunks: this.noteChunks.length,
+            chunkTokens: this.estimateTokens(currentChunk)
+        });
+
+        // Show loading with chunk information
+        const startBtn = document.getElementById('start-flashcards-btn');
+        startBtn.textContent = `Generating... ${chunkInfo}`;
+        startBtn.disabled = true;
+
+        try {
+            // Use the robust backend endpoint like the concept graph
+            const response = await authFetch('/api/generate-flashcards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: currentChunk,
+                    num_cards: 10
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Flashcards generation failed');
+            }
+
+            const data = await response.json();
+            
+            if (data.flashcards && data.flashcards.length > 0) {
+                // Shuffle flashcards for randomization and convert format
+                const shuffledFlashcards = this.shuffleFlashcards(data.flashcards);
+                this.currentFlashcards = shuffledFlashcards.map(card => ({
+                    concept: card.front,
+                    description: card.back
+                }));
+                console.log('Successfully generated flashcards with', this.currentFlashcards.length, 'cards');
+                
+                // Advance to next chunk for next generation
+                this.advanceFlashcardsChunk();
+                
+                // Update button to show next chunk info
+                const nextChunkIndex = this.currentFlashcardsChunkIndex >= this.noteChunks.length ? 1 : this.currentFlashcardsChunkIndex + 1;
+                const nextChunkInfo = `(Next: Chunk ${nextChunkIndex} of ${this.noteChunks.length})`;
+                startBtn.textContent = `Generate Flashcards ${nextChunkInfo}`;
+                
+                // If flashcards were saved to database (has study_id), refresh saved items if user is viewing them
+                if (data.study_id) {
+                    console.log('Flashcards saved to database with ID:', data.study_id);
+                    this.currentFlashcardsStudyId = data.study_id; // Store the study ID for future updates
+                    // Check if user is currently viewing saved items tab
+                    const savedTab = document.getElementById('saved-tab');
+                    if (savedTab && !savedTab.style.display.includes('none')) {
+                        // Refresh saved items list to show the new flashcards
+                        this.loadSavedItems();
+                    }
+                }
+                
+                this.startFlashcards();
+            } else {
+                throw new Error('No flashcards were generated');
+            }
+        } catch (error) {
+            console.error('Error generating flashcards:', error);
+            alert(`Error generating flashcards: ${error.message}. Please check the console for details and try again.`);
+        } finally {
+            if (!this.currentFlashcards) {
+                // Only reset if flashcards generation failed
+                const nextChunkIndex = this.currentFlashcardsChunkIndex >= this.noteChunks.length ? 1 : this.currentFlashcardsChunkIndex + 1;
+                const nextChunkInfo = `(Next: Chunk ${nextChunkIndex} of ${this.noteChunks.length})`;
+                startBtn.textContent = `Generate Flashcards ${nextChunkInfo}`;
+            }
+            startBtn.disabled = false;
+        }
+    }
+
+    startQuiz() {
+        document.getElementById('quiz-setup').classList.add('hidden');
+        document.getElementById('quiz-interface').classList.remove('hidden');
+        
+        this.currentQuestionIndex = 0;
+        this.userAnswers = new Array(this.currentQuiz.length);
+        this.answeredQuestions = new Array(this.currentQuiz.length).fill(false);
+        this.quizScore = { correct: 0, total: 0 };
+        this.isQuizFinished = false;
+        this.allQuizQuestions = [...this.currentQuiz]; // Initialize with current questions
+        
+        this.showQuestion();
+    }
+
+    showQuestion() {
+        const question = this.currentQuiz[this.currentQuestionIndex];
+        document.getElementById('quiz-question-counter').textContent = 
+            `Question ${this.currentQuestionIndex + 1} of ${this.currentQuiz.length}`;
+        document.getElementById('quiz-question-text').textContent = question.question;
+        
+        const answersContainer = document.getElementById('quiz-answers');
+        answersContainer.innerHTML = '';
+        
+        question.answers.forEach((answer, index) => {
+            const answerDiv = document.createElement('div');
+            answerDiv.className = 'quiz-answer';
+            answerDiv.textContent = answer;
+            answerDiv.dataset.index = index;
+            
+            answerDiv.addEventListener('click', () => {
+                this.selectAnswer(index);
+            });
+            
+            answersContainer.appendChild(answerDiv);
+        });
+        
+        // Clear previous feedback
+        this.clearAnswerFeedback();
+        
+        // Update navigation buttons
+        document.getElementById('prev-question-btn').disabled = this.currentQuestionIndex === 0;
+        document.getElementById('next-question-btn').disabled = true;
+        
+        if (this.currentQuestionIndex === this.currentQuiz.length - 1) {
+            document.getElementById('next-question-btn').classList.add('hidden');
+            document.getElementById('finish-quiz-btn').classList.remove('hidden');
+        } else {
+            document.getElementById('next-question-btn').classList.remove('hidden');
+            document.getElementById('finish-quiz-btn').classList.add('hidden');
+        }
+        
+        // Show previous answer if exists
+        if (this.userAnswers[this.currentQuestionIndex] !== undefined) {
+            this.selectAnswer(this.userAnswers[this.currentQuestionIndex], false);
+            this.showAnswerFeedback();
+        }
+    }
+
+    selectAnswer(answerIndex, updateAnswer = true) {
+        const question = this.currentQuiz[this.currentQuestionIndex];
+        
+        // Prevent changing answer if already answered
+        if (this.answeredQuestions[this.currentQuestionIndex] && updateAnswer) {
+            return;
+        }
+        
+        // Remove previous selections
+        document.querySelectorAll('.quiz-answer').forEach(answer => {
+            answer.classList.remove('selected', 'correct', 'incorrect');
+        });
+        
+        // Add selection to clicked answer
+        const selectedAnswer = document.querySelector(`[data-index="${answerIndex}"]`);
+        selectedAnswer.classList.add('selected');
+        
+        if (updateAnswer) {
+            this.userAnswers[this.currentQuestionIndex] = answerIndex;
+            this.answeredQuestions[this.currentQuestionIndex] = true;
+            
+            // Show immediate feedback
+            this.showAnswerFeedback();
+            
+            // Update score
+            const correctIndex = question.correct_answer !== undefined ? question.correct_answer : question.correct;
+            if (answerIndex === correctIndex) {
+                if (this.quizScore.correct <= this.currentQuestionIndex) {
+                    this.quizScore.correct++;
+                }
+            }
+            this.quizScore.total = Math.max(this.quizScore.total, this.currentQuestionIndex + 1);
+        }
+        
+        // Enable next button
+        document.getElementById('next-question-btn').disabled = false;
+        document.getElementById('finish-quiz-btn').disabled = false;
+    }
+
+    showAnswerFeedback() {
+        const question = this.currentQuiz[this.currentQuestionIndex];
+        const userAnswer = this.userAnswers[this.currentQuestionIndex];
+        const correctIndex = question.correct_answer !== undefined ? question.correct_answer : question.correct;
+        
+        const answers = document.querySelectorAll('.quiz-answer');
+        
+        answers.forEach((answerEl, index) => {
+            if (index === correctIndex) {
+                answerEl.classList.add('correct');
+            } else if (index === userAnswer && index !== correctIndex) {
+                answerEl.classList.add('incorrect');
+            }
+        });
+        
+        // Show feedback message
+        this.showFeedbackMessage(userAnswer === correctIndex, question.answers[correctIndex]);
+    }
+
+    showFeedbackMessage(isCorrect, correctAnswer) {
+        // Remove existing feedback
+        const existingFeedback = document.querySelector('.answer-feedback');
+        if (existingFeedback) {
+            existingFeedback.remove();
+        }
+        
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = `answer-feedback ${isCorrect ? 'correct' : 'incorrect'}`;
+        
+        if (isCorrect) {
+            feedbackDiv.innerHTML = `<i class="fas fa-check"></i> Correct!`;
+        } else {
+            feedbackDiv.innerHTML = `<i class="fas fa-times"></i> Incorrect. The correct answer is: <strong>${correctAnswer}</strong>`;
+        }
+        
+        document.querySelector('.quiz-question').appendChild(feedbackDiv);
+    }
+
+    clearAnswerFeedback() {
+        const existingFeedback = document.querySelector('.answer-feedback');
+        if (existingFeedback) {
+            existingFeedback.remove();
+        }
+    }
+
+    async nextQuestion() {
+        if (this.currentQuestionIndex < this.currentQuiz.length - 1) {
+            this.currentQuestionIndex++;
+            
+            // Generate more questions when reaching question 9 (index 8)
+            if (this.currentQuestionIndex === 8 && !this.isGeneratingMore) {
+                this.generateMoreQuestions();
+            }
+            
+            this.showQuestion();
+        }
+    }
+
+    async generateMoreQuestions() {
+        if (this.isGeneratingMore) return;
+        
+        this.isGeneratingMore = true;
+        console.log('Pre-generating more questions...');
+        
+        try {
+            const level = document.getElementById('quiz-level').value;
+            const currentChunk = this.getCurrentQuizChunk();
+            
+            if (!currentChunk) {
+                console.log('No more content chunks available for quiz generation');
+                return;
+            }
+            
+            console.log(`Generating additional questions from chunk ${this.currentQuizChunkIndex + 1}`);
+            
+            // Use the robust backend endpoint
+            const response = await authFetch('/api/generate-quiz', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: currentChunk,
+                    difficulty: level,
+                    num_questions: 10
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Quiz generation failed');
+            }
+
+            const data = await response.json();
+            
+            if (data.questions && data.questions.length > 0) {
+                this.allQuizQuestions = [...this.allQuizQuestions, ...data.questions];
+                console.log('Generated', data.questions.length, 'additional questions');
+                
+                // DO NOT update existing study items - let each generation create its own
+                // This prevents the mixing of questions from different quiz sessions
+                console.log('New quiz questions saved as separate study item');
+                
+                // Advance to next chunk for future generations
+                this.advanceQuizChunk();
+            }
+        } catch (error) {
+            console.error('Error generating additional questions:', error);
+        } finally {
+            this.isGeneratingMore = false;
+        }
+    }
+
+    async generateMoreFlashcards() {
+        if (this.isGeneratingMore) return;
+        
+        this.isGeneratingMore = true;
+        console.log('Pre-generating more flashcards...');
+        
+        try {
+            const currentChunk = this.getCurrentFlashcardsChunk();
+            
+            if (!currentChunk) {
+                console.log('No more content chunks available for flashcards generation');
+                return;
+            }
+            
+            console.log(`Generating additional flashcards from chunk ${this.currentFlashcardsChunkIndex + 1}`);
+            
+            // Use the robust backend endpoint
+            const response = await authFetch('/api/generate-flashcards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: currentChunk,
+                    num_cards: 10
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Flashcards generation failed');
+            }
+
+            const data = await response.json();
+            
+            if (data.flashcards && data.flashcards.length > 0) {
+                // Convert to the format expected by the flashcards interface
+                const newFlashcards = data.flashcards.map(card => ({
+                    concept: card.front,
+                    description: card.back
+                }));
+                this.allFlashcards = [...this.allFlashcards, ...newFlashcards];
+                console.log('Generated', newFlashcards.length, 'additional flashcards');
+                
+                // DO NOT update existing study items - let each generation create its own
+                // This prevents the mixing of flashcards from different sessions
+                console.log('New flashcards saved as separate study item');
+                
+                // Advance to next chunk for future generations
+                this.advanceFlashcardsChunk();
+            }
+        } catch (error) {
+            console.error('Error generating additional flashcards:', error);
+        } finally {
+            this.isGeneratingMore = false;
+        }
+    }
+
+    prevQuestion() {
+        if (this.currentQuestionIndex > 0) {
+            this.currentQuestionIndex--;
+            this.showQuestion();
+        }
+    }
+
+    finishQuiz() {
+        this.isQuizFinished = true;
+        // Instead of showing results, return to quiz options
+        this.resetQuizState();
+    }
+
+    async saveQuiz() {
+        try {
+            const quizData = {
+                title: this.currentNote.title || 'Untitled Quiz',
+                questions: this.currentQuiz,
+                userAnswers: this.userAnswers,
+                timestamp: new Date().toISOString(),
+                language: document.getElementById('quiz-language').value,
+                level: document.getElementById('quiz-level').value
+            };
+
+            await this.saveStudyItem('quiz', quizData);
+            alert('Quiz saved successfully!');
+            this.loadSavedItems();
+        } catch (error) {
+            console.error('Error saving quiz:', error);
+            alert('Error saving quiz.');
+        }
+    }
+
+    async loadSavedQuiz() {
+        try {
+            // Reset to quiz options
+            this.resetQuizState();
+        } catch (error) {
+            console.error('Error loading saved quiz:', error);
+            alert('Error loading saved quizzes.');
+        }
+    }
+
+    newQuiz() {
+        this.resetQuizState();
+    }
+
+    startFlashcards() {
+        document.getElementById('flashcards-setup').classList.add('hidden');
+        document.getElementById('flashcards-interface').classList.remove('hidden');
+        
+        this.currentFlashcardIndex = 0;
+        this.globalShowAnswers = false;
+        this.currentCardShowAnswer = false;
+        this.allFlashcards = [...this.currentFlashcards]; // Initialize with current flashcards
+        
+        // Reset global toggle button state
+        const globalBtn = document.getElementById('global-show-answers-btn');
+        const globalIcon = document.getElementById('global-eye-icon');
+        globalBtn.classList.remove('active');
+        globalIcon.className = 'fas fa-eye';
+        
+        this.showFlashcard();
+    }
+
+    showFlashcard() {
+        const flashcard = this.currentFlashcards[this.currentFlashcardIndex];
+        document.getElementById('flashcard-counter').textContent = 
+            `Card ${this.currentFlashcardIndex + 1} of ${this.currentFlashcards.length}`;
+        
+        document.getElementById('flashcard-concept').textContent = flashcard.concept;
+        document.getElementById('flashcard-description').textContent = flashcard.description;
+        
+        // Update answer visibility based on global setting or individual card setting
+        const shouldShowAnswer = this.globalShowAnswers || this.currentCardShowAnswer;
+        const answerElement = document.getElementById('flashcard-answer');
+        const eyeIcon = document.getElementById('card-eye-icon');
+        const toggleBtn = document.getElementById('toggle-answer-btn');
+        
+        if (shouldShowAnswer) {
+            answerElement.classList.remove('hidden');
+            eyeIcon.className = 'fas fa-eye-slash';
+            toggleBtn.classList.add('active');
+        } else {
+            answerElement.classList.add('hidden');
+            eyeIcon.className = 'fas fa-eye';
+            toggleBtn.classList.remove('active');
+        }
+        
+        // Update navigation buttons
+        document.getElementById('prev-flashcard-btn').disabled = this.currentFlashcardIndex === 0;
+        document.getElementById('next-flashcard-btn').disabled = false;
+        
+        if (this.currentFlashcardIndex === this.currentFlashcards.length - 1) {
+            document.getElementById('next-flashcard-btn').classList.add('hidden');
+            document.getElementById('finish-flashcards-btn').classList.remove('hidden');
+        } else {
+            document.getElementById('next-flashcard-btn').classList.remove('hidden');
+            document.getElementById('finish-flashcards-btn').classList.add('hidden');
+        }
+    }
+
+    toggleAnswer() {
+        this.currentCardShowAnswer = !this.currentCardShowAnswer;
+        this.showFlashcard();
+    }
+
+    toggleGlobalAnswers() {
+        this.globalShowAnswers = !this.globalShowAnswers;
+        const globalBtn = document.getElementById('global-show-answers-btn');
+        const globalIcon = document.getElementById('global-eye-icon');
+        
+        if (this.globalShowAnswers) {
+            globalBtn.classList.add('active');
+            globalIcon.className = 'fas fa-eye-slash';
+        } else {
+            globalBtn.classList.remove('active');
+            globalIcon.className = 'fas fa-eye';
+        }
+        
+        // Reset individual card state when global toggle is used
+        this.currentCardShowAnswer = false;
+        this.showFlashcard();
+    }
+
+    nextFlashcard() {
+        if (this.currentFlashcardIndex < this.currentFlashcards.length - 1) {
+            this.currentFlashcardIndex++;
+            
+            // Reset individual card answer visibility when moving to next card
+            this.currentCardShowAnswer = false;
+            
+            // Generate more flashcards when reaching card 9 (index 8)
+            if (this.currentFlashcardIndex === 8 && !this.isGeneratingMore) {
+                this.generateMoreFlashcards();
+            }
+            
+            this.showFlashcard();
+        }
+    }
+
+    prevFlashcard() {
+        if (this.currentFlashcardIndex > 0) {
+            this.currentFlashcardIndex--;
+            
+            // Reset individual card answer visibility when moving to previous card
+            this.currentCardShowAnswer = false;
+            
+            this.showFlashcard();
+        }
+    }
+
+    finishFlashcards() {
+        document.getElementById('flashcards-interface').classList.add('hidden');
+        document.getElementById('flashcards-results').classList.remove('hidden');
+        
+        // Check if there are more chunks available for generating more flashcards
+        const hasMoreContent = this.currentFlashcardsChunkIndex < this.noteChunks.length;
+        
+        // Update the results HTML with action buttons
+        const resultsDiv = document.getElementById('flashcards-results');
+        resultsDiv.innerHTML = `
+            <h4>Flashcards Complete!</h4>
+            <p>You've completed ${this.currentFlashcards.length} flashcards.</p>
+            <div class="flashcards-results-actions">
+                ${hasMoreContent ? `<button class="btn btn--success" id="generate-more-flashcards-btn">Generate More Flashcards</button>` : ''}
+                <button class="btn btn--primary" id="retry-flashcards-btn">Try Again</button>
+                <button class="btn btn--secondary" id="load-saved-flashcards-btn">Saved Flashcards</button>
+                <button class="btn btn--outline" id="new-flashcards-btn">Generate New</button>
+                <button class="btn btn--tertiary" id="save-flashcards-btn">Save Flashcards</button>
+            </div>
+        `;
+        
+        // Re-attach event listeners
+        if (hasMoreContent) {
+            document.getElementById('generate-more-flashcards-btn').addEventListener('click', () => this.generateMoreFlashcardsAndContinue());
+        }
+        document.getElementById('retry-flashcards-btn').addEventListener('click', () => this.retryFlashcards());
+        document.getElementById('load-saved-flashcards-btn').addEventListener('click', () => this.loadSavedFlashcards());
+        document.getElementById('new-flashcards-btn').addEventListener('click', () => this.newFlashcards());
+        document.getElementById('save-flashcards-btn').addEventListener('click', () => this.saveFlashcards());
+    }
+
+    async saveFlashcards() {
+        try {
+            const flashcardsData = {
+                title: this.currentNote.title || 'Untitled Flashcards',
+                flashcards: this.currentFlashcards,
+                timestamp: new Date().toISOString(),
+                language: document.getElementById('flashcards-language').value,
+                level: document.getElementById('flashcards-level').value
+            };
+
+            await this.saveStudyItem('flashcards', flashcardsData);
+            alert('Flashcards saved successfully!');
+            this.loadSavedItems();
+        } catch (error) {
+            console.error('Error saving flashcards:', error);
+            alert('Error saving flashcards.');
+        }
+    }
+
+    async generateMoreFlashcardsAndContinue() {
+        if (this.currentFlashcardsChunkIndex >= this.noteChunks.length) {
+            alert('No more content available for generating additional flashcards.');
+            return;
+        }
+
+        const generateBtn = document.getElementById('generate-more-flashcards-btn');
+        const originalText = generateBtn.textContent;
+        generateBtn.textContent = 'Generating...';
+        generateBtn.disabled = true;
+
+        try {
+            const currentChunk = this.getCurrentFlashcardsChunk();
+            
+            console.log(`Generating more flashcards from chunk ${this.currentFlashcardsChunkIndex + 1}`);
+            
+            const response = await authFetch('/api/generate-flashcards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: currentChunk,
+                    num_cards: 10
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Flashcards generation failed');
+            }
+
+            const data = await response.json();
+            
+            if (data.flashcards && data.flashcards.length > 0) {
+                // Convert and shuffle new flashcards
+                const newFlashcards = data.flashcards.map(card => ({
+                    concept: card.front,
+                    description: card.back
+                }));
+                const shuffledNewFlashcards = this.shuffleFlashcards(newFlashcards);
+                
+                // Start new session with new flashcards
+                this.currentFlashcards = shuffledNewFlashcards;
+                this.allFlashcards = [...this.allFlashcards, ...shuffledNewFlashcards];
+                
+                // DO NOT update existing study items - let each generation create its own
+                // This prevents the mixing of flashcards from different sessions
+                console.log('New flashcards saved as separate study item');
+                
+                // Reset for new session
+                this.currentFlashcardIndex = 0;
+                this.globalShowAnswers = false;
+                this.currentCardShowAnswer = false;
+                
+                // Advance to next chunk for future generations
+                this.advanceFlashcardsChunk();
+                
+                console.log('Generated', shuffledNewFlashcards.length, 'new flashcards');
+                
+                // Switch back to flashcards interface
+                document.getElementById('flashcards-results').classList.add('hidden');
+                document.getElementById('flashcards-interface').classList.remove('hidden');
+                
+                // Reset global toggle button state
+                const globalBtn = document.getElementById('global-show-answers-btn');
+                const globalIcon = document.getElementById('global-eye-icon');
+                globalBtn.classList.remove('active');
+                globalIcon.className = 'fas fa-eye';
+                
+                this.showFlashcard();
+            } else {
+                throw new Error('No new flashcards were generated');
+            }
+        } catch (error) {
+            console.error('Error generating more flashcards:', error);
+            alert(`Error generating more flashcards: ${error.message}`);
+        } finally {
+            generateBtn.textContent = originalText;
+            generateBtn.disabled = false;
+        }
+    }
+
+    retryFlashcards() {
+        // Shuffle the same flashcards again and restart
+        this.currentFlashcards = this.shuffleFlashcards(this.allFlashcards || this.currentFlashcards);
+        this.currentFlashcardIndex = 0;
+        this.isCardFlipped = false;
+        
+        document.getElementById('flashcards-results').classList.add('hidden');
+        document.getElementById('flashcards-interface').classList.remove('hidden');
+        this.showFlashcard();
+    }
+
+    async loadSavedFlashcards() {
+        try {
+            // Switch to saved items tab to show available flashcards
+            this.showTab('saved-items');
+            // Close the results modal
+            document.getElementById('flashcards-results').classList.add('hidden');
+            document.getElementById('flashcards-setup').classList.remove('hidden');
+        } catch (error) {
+            console.error('Error loading saved flashcards:', error);
+            alert('Error loading saved flashcards.');
+        }
+    }
+
+    newFlashcards() {
+        this.resetFlashcardsState();
+        document.getElementById('flashcards-results').classList.add('hidden');
+        document.getElementById('flashcards-setup').classList.remove('hidden');
+    }
+
+    async saveStudyItem(type, data) {
+        const filename = `${this.currentNote.title || 'untitled'}_${type}_${Date.now()}.json`;
+        
+        const response = await authFetch('/api/save-study-item', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                filename,
+                type,
+                data
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+    }
+
+    async loadSavedItems() {
+        try {
+            const response = await authFetch('/api/get-study-items');
+            if (response.ok) {
+                const items = await response.json();
+                this.renderSavedItems(items);
+            }
+        } catch (error) {
+            console.error('Error loading saved items:', error);
+        }
+    }
+
+    renderSavedItems(items) {
+        const quizList = document.getElementById('saved-quiz-list');
+        const flashcardsList = document.getElementById('saved-flashcards-list');
+        
+        // Filter items by type, including individual items
+        const quizzes = items.filter(item => item.type === 'quiz' || item.type === 'quiz_individual');
+        const flashcards = items.filter(item => item.type === 'flashcards' || item.type === 'flashcards_individual');
+        
+        // Show/hide delete all buttons based on whether there are items
+        const deleteAllQuizzesBtn = document.getElementById('delete-all-quizzes-btn');
+        const deleteAllFlashcardsBtn = document.getElementById('delete-all-flashcards-btn');
+        
+        if (deleteAllQuizzesBtn) {
+            deleteAllQuizzesBtn.style.display = quizzes.length > 0 ? 'inline-flex' : 'none';
+        }
+        
+        if (deleteAllFlashcardsBtn) {
+            deleteAllFlashcardsBtn.style.display = flashcards.length > 0 ? 'inline-flex' : 'none';
+        }
+        
+        if (quizzes.length === 0) {
+            quizList.innerHTML = '<p class="no-items">No saved quizzes yet.</p>';
+        } else {
+            quizList.innerHTML = quizzes.map(quiz => this.renderSavedItem(quiz)).join('');
+        }
+        
+        if (flashcards.length === 0) {
+            flashcardsList.innerHTML = '<p class="no-items">No saved flashcards yet.</p>';
+        } else {
+            flashcardsList.innerHTML = flashcards.map(fc => this.renderSavedItem(fc)).join('');
+        }
+    }
+
+    renderSavedItem(item) {
+        const date = new Date(item.created_at || item.timestamp).toLocaleDateString();
+        const itemId = item.id || item.filename;
+        
+        // Handle individual items vs sets
+        let itemCount = item.item_count || 0;
+        let itemLabel = 'items';
+        
+        if (item.type === 'quiz' || item.type === 'quiz_individual') {
+            if (item.type === 'quiz_individual') {
+                // Individual question
+                itemCount = 1;
+                itemLabel = 'question';
+            } else {
+                // Set of questions
+                const questions = item.content?.questions || item.questions || [];
+                itemCount = questions.length || itemCount;
+                itemLabel = itemCount === 1 ? 'question' : 'questions';
+            }
+        } else if (item.type === 'flashcards' || item.type === 'flashcards_individual') {
+            if (item.type === 'flashcards_individual') {
+                // Individual flashcard
+                itemCount = 1;
+                itemLabel = 'card';
+            } else {
+                // Set of flashcards
+                const flashcards = item.content?.flashcards || item.flashcards || [];
+                itemCount = flashcards.length || itemCount;
+                itemLabel = itemCount === 1 ? 'card' : 'cards';
+            }
+        }
+        
+        // Clean up the display type for UI
+        const displayType = item.type.replace('_individual', '');
+        
+        return `
+            <div class="saved-item">
+                <div class="saved-item-info">
+                    <div class="saved-item-title">${item.title}</div>
+                    <div class="saved-item-meta">${date} • ${itemCount} ${itemLabel}</div>
+                </div>
+                <div class="saved-item-actions">
+                    <button class="btn btn--outline btn--sm" onclick="studyManager.reviewItem('${itemId}', '${displayType}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn--outline btn--sm" onclick="studyManager.deleteItem('${itemId}', '${item.type}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    async reviewItem(itemId, type) {
+        try {
+            // Check if itemId is numeric (database ID) or string (filename for backward compatibility)
+            const endpoint = /^\d+$/.test(itemId) ? `/api/get-study-item/${itemId}` : `/api/get-study-item/${itemId}`;
+            
+            const response = await authFetch(endpoint);
+            if (response.ok) {
+                const data = await response.json();
+                
+                if (type === 'quiz') {
+                    // Handle both individual questions and question sets
+                    let allQuestions;
+                    if (data.content?.question) {
+                        // Individual question - wrap in array
+                        allQuestions = [data.content.question];
+                    } else {
+                        // Set of questions
+                        allQuestions = data.content?.questions || data.questions;
+                    }
+                    
+                    if (allQuestions && allQuestions.length > 0) {
+                        // Show question count selector for quizzes
+                        this.showQuestionCountSelector(allQuestions, itemId);
+                    } else {
+                        alert('No questions found in this item.');
+                    }
+                } else if (type === 'flashcards') {
+                    // Handle both individual flashcards and flashcard sets
+                    let allFlashcards;
+                    if (data.content?.flashcard) {
+                        // Individual flashcard - wrap in array and convert format
+                        const flashcard = data.content.flashcard;
+                        allFlashcards = [{
+                            concept: flashcard.front,
+                            description: flashcard.back
+                        }];
+                    } else {
+                        // Set of flashcards - convert format
+                        const flashcards = data.content?.flashcards || data.flashcards;
+                        allFlashcards = flashcards ? flashcards.map(card => ({
+                            concept: card.front,
+                            description: card.back
+                        })) : [];
+                    }
+                    
+                    if (allFlashcards && allFlashcards.length > 0) {
+                        this.currentFlashcards = allFlashcards;
+                        this.switchToFlashcardsInterface();
+                        this.startFlashcards();
+                    } else {
+                        alert('No flashcards found in this item.');
+                    }
+                }
+            } else {
+                throw new Error('Failed to load study item');
+            }
+        } catch (error) {
+            console.error('Error reviewing item:', error);
+            alert('Error loading study item.');
+        }
+    }
+
+    showQuestionCountSelector(allQuestions, itemId) {
+        const totalQuestions = allQuestions.length;
+        
+        // Create modal content for question count selection
+        const modalContent = `
+            <div class="question-count-modal" style="
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                z-index: 1001;
+                min-width: 300px;
+                text-align: center;
+            ">
+                <h4>Select Number of Questions</h4>
+                <p>This quiz has ${totalQuestions} questions total.</p>
+                <div style="margin: 20px 0;">
+                    <label for="question-count-input" style="display: block; margin-bottom: 10px;">
+                        How many questions do you want? (1-${totalQuestions})
+                    </label>
+                    <input 
+                        type="number" 
+                        id="question-count-input" 
+                        min="1" 
+                        max="${totalQuestions}" 
+                        value="${Math.min(10, totalQuestions)}"
+                        style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100px;"
+                    >
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="start-selected-quiz-btn" class="btn btn--primary">Start Quiz</button>
+                    <button id="cancel-quiz-selection-btn" class="btn btn--outline">Cancel</button>
+                </div>
+            </div>
+            <div class="question-count-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 1000;
+            "></div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+        
+        // Add event listeners
+        document.getElementById('start-selected-quiz-btn').addEventListener('click', () => {
+            const selectedCount = parseInt(document.getElementById('question-count-input').value);
+            if (selectedCount > 0 && selectedCount <= totalQuestions) {
+                this.startQuizWithSelectedQuestions(allQuestions, selectedCount);
+                this.removeQuestionCountModal();
+            } else {
+                alert(`Please enter a number between 1 and ${totalQuestions}`);
+            }
+        });
+        
+        document.getElementById('cancel-quiz-selection-btn').addEventListener('click', () => {
+            this.removeQuestionCountModal();
+        });
+        
+        // Close on overlay click
+        document.querySelector('.question-count-overlay').addEventListener('click', () => {
+            this.removeQuestionCountModal();
+        });
+        
+        // Focus on input and select text
+        const input = document.getElementById('question-count-input');
+        input.focus();
+        input.select();
+        
+        // Allow Enter key to start quiz
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('start-selected-quiz-btn').click();
+            }
+        });
+    }
+
+    removeQuestionCountModal() {
+        const modal = document.querySelector('.question-count-modal');
+        const overlay = document.querySelector('.question-count-overlay');
+        if (modal) modal.remove();
+        if (overlay) overlay.remove();
+    }
+
+    startQuizWithSelectedQuestions(allQuestions, selectedCount) {
+        // Shuffle all questions and take the requested number
+        const shuffledQuestions = this.shuffleQuiz([...allQuestions]);
+        this.currentQuiz = shuffledQuestions.slice(0, selectedCount);
+        
+        console.log(`Starting quiz with ${selectedCount} questions out of ${allQuestions.length} total`);
+        
+        // Switch to quiz tab but go directly to the quiz interface
+        this.switchToQuizInterface();
+        this.startQuiz();
+    }
+
+    showRandomQuizCountSelector(allQuestions) {
+        const totalQuestions = allQuestions.length;
+        
+        // Count unique sources
+        const uniqueSources = new Set();
+        allQuestions.forEach(q => {
+            if (q._source_title) {
+                uniqueSources.add(q._source_title);
+            }
+        });
+        
+        const sourceInfo = uniqueSources.size > 0 ? 
+            `Questions mixed from ${uniqueSources.size} recent quiz sets` : 
+            'Questions from your saved quizzes';
+        
+        // Create modal content for question count selection
+        const modalContent = `
+            <div class="question-count-modal" style="
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                z-index: 1001;
+                min-width: 350px;
+                text-align: center;
+            ">
+                <h4>Mixed Quiz Selection</h4>
+                <p><strong>${totalQuestions} questions available</strong></p>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">${sourceInfo}</p>
+                <div style="margin: 20px 0;">
+                    <label for="random-question-count-input" style="display: block; margin-bottom: 10px;">
+                        How many questions do you want to study? (1-${Math.min(totalQuestions, 30)})
+                    </label>
+                    <input 
+                        type="number" 
+                        id="random-question-count-input" 
+                        min="1" 
+                        max="${Math.min(totalQuestions, 30)}" 
+                        value="${Math.min(10, totalQuestions)}"
+                        style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100px;"
+                    >
+                </div>
+                ${totalQuestions > 30 ? '<p style="font-size: 0.8em; color: #888;">Limited to 30 questions max to prevent overwhelming</p>' : ''}
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="start-random-quiz-btn" class="btn btn--primary">Start Mixed Quiz</button>
+                    <button id="cancel-random-quiz-btn" class="btn btn--outline">Cancel</button>
+                </div>
+            </div>
+            <div class="question-count-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 1000;
+            "></div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+        
+        // Add event listeners
+        document.getElementById('start-random-quiz-btn').addEventListener('click', () => {
+            const selectedCount = parseInt(document.getElementById('random-question-count-input').value);
+            const maxAllowed = Math.min(totalQuestions, 30);
+            if (selectedCount > 0 && selectedCount <= maxAllowed) {
+                this.startRandomQuizWithSelectedQuestions(allQuestions, selectedCount);
+                this.removeRandomQuizCountModal();
+            } else {
+                alert(`Please enter a number between 1 and ${maxAllowed}`);
+            }
+        });
+        
+        document.getElementById('cancel-random-quiz-btn').addEventListener('click', () => {
+            this.removeRandomQuizCountModal();
+        });
+        
+        // Close on overlay click
+        document.querySelector('.question-count-overlay').addEventListener('click', () => {
+            this.removeRandomQuizCountModal();
+        });
+        
+        // Focus on input and select text
+        const input = document.getElementById('random-question-count-input');
+        input.focus();
+        input.select();
+        
+        // Allow Enter key to start quiz
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('start-random-quiz-btn').click();
+            }
+        });
+    }
+
+    removeRandomQuizCountModal() {
+        const modal = document.querySelector('.question-count-modal');
+        const overlay = document.querySelector('.question-count-overlay');
+        if (modal) modal.remove();
+        if (overlay) overlay.remove();
+    }
+
+    startRandomQuizWithSelectedQuestions(allQuestions, selectedCount) {
+        // Set up the quiz with shuffled questions
+        this.currentQuiz = this.shuffleQuiz([...allQuestions]).slice(0, selectedCount);
+        this.allQuizQuestions = [...this.currentQuiz];
+        this.currentQuizStudyId = null; // No specific study ID since it's mixed content
+        
+        console.log(`Starting random quiz with ${selectedCount} questions from saved content`);
+        
+        // Switch directly to quiz interface and start
+        this.switchToQuizInterface();
+        this.startQuiz();
+    }
+
+    showRandomFlashcardCountSelector(allFlashcards) {
+        const totalFlashcards = allFlashcards.length;
+        
+        // Count unique sources
+        const uniqueSources = new Set();
+        allFlashcards.forEach(f => {
+            if (f._source_title) {
+                uniqueSources.add(f._source_title);
+            }
+        });
+        
+        const sourceInfo = uniqueSources.size > 0 ? 
+            `Flashcards mixed from ${uniqueSources.size} recent flashcard sets` : 
+            'Flashcards from your saved sets';
+        
+        // Create modal content for flashcard count selection
+        const modalContent = `
+            <div class="question-count-modal" style="
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                z-index: 1001;
+                min-width: 350px;
+                text-align: center;
+            ">
+                <h4>Mixed Flashcards Selection</h4>
+                <p><strong>${totalFlashcards} flashcards available</strong></p>
+                <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">${sourceInfo}</p>
+                <div style="margin: 20px 0;">
+                    <label for="random-flashcard-count-input" style="display: block; margin-bottom: 10px;">
+                        How many flashcards do you want to study? (1-${Math.min(totalFlashcards, 50)})
+                    </label>
+                    <input 
+                        type="number" 
+                        id="random-flashcard-count-input" 
+                        min="1" 
+                        max="${Math.min(totalFlashcards, 50)}" 
+                        value="${Math.min(15, totalFlashcards)}"
+                        style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100px;"
+                    >
+                </div>
+                ${totalFlashcards > 50 ? '<p style="font-size: 0.8em; color: #888;">Limited to 50 flashcards max to prevent overwhelming</p>' : ''}
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    <button id="start-random-flashcards-btn" class="btn btn--primary">Start Mixed Flashcards</button>
+                    <button id="cancel-random-flashcards-btn" class="btn btn--outline">Cancel</button>
+                </div>
+            </div>
+            <div class="question-count-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 1000;
+            "></div>
+        `;
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalContent);
+        
+        // Add event listeners
+        document.getElementById('start-random-flashcards-btn').addEventListener('click', () => {
+            const selectedCount = parseInt(document.getElementById('random-flashcard-count-input').value);
+            const maxAllowed = Math.min(totalFlashcards, 50);
+            if (selectedCount > 0 && selectedCount <= maxAllowed) {
+                this.startRandomFlashcardsWithSelectedCount(allFlashcards, selectedCount);
+                this.removeRandomFlashcardCountModal();
+            } else {
+                alert(`Please enter a number between 1 and ${maxAllowed}`);
+            }
+        });
+        
+        document.getElementById('cancel-random-flashcards-btn').addEventListener('click', () => {
+            this.removeRandomFlashcardCountModal();
+        });
+        
+        // Close on overlay click
+        document.querySelector('.question-count-overlay').addEventListener('click', () => {
+            this.removeRandomFlashcardCountModal();
+        });
+        
+        // Focus on input and select text
+        const input = document.getElementById('random-flashcard-count-input');
+        input.focus();
+        input.select();
+        
+        // Allow Enter key to start flashcards
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('start-random-flashcards-btn').click();
+            }
+        });
+    }
+
+    removeRandomFlashcardCountModal() {
+        const modal = document.querySelector('.question-count-modal');
+        const overlay = document.querySelector('.question-count-overlay');
+        if (modal) modal.remove();
+        if (overlay) overlay.remove();
+    }
+
+    startRandomFlashcardsWithSelectedCount(allFlashcards, selectedCount) {
+        // Convert to the format expected by the flashcards interface and shuffle
+        const shuffledFlashcards = this.shuffleFlashcards([...allFlashcards]).slice(0, selectedCount);
+        this.currentFlashcards = shuffledFlashcards.map(card => ({
+            concept: card.front,
+            description: card.back
+        }));
+        this.allFlashcards = [...this.currentFlashcards];
+        this.currentFlashcardsStudyId = null; // No specific study ID since it's mixed content
+        
+        console.log(`Starting random flashcards with ${selectedCount} cards from saved content`);
+        
+        // Switch directly to flashcards interface and start
+        this.switchToFlashcardsInterface();
+        this.startFlashcards();
+    }
+
+    switchToQuizInterface() {
+        // Hide all tabs first
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Remove active class from all buttons
+        document.querySelectorAll('.tab-buttons button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Show quiz tab
+        const quizTab = document.getElementById('quiz-tab');
+        if (quizTab) {
+            quizTab.style.display = 'block';
+        }
+
+        // Add active class to quiz tab button
+        const quizButton = document.querySelector('[data-tab="quiz-tab"]');
+        if (quizButton) {
+            quizButton.classList.add('active');
+        }
+
+        // Skip the options and go directly to setup, which will be hidden by startQuiz()
+        document.getElementById('quiz-options').classList.add('hidden');
+        document.getElementById('quiz-setup').classList.remove('hidden');
+        document.getElementById('quiz-interface').classList.add('hidden');
+        document.getElementById('quiz-results').classList.add('hidden');
+    }
+
+    switchToFlashcardsInterface() {
+        // Hide all tabs first
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Remove active class from all buttons
+        document.querySelectorAll('.tab-buttons button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        // Show flashcards tab
+        const flashcardsTab = document.getElementById('flashcards-tab');
+        if (flashcardsTab) {
+            flashcardsTab.style.display = 'block';
+        }
+
+        // Add active class to flashcards tab button
+        const flashcardsButton = document.querySelector('[data-tab="flashcards-tab"]');
+        if (flashcardsButton) {
+            flashcardsButton.classList.add('active');
+        }
+
+        // Skip the options and go directly to setup, which will be hidden by startFlashcards()
+        document.getElementById('flashcards-options').classList.add('hidden');
+        document.getElementById('flashcards-setup').classList.remove('hidden');
+        document.getElementById('flashcards-interface').classList.add('hidden');
+        document.getElementById('flashcards-results').classList.add('hidden');
+    }
+
+    async deleteItem(itemId, type = 'item') {
+        if (confirm('Are you sure you want to delete this study item?')) {
+            try {
+                // Check if itemId is numeric (database ID) or string (filename for backward compatibility)
+                const endpoint = /^\d+$/.test(itemId) ? `/api/delete-study-item/${itemId}` : `/api/delete-study-item/${itemId}`;
+                
+                const response = await authFetch(endpoint, {
+                    method: 'DELETE'
+                });
+                if (response.ok) {
+                    this.loadSavedItems();
+                    
+                    // Determine item type for display message
+                    let itemType = 'item';
+                    if (type.includes('quiz')) {
+                        itemType = type.includes('individual') ? 'question' : 'quiz';
+                    } else if (type.includes('flashcards')) {
+                        itemType = type.includes('individual') ? 'flashcard' : 'flashcard set';
+                    }
+                    
+                    alert(`${itemType.charAt(0).toUpperCase() + itemType.slice(1)} deleted successfully.`);
+                } else {
+                    alert('Error deleting study item.');
+                }
+            } catch (error) {
+                console.error('Error deleting item:', error);
+                alert('Error deleting study item.');
+            }
+        }
+    }
+
+    async deleteAllQuizzes() {
+        const confirmed = confirm('Are you sure you want to delete ALL saved quizzes? This action cannot be undone.');
+        if (!confirmed) return;
+
+        try {
+            const response = await authFetch('/api/delete-all-study-items/quiz', {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                alert('All quizzes have been deleted successfully.');
+                this.loadSavedItems();
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete quizzes');
+            }
+        } catch (error) {
+            console.error('Error deleting all quizzes:', error);
+            alert('Error deleting quizzes: ' + error.message);
+        }
+    }
+
+    async deleteAllFlashcards() {
+        const confirmed = confirm('Are you sure you want to delete ALL saved flashcards? This action cannot be undone.');
+        if (!confirmed) return;
+
+        try {
+            const response = await authFetch('/api/delete-all-study-items/flashcards', {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                alert('All flashcards have been deleted successfully.');
+                this.loadSavedItems();
+            } else {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to delete flashcards');
+            }
+        } catch (error) {
+            console.error('Error deleting all flashcards:', error);
+            alert('Error deleting flashcards: ' + error.message);
+        }
+    }
+
+    resetState() {
+        this.resetQuizState();
+        this.resetFlashcardsState();
+    }
+
+    resetQuizState(resetAccumulatedScore = true) {
+        this.currentQuiz = null;
+        this.currentQuestionIndex = 0;
+        this.userAnswers = [];
+        this.answeredQuestions = [];
+        if (resetAccumulatedScore) {
+            this.quizScore = { correct: 0, total: 0 };
+        }
+        this.isQuizFinished = false;
+        this.allQuizQuestions = [];
+        this.isGeneratingMore = false;
+        this.currentQuizStudyId = null; // Reset study ID when starting fresh
+        
+        document.getElementById('quiz-interface').classList.add('hidden');
+        document.getElementById('quiz-results').classList.add('hidden');
+        document.getElementById('quiz-options').classList.remove('hidden');
+        document.getElementById('quiz-setup').classList.add('hidden');
+        
+        // Reset button text
+        const startBtn = document.getElementById('start-quiz-btn');
+        if (startBtn) {
+            startBtn.textContent = 'Generate Quiz';
+        }
+    }
+
+    resetFlashcardsState() {
+        this.currentFlashcards = null;
+        this.currentFlashcardIndex = 0;
+        this.allFlashcards = [];
+        this.isGeneratingMore = false;
+        this.globalShowAnswers = false;
+        this.currentCardShowAnswer = false;
+        this.currentFlashcardsStudyId = null; // Reset study ID when starting fresh
+        
+        document.getElementById('flashcards-interface').classList.add('hidden');
+        document.getElementById('flashcards-results').classList.add('hidden');
+        document.getElementById('flashcards-options').classList.remove('hidden');
+        document.getElementById('flashcards-setup').classList.add('hidden');
+        
+        // Reset button text
+        const startBtn = document.getElementById('start-flashcards-btn');
+        if (startBtn) {
+            startBtn.textContent = 'Generate Flashcards';
+        }
+    }
+
+    // Utility functions for randomization
+    shuffleArray(array) {
+        const shuffled = [...array];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+    }
+
+    shuffleQuiz(questions) {
+        // Shuffle the order of questions
+        const shuffledQuestions = this.shuffleArray(questions);
+        
+        // Shuffle the answers within each question while keeping track of correct answer
+        return shuffledQuestions.map(question => {
+            const originalAnswers = [...question.answers];
+            const originalCorrectIndex = question.correct_answer !== undefined ? question.correct_answer : question.correct;
+            const originalCorrectAnswer = originalAnswers[originalCorrectIndex];
+            
+            // Create array of answer objects with their original indices
+            const answerObjects = originalAnswers.map((answer, index) => ({
+                text: answer,
+                wasCorrect: index === originalCorrectIndex
+            }));
+            
+            // Shuffle the answer objects
+            const shuffledAnswerObjects = this.shuffleArray(answerObjects);
+            
+            // Extract shuffled answers and find new correct index
+            const shuffledAnswers = shuffledAnswerObjects.map(obj => obj.text);
+            const newCorrectIndex = shuffledAnswerObjects.findIndex(obj => obj.wasCorrect);
+            
+            return {
+                ...question,
+                answers: shuffledAnswers,
+                correct_answer: newCorrectIndex,
+                correct: newCorrectIndex // Support both formats
+            };
+        });
+    }
+
+    shuffleFlashcards(flashcards) {
+        return this.shuffleArray(flashcards);
+    }
+
+    // New functions for study options interface
+    showQuizSetup() {
+        document.getElementById('quiz-options').classList.add('hidden');
+        document.getElementById('quiz-setup').classList.remove('hidden');
+        
+        // Update button text to show current chunk info
+        this.updateQuizButtonText();
+    }
+
+    showFlashcardsSetup() {
+        document.getElementById('flashcards-options').classList.add('hidden');
+        document.getElementById('flashcards-setup').classList.remove('hidden');
+        
+        // Update button text to show current chunk info
+        this.updateFlashcardsButtonText();
+    }
+
+    updateQuizButtonText() {
+        const startBtn = document.getElementById('start-quiz-btn');
+        if (startBtn && this.noteChunks.length > 1) {
+            const chunkIndex = this.currentQuizChunkIndex >= this.noteChunks.length ? 1 : this.currentQuizChunkIndex + 1;
+            const chunkInfo = `(Chunk ${chunkIndex} of ${this.noteChunks.length})`;
+            startBtn.textContent = `Generate Quiz ${chunkInfo}`;
+        }
+    }
+
+    updateFlashcardsButtonText() {
+        const startBtn = document.getElementById('start-flashcards-btn');
+        if (startBtn && this.noteChunks.length > 1) {
+            const chunkIndex = this.currentFlashcardsChunkIndex >= this.noteChunks.length ? 1 : this.currentFlashcardsChunkIndex + 1;
+            const chunkInfo = `(Chunk ${chunkIndex} of ${this.noteChunks.length})`;
+            startBtn.textContent = `Generate Flashcards ${chunkInfo}`;
+        }
+    }
+
+    async startRandomQuiz() {
+        try {
+            // Show loading
+            const startBtn = document.getElementById('study-saved-quiz-btn');
+            const originalText = startBtn.textContent;
+            startBtn.textContent = 'Loading Quiz Options...';
+            startBtn.disabled = true;
+
+            // Get random questions from all saved quizzes
+            const response = await authFetch('/api/get-random-study-content/quiz');
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    alert('No saved quizzes found. Please generate and save some quizzes first.');
+                    return;
+                }
+                throw new Error('Failed to load random quiz');
+            }
+
+            const data = await response.json();
+            
+            if (data.questions && data.questions.length > 0) {
+                // Show question count selector modal before starting
+                this.showRandomQuizCountSelector(data.questions);
+            } else {
+                alert('No questions found in saved quizzes.');
+            }
+            
+        } catch (error) {
+            console.error('Error starting random quiz:', error);
+            alert('Error loading random quiz: ' + error.message);
+        } finally {
+            const startBtn = document.getElementById('study-saved-quiz-btn');
+            startBtn.textContent = 'Study Saved Quizzes';
+            startBtn.disabled = false;
+        }
+    }
+
+    async startRandomFlashcards() {
+        try {
+            // Show loading
+            const startBtn = document.getElementById('study-saved-flashcards-btn');
+            const originalText = startBtn.textContent;
+            startBtn.textContent = 'Loading Flashcard Options...';
+            startBtn.disabled = true;
+
+            // Get random flashcards from all saved sets
+            const response = await authFetch('/api/get-random-study-content/flashcards');
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    alert('No saved flashcards found. Please generate and save some flashcards first.');
+                    return;
+                }
+                throw new Error('Failed to load random flashcards');
+            }
+
+            const data = await response.json();
+            
+            if (data.flashcards && data.flashcards.length > 0) {
+                // Show flashcard count selector modal before starting
+                this.showRandomFlashcardCountSelector(data.flashcards);
+            } else {
+                alert('No flashcards found in saved sets.');
+            }
+            
+        } catch (error) {
+            console.error('Error starting random flashcards:', error);
+            alert('Error loading random flashcards: ' + error.message);
+        } finally {
+            const startBtn = document.getElementById('study-saved-flashcards-btn');
+            startBtn.textContent = 'Study Saved Flashcards';
+            startBtn.disabled = false;
+        }
+    }
+
+    async showSavedQuizzes() {
+        // Load saved items and filter quizzes
+        await this.loadSavedItems();
+        this.switchTab('saved-tab');
+    }
+
+    async showSavedFlashcards() {
+        // Load saved items and filter flashcards
+        await this.loadSavedItems();
+        this.switchTab('saved-tab');
+    }
+
+    // Override switchTab to reset to options view
+    switchTab(tabId) {
+        // Hide all tabs
+        document.querySelectorAll('.tab-content').forEach(tab => {
+            tab.style.display = 'none';
+        });
+
+        // Remove active class from all buttons - using the correct classes
+        document.querySelectorAll('[data-tab]').forEach(button => {
+            button.classList.remove('btn--primary');
+            button.classList.add('btn--outline');
+        });
+
+        // Show selected tab
+        const selectedTab = document.getElementById(tabId);
+        if (selectedTab) {
+            selectedTab.style.display = 'block';
+        }
+
+        // Add active class to clicked button - using the correct classes
+        const activeButton = document.querySelector(`[data-tab="${tabId}"]`);
+        if (activeButton) {
+            activeButton.classList.remove('btn--outline');
+            activeButton.classList.add('btn--primary');
+        }
+
+        // Reset to options view when switching to quiz or flashcards tabs
+        if (tabId === 'quiz-tab') {
+            document.getElementById('quiz-options').classList.remove('hidden');
+            document.getElementById('quiz-setup').classList.add('hidden');
+            document.getElementById('quiz-interface').classList.add('hidden');
+            document.getElementById('quiz-results').classList.add('hidden');
+        } else if (tabId === 'flashcards-tab') {
+            document.getElementById('flashcards-options').classList.remove('hidden');
+            document.getElementById('flashcards-setup').classList.add('hidden');
+            document.getElementById('flashcards-interface').classList.add('hidden');
+            document.getElementById('flashcards-results').classList.add('hidden');
+        } else if (tabId === 'saved-tab' || tabId === 'saved-items') {
+            // Reload saved items from server when switching to saved items tab
+            this.loadSavedItems();
+        }
+    }
+}
+
+// Initialize study manager
+const studyManager = new StudyManager();
+
 // Actualizar botones de formato cuando cambia la selección
 document.addEventListener('selectionchange', () => {
     const editor = document.getElementById('editor');
@@ -10187,5 +12215,3 @@ document.addEventListener('keydown', async (e) => {
         }
     }
 });
-
-//# sourceMappingURL=app.js.map

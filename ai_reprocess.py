@@ -363,3 +363,157 @@ def build_graph_with_selected_nodes(note_text, filtered_terms, analysis_type='br
         }
     
     return result
+
+async def call_ai_generic(prompt, ai_provider, api_key=None, ai_model=None, host=None, port=None):
+    """Generic AI call function for quiz and flashcard generation."""
+    try:
+        if ai_provider.lower() == 'openai':
+            return await _call_openai_generic(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'openrouter':
+            return await _call_openrouter_generic(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'google':
+            return await _call_google_generic(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'groq':
+            return await _call_groq_generic(prompt, api_key, ai_model)
+        elif ai_provider.lower() == 'lmstudio':
+            return await _call_lmstudio_generic(prompt, ai_model, host, port)
+        elif ai_provider.lower() == 'ollama':
+            return await _call_ollama_generic(prompt, ai_model, host, port)
+        else:
+            return None
+    except Exception as e:
+        print(f"Generic AI call error: {str(e)}")
+        return None
+
+async def _call_openai_generic(prompt, api_key, model=None):
+    """Call OpenAI API for generic text generation."""
+    if not model:
+        model = "gpt-4o-mini"
+    
+    url = "https://api.openai.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 2000,
+        "temperature": 0.1
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["choices"][0]["message"]["content"]
+    return None
+
+async def _call_openrouter_generic(prompt, api_key, model=None):
+    """Call OpenRouter API for generic text generation."""
+    if not model:
+        model = "meta-llama/llama-3.1-8b-instruct:free"
+    
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 2000,
+        "temperature": 0.1
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["choices"][0]["message"]["content"]
+    return None
+
+async def _call_google_generic(prompt, api_key, model=None):
+    """Call Google API for generic text generation."""
+    if not model:
+        model = "gemini-1.5-flash"
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"maxOutputTokens": 2000, "temperature": 0.1}
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["candidates"][0]["content"]["parts"][0]["text"]
+    return None
+
+async def _call_groq_generic(prompt, api_key, model=None):
+    """Call Groq API for generic text generation."""
+    if not model:
+        model = "llama-3.1-8b-instant"
+    
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 2000,
+        "temperature": 0.1
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["choices"][0]["message"]["content"]
+    return None
+
+async def _call_lmstudio_generic(prompt, model, host, port):
+    """Call LM Studio API for generic text generation."""
+    if not model:
+        model = "gpt-4o-mini"
+    
+    url = f"http://{host}:{port}/v1/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 2000,
+        "temperature": 0.1
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["choices"][0]["message"]["content"]
+    return None
+
+async def _call_ollama_generic(prompt, model, host, port):
+    """Call Ollama API for generic text generation."""
+    if not model:
+        model = "llama3.1"
+    
+    url = f"http://{host}:{port}/api/generate"
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.1}
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, headers=headers, json=data) as response:
+            if response.status == 200:
+                result = await response.json()
+                return result["response"]
+    return None
