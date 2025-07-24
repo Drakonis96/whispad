@@ -44,6 +44,33 @@ def init_db():
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS study_items (
+                id SERIAL PRIMARY KEY,
+                username TEXT NOT NULL,
+                type VARCHAR(20) NOT NULL CHECK (type IN ('quiz', 'flashcards')),
+                title TEXT NOT NULL,
+                content JSONB NOT NULL,
+                source_content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_study_items_username_type 
+            ON study_items (username, type)
+            """
+        )
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_study_items_created_at 
+            ON study_items (created_at DESC)
+            """
+        )
         conn.commit()
 
 
@@ -227,6 +254,165 @@ def get_user_preference(username: str, preference_key: str):
         return row[0] if row else None
 
 
+# Study Items functions
+def save_study_item(username: str, item_type: str, title: str, content: dict, source_content: str = None):
+    """Save a quiz or flashcard set to the database."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            """
+            INSERT INTO study_items (username, type, title, content, source_content)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            [username, item_type, title, json.dumps(content), source_content]
+        )
+        study_id = cur.fetchone()[0]
+        conn.commit()
+        return study_id
+
+
+def save_individual_study_items(username: str, item_type: str, items: list, source_content: str = None, base_title: str = None):
+    """Save individual questions or flashcards as separate study items."""
+    saved_ids = []
+    with pool.connection() as conn:
+        for i, item in enumerate(items, 1):
+            if item_type == 'quiz':
+                # Save individual question
+                title = f"Question {i}: {item.get('question', 'Untitled')[:50]}..."
+                content = {"question": item}
+            elif item_type == 'flashcards':
+                # Save individual flashcard
+                title = f"Flashcard {i}: {item.get('front', 'Untitled')[:50]}..."
+                content = {"flashcard": item}
+            else:
+                continue
+                
+            # Add base title if provided
+            if base_title:
+                title = f"{base_title} - {title}"
+            
+            cur = conn.execute(
+                """
+                INSERT INTO study_items (username, type, title, content, source_content)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                [username, item_type, title, json.dumps(content), source_content]
+            )
+            study_id = cur.fetchone()[0]
+            saved_ids.append(study_id)
+        
+        conn.commit()
+    return saved_ids
+
+
+def update_study_item_content(username: str, item_id: int, content: dict):
+    """Update the content of an existing study item."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            """
+            UPDATE study_items 
+            SET content = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE username = %s AND id = %s
+            RETURNING id
+            """,
+            [json.dumps(content), username, item_id]
+        )
+        result = cur.fetchone()
+        conn.commit()
+        return result[0] if result else None
+
+
+def get_study_items(username: str, item_type: str = None):
+    """Get all study items for a user, optionally filtered by type."""
+    with pool.connection() as conn:
+        if item_type:
+            cur = conn.execute(
+                """
+                SELECT id, type, title, content, source_content, created_at, updated_at
+                FROM study_items 
+                WHERE username=%s AND type=%s 
+                ORDER BY created_at DESC
+                """,
+                [username, item_type]
+            )
+        else:
+            cur = conn.execute(
+                """
+                SELECT id, type, title, content, source_content, created_at, updated_at
+                FROM study_items 
+                WHERE username=%s 
+                ORDER BY created_at DESC
+                """,
+                [username]
+            )
+        
+        items = []
+        for row in cur.fetchall():
+            # PostgreSQL JSONB column returns dict directly, no need to parse
+            content = row[3] if isinstance(row[3], dict) else json.loads(row[3]) if row[3] else {}
+            items.append({
+                'id': row[0],
+                'type': row[1],
+                'title': row[2],
+                'content': content,
+                'source_content': row[4],
+                'created_at': row[5].isoformat() if row[5] else None,
+                'updated_at': row[6].isoformat() if row[6] else None
+            })
+        
+        return items
+
+
+def get_study_item(username: str, item_id: int):
+    """Get a specific study item by ID."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            """
+            SELECT id, type, title, content, source_content, created_at, updated_at
+            FROM study_items 
+            WHERE username=%s AND id=%s
+            """,
+            [username, item_id]
+        )
+        row = cur.fetchone()
+        if row:
+            # PostgreSQL JSONB column returns dict directly, no need to parse
+            content = row[3] if isinstance(row[3], dict) else json.loads(row[3]) if row[3] else {}
+            return {
+                'id': row[0],
+                'type': row[1],
+                'title': row[2],
+                'content': content,
+                'source_content': row[4],
+                'created_at': row[5].isoformat() if row[5] else None,
+                'updated_at': row[6].isoformat() if row[6] else None
+            }
+        return None
+
+
+def delete_study_item(username: str, item_id: int):
+    """Delete a study item."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM study_items WHERE username=%s AND id=%s",
+            [username, item_id]
+        )
+        conn.commit()
+        return cur.rowcount > 0
+
+
+def delete_all_study_items_by_type(username: str, study_type: str):
+    """Delete all study items of a specific type for a user."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM study_items WHERE username=%s AND type=%s",
+            [username, study_type]
+        )
+        conn.commit()
+        return cur.rowcount
+
+
 def set_user_preference(username: str, preference_key: str, preference_value: str):
     """Set a user preference value."""
     with pool.connection() as conn:
@@ -250,5 +436,31 @@ def get_user_preferences(username: str):
             [username],
         )
         return dict(cur.fetchall())
+
+
+def get_all_questions_or_flashcards(username: str, item_type: str):
+    """Get all questions or flashcards from all study items of a specific type for random selection."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            """
+            SELECT content
+            FROM study_items 
+            WHERE username=%s AND type=%s 
+            ORDER BY created_at DESC
+            """,
+            [username, item_type]
+        )
+        
+        all_items = []
+        for row in cur.fetchall():
+            # PostgreSQL JSONB column returns dict directly, no need to parse
+            content = row[0] if isinstance(row[0], dict) else json.loads(row[0]) if row[0] else {}
+            
+            if item_type == 'quiz' and 'questions' in content:
+                all_items.extend(content['questions'])
+            elif item_type == 'flashcards' and 'flashcards' in content:
+                all_items.extend(content['flashcards'])
+        
+        return all_items
 
 

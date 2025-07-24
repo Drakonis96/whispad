@@ -4077,19 +4077,57 @@ def user_config():
     if request.method == 'GET':
         if os.path.exists(config_file):
             try:
+                # Attempt to read and parse the file
                 with open(config_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                # Validate that data is a dictionary
+                if not isinstance(data, dict):
+                    print(f"Warning: Config file for user {username} contains invalid data type: {type(data)}")
+                    return jsonify({"config": {}})
                 return jsonify({"config": data})
+            except json.JSONDecodeError as e:
+                print(f"Warning: Config file for user {username} contains invalid JSON: {str(e)}")
+                # If JSON is corrupted, return empty config and optionally backup the corrupted file
+                try:
+                    import shutil
+                    backup_file = config_file + '.backup'
+                    shutil.copy2(config_file, backup_file)
+                    print(f"Backed up corrupted config to {backup_file}")
+                except Exception:
+                    pass
+                return jsonify({"config": {}})
             except Exception as e:
+                print(f"Error reading config file for user {username}: {str(e)}")
                 return jsonify({"error": f"Error reading config: {str(e)}"}), 500
         return jsonify({"config": {}})
 
+    # POST method - save config
     data = request.get_json() or {}
+    
+    # Validate that data is a dictionary
+    if not isinstance(data, dict):
+        return jsonify({"error": "Config data must be a JSON object"}), 400
+    
     try:
-        with open(config_file, 'w', encoding='utf-8') as f:
+        # Write to a temporary file first, then atomically move it
+        import tempfile
+        temp_file = config_file + '.tmp'
+        with open(temp_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        # Atomic move to prevent corruption during concurrent access
+        import shutil
+        shutil.move(temp_file, config_file)
+        
         return jsonify({"success": True})
     except Exception as e:
+        print(f"Error saving config file for user {username}: {str(e)}")
+        # Clean up temp file if it exists
+        try:
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+        except Exception:
+            pass
         return jsonify({"error": f"Error saving config: {str(e)}"}), 500
 
 @app.route('/api/list-saved-notes', methods=['GET'])
@@ -5633,6 +5671,879 @@ def get_folder_structure():
     
     except Exception as e:
         return jsonify({"error": f"Error getting folder structure: {str(e)}"}), 500
+
+@app.route('/api/save-study-item', methods=['POST'])
+def save_study_item():
+    """Save a quiz or flashcards set"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing parameters"}), 400
+
+        filename = data.get('filename')
+        item_type = data.get('type')
+        item_data = data.get('data')
+
+        if not all([filename, item_type, item_data]):
+            return jsonify({"error": "Missing required parameters"}), 400
+
+        # Sanitize filename
+        filename = sanitize_filename(filename)
+        
+        # Create study items directory
+        user_dir = os.path.join('user_data', username)
+        study_dir = os.path.join(user_dir, 'study_items')
+        os.makedirs(study_dir, exist_ok=True)
+
+        # Save study item
+        file_path = os.path.join(study_dir, filename)
+        
+        # Ensure path is within user directory
+        if not is_path_within_directory(user_dir, file_path):
+            return jsonify({"error": "Invalid file path"}), 400
+
+        study_item = {
+            'type': item_type,
+            'filename': filename,
+            'timestamp': item_data.get('timestamp', datetime.now().isoformat()),
+            'title': item_data.get('title', 'Untitled'),
+            'language': item_data.get('language', 'english'),
+            'level': item_data.get('level', 'medium'),
+            'data': item_data
+        }
+
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(study_item, f, ensure_ascii=False, indent=2)
+
+        return jsonify({"message": "Study item saved successfully"})
+
+    except Exception as e:
+        return jsonify({"error": f"Error saving study item: {str(e)}"}), 500
+
+@app.route('/api/get-study-items', methods=['GET'])
+def get_study_items():
+    """Get all saved study items for the current user"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        # Get items from database
+        try:
+            from db import get_study_items as db_get_study_items
+            items = db_get_study_items(username)
+            
+            # Format for frontend
+            formatted_items = []
+            for item in items:
+                formatted_items.append({
+                    'id': item['id'],
+                    'type': item['type'],
+                    'title': item['title'],
+                    'created_at': item['created_at'],
+                    'item_count': len(item['content'].get('questions', [])) if item['type'] == 'quiz' else len(item['content'].get('flashcards', []))
+                })
+            
+            # Sort by created_at (newest first)
+            formatted_items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+            
+            return jsonify(formatted_items)
+            
+        except Exception as e:
+            print(f"Database error, falling back to file system: {e}")
+            # Fallback to file system for backward compatibility
+            study_dir = os.path.join('user_data', username, 'study_items')
+            
+            if not os.path.exists(study_dir):
+                return jsonify([])
+
+            items = []
+            for filename in os.listdir(study_dir):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(study_dir, filename)
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            item = json.load(f)
+                            # Return basic info for listing
+                            items.append({
+                                'filename': filename,
+                                'type': item.get('type'),
+                                'title': item.get('title'),
+                                'timestamp': item.get('timestamp'),
+                                'language': item.get('language'),
+                                'level': item.get('level'),
+                                'item_count': len(item.get('data', {}).get('questions', [])) if item.get('type') == 'quiz' else len(item.get('data', {}).get('flashcards', []))
+                            })
+                    except Exception as e:
+                        print(f"Error reading study item {filename}: {e}")
+                        continue
+
+            # Sort by timestamp (newest first)
+            items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            
+            return jsonify(items)
+
+        # Sort by timestamp (newest first)
+        items.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        return jsonify(items)
+
+    except Exception as e:
+        return jsonify({"error": f"Error getting study items: {str(e)}"}), 500
+
+@app.route('/api/get-study-item/<int:item_id>', methods=['GET'])
+def get_study_item_by_id(item_id):
+    """Get a specific study item by ID"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        try:
+            from db import get_study_item as db_get_study_item
+            item = db_get_study_item(username, item_id)
+            
+            if not item:
+                return jsonify({"error": "Study item not found"}), 404
+            
+            return jsonify(item)
+            
+        except Exception as e:
+            print(f"Database error: {e}")
+            return jsonify({"error": "Error loading study item"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"Error getting study item: {str(e)}"}), 500
+
+@app.route('/api/get-study-item/<filename>', methods=['GET'])
+def get_study_item(filename):
+    """Get a specific study item (legacy file-based)"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        # Sanitize filename
+        filename = sanitize_filename(filename)
+        
+        user_dir = os.path.join('user_data', username)
+        file_path = os.path.join(user_dir, 'study_items', filename)
+        
+        # Ensure path is within user directory
+        if not is_path_within_directory(user_dir, file_path):
+            return jsonify({"error": "Invalid file path"}), 400
+
+        if not os.path.exists(file_path):
+            return jsonify({"error": "Study item not found"}), 404
+
+        with open(file_path, 'r', encoding='utf-8') as f:
+            item = json.load(f)
+
+        return jsonify(item.get('data', {}))
+
+    except Exception as e:
+        return jsonify({"error": f"Error getting study item: {str(e)}"}), 500
+
+@app.route('/api/update-study-item/<int:item_id>', methods=['PUT'])
+def update_study_item(item_id):
+    """Update an existing study item by adding new questions/flashcards to it"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        new_content = data.get('content')
+        
+        if not new_content:
+            return jsonify({"error": "Content is required"}), 400
+
+        try:
+            from db import get_study_item as db_get_study_item, update_study_item_content
+            
+            # Get existing study item
+            existing_item = db_get_study_item(username, item_id)
+            if not existing_item:
+                return jsonify({"error": "Study item not found"}), 404
+            
+            # Merge content based on item type
+            existing_content = existing_item['content']
+            
+            if existing_item['type'] == 'quiz' and 'questions' in new_content:
+                # Merge quiz questions
+                if 'questions' not in existing_content:
+                    existing_content['questions'] = []
+                existing_content['questions'].extend(new_content['questions'])
+                
+            elif existing_item['type'] == 'flashcards' and 'flashcards' in new_content:
+                # Merge flashcards
+                if 'flashcards' not in existing_content:
+                    existing_content['flashcards'] = []
+                existing_content['flashcards'].extend(new_content['flashcards'])
+            else:
+                return jsonify({"error": "Invalid content type for study item"}), 400
+            
+            # Update the study item in database
+            updated_id = update_study_item_content(username, item_id, existing_content)
+            
+            if updated_id:
+                return jsonify({
+                    "message": "Study item updated successfully",
+                    "study_id": updated_id,
+                    "total_items": len(existing_content.get('questions', [])) if existing_item['type'] == 'quiz' else len(existing_content.get('flashcards', []))
+                })
+            else:
+                return jsonify({"error": "Failed to update study item"}), 500
+                
+        except Exception as e:
+            print(f"Database error: {e}")
+            return jsonify({"error": "Error updating study item"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"Error updating study item: {str(e)}"}), 500
+
+@app.route('/api/get-random-study-content/<item_type>', methods=['GET'])
+def get_random_study_content(item_type):
+    """Get random questions or flashcards from saved study items, handling both individual items and sets"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if item_type not in ['quiz', 'flashcards']:
+            return jsonify({"error": "Invalid item type"}), 400
+
+        try:
+            from db import get_study_items
+            import random
+            
+            # Get individual items first (preferred)
+            individual_type = f"{item_type}_individual"
+            individual_items = get_study_items(username, individual_type)
+            
+            # Also get sets for backward compatibility
+            set_items = get_study_items(username, item_type)
+            
+            all_items = []
+            sources_count = 0
+            
+            # Process individual items (these are already individual questions/flashcards)
+            if individual_items:
+                # Limit to the most recent 30 individual items to avoid overwhelming
+                limited_individual = individual_items[:30]
+                sources_count += len(limited_individual)
+                
+                for study_item in limited_individual:
+                    content = study_item['content']
+                    if item_type == 'quiz' and 'question' in content:
+                        # Individual question
+                        question_copy = content['question'].copy()
+                        question_copy['_source_title'] = study_item['title']
+                        question_copy['_source_id'] = study_item['id']
+                        all_items.append(question_copy)
+                    elif item_type == 'flashcards' and 'flashcard' in content:
+                        # Individual flashcard
+                        flashcard_copy = content['flashcard'].copy()
+                        flashcard_copy['_source_title'] = study_item['title']
+                        flashcard_copy['_source_id'] = study_item['id']
+                        all_items.append(flashcard_copy)
+            
+            # If we don't have enough individual items, supplement with sets (backward compatibility)
+            if len(all_items) < 20 and set_items:
+                limited_sets = set_items[:3]  # Limit to 3 sets max
+                sources_count += len(limited_sets)
+                
+                for study_item in limited_sets:
+                    content = study_item['content']
+                    if item_type == 'quiz':
+                        if 'questions' in content:
+                            # Set of questions
+                            for question in content['questions']:
+                                question_copy = question.copy()
+                                question_copy['_source_title'] = f"Set: {study_item['title']}"
+                                question_copy['_source_id'] = study_item['id']
+                                all_items.append(question_copy)
+                        elif 'question' in content:
+                            # Individual question stored with 'quiz' type (legacy format)
+                            question_copy = content['question'].copy()
+                            question_copy['_source_title'] = study_item['title']
+                            question_copy['_source_id'] = study_item['id']
+                            all_items.append(question_copy)
+                    elif item_type == 'flashcards':
+                        if 'flashcards' in content:
+                            # Set of flashcards
+                            for flashcard in content['flashcards']:
+                                flashcard_copy = flashcard.copy()
+                                flashcard_copy['_source_title'] = f"Set: {study_item['title']}"
+                                flashcard_copy['_source_id'] = study_item['id']
+                                all_items.append(flashcard_copy)
+                        elif 'flashcard' in content:
+                            # Individual flashcard stored with 'flashcards' type (legacy format)
+                            flashcard_copy = content['flashcard'].copy()
+                            flashcard_copy['_source_title'] = study_item['title']
+                            flashcard_copy['_source_id'] = study_item['id']
+                            all_items.append(flashcard_copy)
+            
+            if not all_items:
+                return jsonify({"error": f"No saved {item_type} found"}), 404
+            
+            # Shuffle the items for randomization
+            random.shuffle(all_items)
+            
+            # Limit total items to avoid overwhelming the user
+            max_items = 30 if item_type == 'quiz' else 50
+            if len(all_items) > max_items:
+                all_items = all_items[:max_items]
+            
+            # Return the content in the expected format
+            if item_type == 'quiz':
+                return jsonify({
+                    "questions": all_items,
+                    "total_questions": len(all_items),
+                    "source": f"mixed_from_{sources_count}_items",
+                    "limited_to": max_items,
+                    "individual_count": len(individual_items) if individual_items else 0
+                })
+            else:  # flashcards
+                return jsonify({
+                    "flashcards": all_items,
+                    "total_flashcards": len(all_items),
+                    "source": f"mixed_from_{sources_count}_items",
+                    "limited_to": max_items,
+                    "individual_count": len(individual_items) if individual_items else 0
+                })
+                
+        except Exception as e:
+            print(f"Database error: {e}")
+            return jsonify({"error": "Error loading study content"}), 500
+
+    except Exception as e:
+        return jsonify({"error": f"Error getting random study content: {str(e)}"}), 500
+
+@app.route('/api/delete-study-item/<filename>', methods=['DELETE'])
+def delete_study_item(filename):
+    """Delete a study item"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        # Check if it's a numeric ID (database) or filename (file system)
+        if filename.isdigit():
+            # Delete from database
+            try:
+                from db import delete_study_item as db_delete_study_item
+                success = db_delete_study_item(username, int(filename))
+                if success:
+                    return jsonify({"message": "Study item deleted successfully"})
+                else:
+                    return jsonify({"error": "Study item not found"}), 404
+            except Exception as e:
+                print(f"Database delete error, falling back to file system: {e}")
+                return jsonify({"error": "Study item not found"}), 404
+        else:
+            # Delete from file system (backward compatibility)
+            # Sanitize filename
+            filename = sanitize_filename(filename)
+            
+            user_dir = os.path.join('user_data', username)
+            file_path = os.path.join(user_dir, 'study_items', filename)
+            
+            # Ensure path is within user directory
+            if not is_path_within_directory(user_dir, file_path):
+                return jsonify({"error": "Invalid file path"}), 400
+
+            if not os.path.exists(file_path):
+                return jsonify({"error": "Study item not found"}), 404
+
+            os.remove(file_path)
+            
+            return jsonify({"message": "Study item deleted successfully"})
+
+    except Exception as e:
+        return jsonify({"error": f"Error deleting study item: {str(e)}"}), 500
+
+@app.route('/api/delete-all-study-items/<study_type>', methods=['DELETE'])
+def delete_all_study_items(study_type):
+    """Delete all study items of a specific type (quiz or flashcards)"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if study_type not in ['quiz', 'flashcards']:
+            return jsonify({"error": "Invalid study type. Must be 'quiz' or 'flashcards'"}), 400
+
+        # Try database first
+        try:
+            from db import delete_all_study_items_by_type
+            deleted_count = delete_all_study_items_by_type(username, study_type)
+            return jsonify({
+                "message": f"Successfully deleted {deleted_count} {study_type}{'s' if deleted_count != 1 else ''}",
+                "deleted_count": deleted_count
+            })
+        except Exception as e:
+            print(f"Database delete error, falling back to file system: {e}")
+            
+            # Fallback to file system (backward compatibility)
+            user_dir = os.path.join('user_data', username)
+            study_items_dir = os.path.join(user_dir, 'study_items')
+            
+            if not os.path.exists(study_items_dir):
+                return jsonify({
+                    "message": f"No {study_type}s found to delete",
+                    "deleted_count": 0
+                })
+            
+            deleted_count = 0
+            for filename in os.listdir(study_items_dir):
+                file_path = os.path.join(study_items_dir, filename)
+                
+                # Check if it's a valid study item file
+                if filename.endswith('.json') and study_type in filename:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            item_data = json.load(f)
+                            if item_data.get('type') == study_type:
+                                os.remove(file_path)
+                                deleted_count += 1
+                    except (json.JSONDecodeError, IOError):
+                        # Skip invalid files
+                        continue
+            
+            return jsonify({
+                "message": f"Successfully deleted {deleted_count} {study_type}{'s' if deleted_count != 1 else ''}",
+                "deleted_count": deleted_count
+            })
+
+    except Exception as e:
+        return jsonify({"error": f"Error deleting {study_type}s: {str(e)}"}), 500
+
+@app.route('/api/generate-quiz', methods=['POST'])
+def generate_quiz():
+    """Generate a quiz from note content using AI"""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note_content = data.get('content', '')
+    difficulty = data.get('difficulty', 'medium')
+    num_questions = data.get('num_questions', 5)
+    
+    if not note_content:
+        return jsonify({"error": "Note content is required"}), 400
+    
+    # Get user's AI configuration
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured"}), 400
+    
+    # Get API keys from environment variables
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the generic AI function
+            from ai_reprocess import call_ai_generic
+            
+            # Create the prompt for quiz generation with randomization
+            import random
+            random_seed = random.randint(1000, 9999)
+            
+            prompt = f"""Generate a quiz with {num_questions} multiple choice questions based on the following content. 
+            Difficulty level: {difficulty}
+            Random seed: {random_seed} (use this to ensure different questions each time)
+            
+            Content:
+            {note_content}
+            
+            Please respond with a JSON object in this exact format:
+            {{
+                "questions": [
+                    {{
+                        "question": "Question text here?",
+                        "answers": ["Option A", "Option B", "Option C", "Option D"],
+                        "correct": 0
+                    }}
+                ]
+            }}
+            
+            Rules:
+            - Each question should have exactly 4 answer options
+            - The "correct" field should be the index (0-3) of the correct answer
+            - Questions should test understanding of the key concepts
+            - Vary the difficulty based on the specified level
+            - Generate DIFFERENT questions each time, avoid repetition
+            - Focus on different aspects and angles of the content
+            - Only respond with valid JSON, no additional text"""
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                response = loop.run_until_complete(
+                    call_ai_generic(prompt, ai_provider, 
+                                    api_key=None, ai_model=ai_model, host=host, port=port)
+                )
+            else:
+                response = loop.run_until_complete(
+                    call_ai_generic(prompt, ai_provider, 
+                                    api_key=api_key, ai_model=ai_model)
+                )
+            
+            if not response:
+                return jsonify({"error": "No response from AI"}), 500
+            
+            # Parse the JSON response with robust extraction
+            try:
+                # First try direct JSON parsing
+                try:
+                    quiz_data = json.loads(response.strip())
+                except json.JSONDecodeError:
+                    # If that fails, use pattern-based extraction
+                    import re
+                    patterns = [
+                        r'```json\s*(\{.*?\})\s*```',
+                        r'```\s*(\{.*?\})\s*```',
+                        r'\{[^{}]*"questions"[^{}]*\[[^\]]*\][^{}]*\}',
+                        r'(\{.*?"questions".*?\[.*?\].*?\})',
+                    ]
+                    
+                    quiz_data = None
+                    for pattern in patterns:
+                        matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
+                        for match in matches:
+                            try:
+                                quiz_data = json.loads(match)
+                                if isinstance(quiz_data, dict) and 'questions' in quiz_data:
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                        if quiz_data:
+                            break
+                    
+                    if not quiz_data:
+                        raise json.JSONDecodeError("No valid JSON found", response, 0)
+                
+                # Validate structure
+                if 'questions' not in quiz_data or not isinstance(quiz_data['questions'], list):
+                    raise ValueError("Invalid quiz format")
+                
+                # Ensure all questions have proper format
+                for i, question in enumerate(quiz_data['questions']):
+                    if not isinstance(question, dict):
+                        raise ValueError(f"Question {i+1} is not a dict")
+                    
+                    if 'question' not in question or 'answers' not in question:
+                        raise ValueError(f"Question {i+1} missing required fields")
+                    
+                    # Support both 'correct' and 'correct_answer'
+                    if 'correct' not in question and 'correct_answer' not in question:
+                        raise ValueError(f"Question {i+1} missing correct answer field")
+                    
+                    # Normalize to 'correct_answer'
+                    if 'correct' in question and 'correct_answer' not in question:
+                        question['correct_answer'] = question.pop('correct')
+                
+                print(f"Successfully parsed quiz with {len(quiz_data['questions'])} questions")
+                
+                # Save individual questions to database instead of saving as a batch
+                try:
+                    from db import save_individual_study_items
+                    import datetime
+                    # Generate base title from first words of content with timestamp
+                    title_words = note_content.strip().split()[:6]
+                    base_title = " ".join(title_words) + ("..." if len(title_words) >= 6 else "")
+                    timestamp = datetime.datetime.now().strftime("%H:%M")
+                    base_title = f"Quiz: {base_title} ({timestamp})"
+                    
+                    # Save each question individually
+                    saved_ids = save_individual_study_items(
+                        username=username,
+                        item_type='quiz',
+                        items=quiz_data['questions'],
+                        source_content=note_content,
+                        base_title=base_title
+                    )
+                    
+                    # Return the first ID as study_id for compatibility
+                    if saved_ids:
+                        quiz_data['study_id'] = saved_ids[0]
+                        quiz_data['individual_ids'] = saved_ids
+                        print(f"NEW {len(saved_ids)} individual questions saved to database with IDs: {saved_ids}")
+                    else:
+                        print("Warning: No questions were saved to database")
+                except Exception as e:
+                    print(f"Warning: Could not save questions to database: {e}")
+                    # Continue without failing the request
+                
+                return jsonify(quiz_data)
+                
+            except json.JSONDecodeError as e:
+                print(f"JSON parsing error: {e}")
+                print(f"Raw response: {response}")
+                return jsonify({"error": "Invalid JSON response from AI"}), 500
+            except ValueError as e:
+                print(f"Quiz format error: {e}")
+                return jsonify({"error": "Invalid quiz format from AI"}), 500
+                
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"Quiz generation error: {str(e)}")
+        return jsonify({"error": f"Quiz generation failed: {str(e)}"}), 500
+
+@app.route('/api/generate-flashcards', methods=['POST'])
+def generate_flashcards():
+    """Generate flashcards from note content using AI"""
+    username = get_current_username()
+    if not username:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.get_json() or {}
+    note_content = data.get('content', '')
+    num_cards = data.get('num_cards', 10)
+    
+    if not note_content:
+        return jsonify({"error": "Note content is required"}), 400
+    
+    # Get user's AI configuration
+    user_dir = os.path.join(os.getcwd(), 'user_data', username)
+    config_file = os.path.join(user_dir, 'config.json')
+    
+    ai_provider = None
+    api_key = None
+    ai_model = None
+    host = None
+    port = None
+    
+    # Read configuration from file
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            ai_provider = config.get('postprocessProvider')
+            ai_model = config.get('postprocessModel')
+            
+            # Get host/port for local providers
+            if ai_provider == 'lmstudio':
+                host = config.get('lmstudioHost') or LMSTUDIO_HOST
+                port = config.get('lmstudioPort') or LMSTUDIO_PORT
+            elif ai_provider == 'ollama':
+                host = config.get('ollamaHost') or OLLAMA_HOST
+                port = config.get('ollamaPort') or OLLAMA_PORT
+            
+        except Exception as e:
+            return jsonify({"error": f"Error reading user configuration: {str(e)}"}), 500
+    
+    if not ai_provider:
+        return jsonify({"error": "AI provider not configured"}), 400
+    
+    # Get API keys from environment variables
+    if ai_provider == 'openai':
+        api_key = OPENAI_API_KEY
+    elif ai_provider == 'openrouter':
+        api_key = OPENROUTER_API_KEY
+    elif ai_provider == 'google':
+        api_key = GOOGLE_API_KEY
+    elif ai_provider == 'groq':
+        api_key = GROQ_API_KEY
+    
+    # Check API key for cloud providers
+    if ai_provider in ['openai', 'openrouter', 'google', 'groq'] and not api_key:
+        return jsonify({"error": f"API key not configured for {ai_provider}"}), 400
+    
+    try:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            # Import the generic AI function
+            from ai_reprocess import call_ai_generic
+            
+            # Create the prompt for flashcard generation with randomization
+            import random
+            random_seed = random.randint(1000, 9999)
+            
+            prompt = f"""Generate {num_cards} flashcards based on the following content. Each flashcard should have a front (question/term) and back (answer/definition).
+            Random seed: {random_seed} (use this to ensure different flashcards each time)
+            
+            Content:
+            {note_content}
+            
+            Please respond with a JSON object in this exact format:
+            {{
+                "flashcards": [
+                    {{
+                        "front": "Question or term here",
+                        "back": "Answer or definition here"
+                    }}
+                ]
+            }}
+            
+            Rules:
+            - Create flashcards that test key concepts and definitions
+            - Make fronts concise and backs informative
+            - Focus on the most important information
+            - Generate DIFFERENT flashcards each time, avoid repetition
+            - Explore different concepts and angles from the content
+            - Only respond with valid JSON, no additional text"""
+            
+            # Prepare arguments based on provider type
+            if ai_provider in ['lmstudio', 'ollama']:
+                response = loop.run_until_complete(
+                    call_ai_generic(prompt, ai_provider, 
+                                    api_key=None, ai_model=ai_model, host=host, port=port)
+                )
+            else:
+                response = loop.run_until_complete(
+                    call_ai_generic(prompt, ai_provider, 
+                                    api_key=api_key, ai_model=ai_model)
+                )
+            
+            if not response:
+                return jsonify({"error": "No response from AI"}), 500
+            
+            # Parse the JSON response with robust extraction
+            try:
+                # First try direct JSON parsing
+                try:
+                    flashcards_data = json.loads(response.strip())
+                except json.JSONDecodeError:
+                    # If that fails, use pattern-based extraction
+                    import re
+                    patterns = [
+                        r'```json\s*(\{.*?\})\s*```',
+                        r'```\s*(\{.*?\})\s*```',
+                        r'\{[^{}]*"flashcards"[^{}]*\[[^\]]*\][^{}]*\}',
+                        r'(\{.*?"flashcards".*?\[.*?\].*?\})',
+                    ]
+                    
+                    flashcards_data = None
+                    for pattern in patterns:
+                        matches = re.findall(pattern, response, re.DOTALL | re.IGNORECASE)
+                        for match in matches:
+                            try:
+                                flashcards_data = json.loads(match)
+                                if isinstance(flashcards_data, dict) and 'flashcards' in flashcards_data:
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+                        if flashcards_data:
+                            break
+                    
+                    if not flashcards_data:
+                        raise json.JSONDecodeError("No valid JSON found", response, 0)
+                
+                # Validate structure
+                if 'flashcards' not in flashcards_data or not isinstance(flashcards_data['flashcards'], list):
+                    raise ValueError("Invalid flashcards format")
+                
+                # Ensure all flashcards have proper format
+                for i, card in enumerate(flashcards_data['flashcards']):
+                    if not isinstance(card, dict):
+                        raise ValueError(f"Flashcard {i+1} is not a dict")
+                    
+                    if 'front' not in card or 'back' not in card:
+                        raise ValueError(f"Flashcard {i+1} missing required fields")
+                
+                print(f"Successfully parsed flashcards with {len(flashcards_data['flashcards'])} cards")
+                
+                # Save individual flashcards to database instead of saving as a batch
+                try:
+                    from db import save_individual_study_items
+                    import datetime
+                    # Generate base title from first words of content with timestamp
+                    title_words = note_content.strip().split()[:6]
+                    base_title = " ".join(title_words) + ("..." if len(title_words) >= 6 else "")
+                    timestamp = datetime.datetime.now().strftime("%H:%M")
+                    base_title = f"Flashcards: {base_title} ({timestamp})"
+                    
+                    # Save each flashcard individually
+                    saved_ids = save_individual_study_items(
+                        username=username,
+                        item_type='flashcards',
+                        items=flashcards_data['flashcards'],
+                        source_content=note_content,
+                        base_title=base_title
+                    )
+                    
+                    # Return the first ID as study_id for compatibility
+                    if saved_ids:
+                        flashcards_data['study_id'] = saved_ids[0]
+                        flashcards_data['individual_ids'] = saved_ids
+                        print(f"NEW {len(saved_ids)} individual flashcards saved to database with IDs: {saved_ids}")
+                    else:
+                        print("Warning: No flashcards were saved to database")
+                except Exception as e:
+                    print(f"Warning: Could not save flashcards to database: {e}")
+                    # Continue without failing the request
+                
+                return jsonify(flashcards_data)
+                
+            except json.JSONDecodeError as e:
+                print(f"JSON parsing error: {e}")
+                print(f"Raw response: {response}")
+                return jsonify({"error": "Invalid JSON response from AI"}), 500
+            except ValueError as e:
+                print(f"Flashcards format error: {e}")
+                return jsonify({"error": "Invalid flashcards format from AI"}), 500
+                
+        finally:
+            loop.close()
+            
+    except Exception as e:
+        print(f"Flashcards generation error: {str(e)}")
+        return jsonify({"error": f"Flashcards generation failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     port = int(os.getenv('BACKEND_PORT', 8000))
