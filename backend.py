@@ -5366,34 +5366,38 @@ def create_folder():
 
 @app.route('/api/folders/<path:folder_path>', methods=['DELETE'])
 def delete_folder(folder_path):
-    """Delete a folder (must be empty)"""
+    """Delete a folder. Can delete non-empty folders if force=true is passed."""
     try:
         username = get_current_username()
         if not username:
             return jsonify({"error": "Unauthorized"}), 401
-        
+
         saved_notes_dir = os.path.join(os.getcwd(), 'saved_notes', username)
         full_folder_path = os.path.join(saved_notes_dir, folder_path)
-        
+
         # Security check
         if not is_path_within_directory(saved_notes_dir, full_folder_path):
             return jsonify({"error": "Invalid folder path"}), 400
-        
+
         if not os.path.exists(full_folder_path):
             return jsonify({"error": "Folder not found"}), 404
-        
+
         if not os.path.isdir(full_folder_path):
             return jsonify({"error": "Path is not a folder"}), 400
-        
+
+        force_delete = request.args.get('force', 'false').lower() == 'true'
+
         # Check if folder is empty
         if os.listdir(full_folder_path):
-            return jsonify({"error": "Folder must be empty before deletion"}), 409
-        
-        # Delete the folder
-        os.rmdir(full_folder_path)
-        
+            if not force_delete:
+                return jsonify({"error": "Folder must be empty before deletion"}), 409
+            else:
+                shutil.rmtree(full_folder_path)
+        else:
+            os.rmdir(full_folder_path)
+
         return jsonify({"success": True, "message": "Folder deleted successfully"})
-    
+
     except Exception as e:
         return jsonify({"error": f"Error deleting folder: {str(e)}"}), 500
 
