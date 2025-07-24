@@ -4103,15 +4103,18 @@ def list_saved_notes():
         if not os.path.exists(saved_notes_dir):
             return jsonify({"notes": [], "message": "Directorio saved_notes no existe"})
 
-        # Ensure missing metadata is created for this user's notes
-        for fname in os.listdir(saved_notes_dir):
-            if fname.endswith('.md'):
-                meta = f"{os.path.join(saved_notes_dir, fname)}.meta"
-                if not os.path.exists(meta):
-                    note_id = parse_note_id_from_md(os.path.join(saved_notes_dir, fname))
+        # Ensure missing metadata is created for this user's notes (recursively)
+        for root, _, files in os.walk(saved_notes_dir):
+            for fname in files:
+                if not fname.endswith('.md'):
+                    continue
+                md_path = os.path.join(root, fname)
+                meta_path = f"{md_path}.meta"
+                if not os.path.exists(meta_path):
+                    note_id = parse_note_id_from_md(md_path)
                     if not note_id:
                         note_id = generate_note_id_from_filename(fname)
-                    stat = os.stat(os.path.join(saved_notes_dir, fname))
+                    stat = os.stat(md_path)
                     meta_data = {
                         "id": note_id,
                         "title": os.path.splitext(fname)[0],
@@ -4119,16 +4122,18 @@ def list_saved_notes():
                         "tags": []
                     }
                     try:
-                        with open(meta, 'w', encoding='utf-8') as mf:
+                        with open(meta_path, 'w', encoding='utf-8') as mf:
                             json.dump(meta_data, mf, ensure_ascii=False, indent=2)
                     except Exception:
                         pass
-        
-        # Listar todos los archivos .md en el directorio
+
+        # Recursively list all .md files
         notes = []
-        for filename in os.listdir(saved_notes_dir):
-            if filename.endswith('.md'):
-                filepath = os.path.join(saved_notes_dir, filename)
+        for root, _, files in os.walk(saved_notes_dir):
+            for fname in files:
+                if not fname.endswith('.md'):
+                    continue
+                filepath = os.path.join(root, fname)
                 try:
                     # Obtener información del archivo
                     stat = os.stat(filepath)
@@ -4144,7 +4149,8 @@ def list_saved_notes():
                         except Exception:
                             pass
                     notes.append({
-                        "filename": filename,
+                        "filename": os.path.basename(filepath),
+                        "path": os.path.relpath(filepath, saved_notes_dir),
                         "size": stat.st_size,
                         "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                         "created": datetime.fromtimestamp(stat.st_ctime).isoformat(),
@@ -4152,7 +4158,7 @@ def list_saved_notes():
                         "tags": tags
                     })
                 except Exception as e:
-                    print(f"Error al leer información del archivo {filename}: {e}")
+                    print(f"Error al leer información del archivo {fname}: {e}")
         
         # Ordenar por fecha de modificación (más reciente primero)
         notes.sort(key=lambda x: x['modified'], reverse=True)
