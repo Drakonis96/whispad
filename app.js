@@ -1919,13 +1919,37 @@ class NotesApp {
         }
     }
     
+    findFolderInStructure(targetPath, items) {
+        for (const item of items) {
+            if (item.type === 'folder') {
+                if (item.path === targetPath) {
+                    return item;
+                }
+                if (item.children) {
+                    const found = this.findFolderInStructure(targetPath, item.children);
+                    if (found) return found;
+                }
+            }
+        }
+        return null;
+    }
+
     async deleteFolder(path) {
-        if (!confirm('Are you sure you want to delete this folder? It must be empty.')) {
+        const folder = this.findFolderInStructure(path, this.folderStructure);
+        let confirmMessage = 'Are you sure you want to delete this folder?';
+        let force = false;
+        if (folder && folder.children && folder.children.length > 0) {
+            confirmMessage = 'This action will delete the selected folder and all its contents. Do you want to continue?';
+            force = true;
+        }
+
+        if (!confirm(confirmMessage)) {
             return;
         }
-        
+
         try {
-            const response = await authFetch(`/api/folders/${encodeURIComponent(path)}`, {
+            const url = `/api/folders/${encodeURIComponent(path)}${force ? '?force=true' : ''}`;
+            const response = await authFetch(url, {
                 method: 'DELETE'
             });
             
