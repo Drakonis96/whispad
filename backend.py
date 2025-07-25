@@ -4538,8 +4538,9 @@ def export_pdf():
 
         full_html = f"<h1 style='text-align:center'>{title}</h1>" + html_content
         css = CSS(string="""
-            body { font-family: Arial, sans-serif; }
+            body { font-family: Arial, sans-serif; text-align: justify; }
             p { text-align: justify; }
+            li { text-align: justify; }
             table { width: 100%; border-collapse: collapse; }
             th, td { border: 1px solid #ddd; padding: 8px; }
             th { background: #f2f2f2; }
