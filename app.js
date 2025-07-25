@@ -8177,9 +8177,23 @@ class NotesApp {
             tempSpan.style.border = '1px dashed #1976d2';
             tempSpan.textContent = '⏳ Improving...';
             
-            // Reemplazar el texto seleccionado con el elemento temporal
-            rangeToReplace.deleteContents();
-            rangeToReplace.insertNode(tempSpan);
+            const keepOriginal = document.getElementById('keep-original')?.checked;
+
+            if (!keepOriginal) {
+                // Reemplazar el texto seleccionado con el elemento temporal
+                rangeToReplace.deleteContents();
+            } else {
+                // Insert after the selected text
+                rangeToReplace.collapse(false);
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createElement('br'));
+                fragment.appendChild(document.createElement('br'));
+                fragment.appendChild(tempSpan);
+                rangeToReplace.insertNode(fragment);
+            }
+            if (!keepOriginal) {
+                rangeToReplace.insertNode(tempSpan);
+            }
             
             // Limpiar selección visual pero mantener referencia
             const selection = window.getSelection();
