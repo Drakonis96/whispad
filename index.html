@@ -1377,29 +1377,15 @@
                 
                 <!-- Saved Items Tab -->
                 <div class="tab-content" id="saved-tab" style="display:none;">
-                    <div class="saved-items">
-                        <div class="saved-section">
-                            <div class="saved-section-header">
-                                <h4>Saved Quizzes</h4>
-                                <button class="btn btn--danger btn--sm" id="delete-all-quizzes-btn" title="Delete all saved quizzes">
-                                    <i class="fas fa-trash"></i> Delete All
-                                </button>
-                            </div>
-                            <div class="saved-list" id="saved-quiz-list">
-                                <p class="no-items">No saved quizzes yet.</p>
-                            </div>
-                        </div>
-                        <div class="saved-section">
-                            <div class="saved-section-header">
-                                <h4>Saved Flashcards</h4>
-                                <button class="btn btn--danger btn--sm" id="delete-all-flashcards-btn" title="Delete all saved flashcards">
-                                    <i class="fas fa-trash"></i> Delete All
-                                </button>
-                            </div>
-                            <div class="saved-list" id="saved-flashcards-list">
-                                <p class="no-items">No saved flashcards yet.</p>
-                            </div>
-                        </div>
+                    <div class="study-choice-buttons">
+                        <button class="btn btn--primary btn--large" id="open-saved-questions-btn">
+                            <i class="fas fa-folder-open"></i>
+                            Questions
+                        </button>
+                        <button class="btn btn--primary btn--large" id="open-saved-flashcards-btn">
+                            <i class="fas fa-folder-open"></i>
+                            Flashcards
+                        </button>
                     </div>
                 </div>
             </div>
@@ -1445,6 +1431,54 @@
         </button>
     </div>
     </div> <!-- end app-content -->
+
+    <!-- Saved Questions Modal -->
+    <div class="modal" id="saved-questions-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>Saved Questions</h3>
+            <div class="modal-body">
+                <div class="saved-section-header">
+                    <button class="btn btn--danger btn--sm" id="delete-all-quizzes-btn" title="Delete all saved quizzes">
+                        <i class="fas fa-trash"></i> Delete All
+                    </button>
+                </div>
+                <div class="search-container">
+                    <input type="text" class="form-control" id="questions-search-input" placeholder="Search questions...">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div class="saved-list" id="saved-quiz-list">
+                    <p class="no-items">No saved quizzes yet.</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-saved-questions-modal">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Saved Flashcards Modal -->
+    <div class="modal" id="saved-flashcards-modal">
+        <div class="modal-content modal-content--wide">
+            <h3>Saved Flashcards</h3>
+            <div class="modal-body">
+                <div class="saved-section-header">
+                    <button class="btn btn--danger btn--sm" id="delete-all-flashcards-btn" title="Delete all saved flashcards">
+                        <i class="fas fa-trash"></i> Delete All
+                    </button>
+                </div>
+                <div class="search-container">
+                    <input type="text" class="form-control" id="flashcards-search-input" placeholder="Search flashcards...">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div class="saved-list" id="saved-flashcards-list">
+                    <p class="no-items">No saved flashcards yet.</p>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="close-saved-flashcards-modal">Close</button>
+            </div>
+        </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="/backend-api.js"></script>

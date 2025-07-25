@@ -10350,7 +10350,12 @@ class StudyManager {
         this.currentFlashcardsChunkIndex = 0; // Current chunk for flashcards generation
         this.noteChunks = []; // Store pre-calculated chunks
         this.chunkPositions = {}; // Store chunk positions per note
-        
+
+        // Saved items cache and search terms
+        this.savedItems = [];
+        this.quizSearchTerm = '';
+        this.flashcardSearchTerm = '';
+
         this.initializeEventListeners();
     }
 
@@ -10453,6 +10458,30 @@ class StudyManager {
 
         document.getElementById('delete-all-flashcards-btn').addEventListener('click', () => {
             this.deleteAllFlashcards();
+        });
+
+        // Saved items modal buttons
+        document.getElementById('open-saved-questions-btn').addEventListener('click', () => {
+            this.showSavedQuestions();
+        });
+        document.getElementById('open-saved-flashcards-btn').addEventListener('click', () => {
+            this.showSavedFlashcards();
+        });
+        document.getElementById('close-saved-questions-modal').addEventListener('click', () => {
+            this.hideSavedQuestionsModal();
+        });
+        document.getElementById('close-saved-flashcards-modal').addEventListener('click', () => {
+            this.hideSavedFlashcardsModal();
+        });
+
+        // Search inputs for saved items
+        document.getElementById('questions-search-input').addEventListener('input', (e) => {
+            this.quizSearchTerm = e.target.value.toLowerCase();
+            this.renderSavedQuizzes();
+        });
+        document.getElementById('flashcards-search-input').addEventListener('input', (e) => {
+            this.flashcardSearchTerm = e.target.value.toLowerCase();
+            this.renderSavedFlashcards();
         });
     }
 
@@ -10723,9 +10752,8 @@ class StudyManager {
                     console.log('Quiz saved to database with ID:', data.study_id);
                     this.currentQuizStudyId = data.study_id; // Store the study ID for future updates
                     // Check if user is currently viewing saved items tab
-                    const savedTab = document.getElementById('saved-tab');
-                    if (savedTab && !savedTab.style.display.includes('none')) {
-                        // Refresh saved items list to show the new quiz
+                    const questionsModal = document.getElementById('saved-questions-modal');
+                    if (questionsModal && questionsModal.classList.contains('active')) {
                         this.loadSavedItems();
                     }
                 }
@@ -10814,9 +10842,8 @@ class StudyManager {
                     console.log('Flashcards saved to database with ID:', data.study_id);
                     this.currentFlashcardsStudyId = data.study_id; // Store the study ID for future updates
                     // Check if user is currently viewing saved items tab
-                    const savedTab = document.getElementById('saved-tab');
-                    if (savedTab && !savedTab.style.display.includes('none')) {
-                        // Refresh saved items list to show the new flashcards
+                    const flashcardsModal = document.getElementById('saved-flashcards-modal');
+                    if (flashcardsModal && flashcardsModal.classList.contains('active')) {
                         this.loadSavedItems();
                     }
                 }
@@ -11400,11 +11427,9 @@ class StudyManager {
 
     async loadSavedFlashcards() {
         try {
-            // Switch to saved items tab to show available flashcards
-            this.showTab('saved-items');
-            // Close the results modal
             document.getElementById('flashcards-results').classList.add('hidden');
             document.getElementById('flashcards-setup').classList.remove('hidden');
+            await this.showSavedFlashcards();
         } catch (error) {
             console.error('Error loading saved flashcards:', error);
             alert('Error loading saved flashcards.');
@@ -11441,46 +11466,56 @@ class StudyManager {
         try {
             const response = await authFetch('/api/get-study-items');
             if (response.ok) {
-                const items = await response.json();
-                this.renderSavedItems(items);
+                this.savedItems = await response.json();
+                this.renderSavedQuizzes();
+                this.renderSavedFlashcards();
             }
         } catch (error) {
             console.error('Error loading saved items:', error);
+            this.savedItems = [];
         }
     }
 
-    renderSavedItems(items) {
+    renderSavedQuizzes() {
         const quizList = document.getElementById('saved-quiz-list');
-        const flashcardsList = document.getElementById('saved-flashcards-list');
-        
-        // Filter items by type, including individual items
-        const quizzes = items.filter(item => item.type === 'quiz' || item.type === 'quiz_individual');
-        const flashcards = items.filter(item => item.type === 'flashcards' || item.type === 'flashcards_individual');
-        
-        // Show/hide delete all buttons based on whether there are items
         const deleteAllQuizzesBtn = document.getElementById('delete-all-quizzes-btn');
-        const deleteAllFlashcardsBtn = document.getElementById('delete-all-flashcards-btn');
-        
+        const term = this.quizSearchTerm || '';
+        const quizzes = this.savedItems.filter(item =>
+            (item.type === 'quiz' || item.type === 'quiz_individual') &&
+            JSON.stringify(item).toLowerCase().includes(term)
+        );
+
         if (deleteAllQuizzesBtn) {
             deleteAllQuizzesBtn.style.display = quizzes.length > 0 ? 'inline-flex' : 'none';
         }
-        
-        if (deleteAllFlashcardsBtn) {
-            deleteAllFlashcardsBtn.style.display = flashcards.length > 0 ? 'inline-flex' : 'none';
-        }
-        
+
         if (quizzes.length === 0) {
             quizList.innerHTML = '<p class="no-items">No saved quizzes yet.</p>';
         } else {
-            quizList.innerHTML = quizzes.map(quiz => this.renderSavedItem(quiz)).join('');
+            quizList.innerHTML = quizzes.map(q => this.renderSavedItem(q)).join('');
         }
-        
+    }
+
+    renderSavedFlashcards() {
+        const flashcardsList = document.getElementById('saved-flashcards-list');
+        const deleteAllFlashcardsBtn = document.getElementById('delete-all-flashcards-btn');
+        const term = this.flashcardSearchTerm || '';
+        const flashcards = this.savedItems.filter(item =>
+            (item.type === 'flashcards' || item.type === 'flashcards_individual') &&
+            JSON.stringify(item).toLowerCase().includes(term)
+        );
+
+        if (deleteAllFlashcardsBtn) {
+            deleteAllFlashcardsBtn.style.display = flashcards.length > 0 ? 'inline-flex' : 'none';
+        }
+
         if (flashcards.length === 0) {
             flashcardsList.innerHTML = '<p class="no-items">No saved flashcards yet.</p>';
         } else {
             flashcardsList.innerHTML = flashcards.map(fc => this.renderSavedItem(fc)).join('');
         }
     }
+
 
     renderSavedItem(item) {
         const date = new Date(item.created_at || item.timestamp).toLocaleDateString();
@@ -12287,15 +12322,27 @@ class StudyManager {
     }
 
     async showSavedQuizzes() {
-        // Load saved items and filter quizzes
         await this.loadSavedItems();
-        this.switchTab('saved-tab');
+        this.quizSearchTerm = '';
+        document.getElementById('questions-search-input').value = '';
+        this.renderSavedQuizzes();
+        document.getElementById('saved-questions-modal').classList.add('active');
     }
 
     async showSavedFlashcards() {
-        // Load saved items and filter flashcards
         await this.loadSavedItems();
-        this.switchTab('saved-tab');
+        this.flashcardSearchTerm = '';
+        document.getElementById('flashcards-search-input').value = '';
+        this.renderSavedFlashcards();
+        document.getElementById('saved-flashcards-modal').classList.add('active');
+    }
+
+    hideSavedQuestionsModal() {
+        document.getElementById('saved-questions-modal').classList.remove('active');
+    }
+
+    hideSavedFlashcardsModal() {
+        document.getElementById('saved-flashcards-modal').classList.remove('active');
     }
 
     // Override switchTab to reset to options view
