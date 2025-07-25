@@ -8182,6 +8182,11 @@ class NotesApp {
             if (!keepOriginal) {
                 // Reemplazar el texto seleccionado con el elemento temporal
                 rangeToReplace.deleteContents();
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(tempSpan);
+                fragment.appendChild(document.createElement('br'));
+                fragment.appendChild(document.createElement('br'));
+                rangeToReplace.insertNode(fragment);
             } else {
                 // Insert after the selected text
                 rangeToReplace.collapse(false);
@@ -8189,10 +8194,9 @@ class NotesApp {
                 fragment.appendChild(document.createElement('br'));
                 fragment.appendChild(document.createElement('br'));
                 fragment.appendChild(tempSpan);
+                fragment.appendChild(document.createElement('br'));
+                fragment.appendChild(document.createElement('br'));
                 rangeToReplace.insertNode(fragment);
-            }
-            if (!keepOriginal) {
-                rangeToReplace.insertNode(tempSpan);
             }
             
             // Limpiar selección visual pero mantener referencia

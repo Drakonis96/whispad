@@ -832,7 +832,11 @@ class NotesApp {
             if (!keepOriginal) {
                 // Reemplazar texto seleccionado
                 this.selectedRange.deleteContents();
-                this.selectedRange.insertNode(document.createTextNode(improvedText));
+                const fragment = document.createDocumentFragment();
+                fragment.appendChild(document.createTextNode(improvedText));
+                fragment.appendChild(document.createElement('br'));
+                fragment.appendChild(document.createElement('br'));
+                this.selectedRange.insertNode(fragment);
             } else {
                 const range = this.selectedRange.cloneRange();
                 range.collapse(false);
@@ -840,6 +844,8 @@ class NotesApp {
                 fragment.appendChild(document.createElement('br'));
                 fragment.appendChild(document.createElement('br'));
                 fragment.appendChild(document.createTextNode(improvedText));
+                fragment.appendChild(document.createElement('br'));
+                fragment.appendChild(document.createElement('br'));
                 range.insertNode(fragment);
             }
             
