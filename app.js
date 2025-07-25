@@ -11428,34 +11428,9 @@ class StudyManager {
     }
 
     finishFlashcards() {
-        document.getElementById('flashcards-interface').classList.add('hidden');
-        document.getElementById('flashcards-results').classList.remove('hidden');
-        
-        // Check if there are more chunks available for generating more flashcards
-        const hasMoreContent = this.currentFlashcardsChunkIndex < this.noteChunks.length;
-        
-        // Update the results HTML with action buttons
-        const resultsDiv = document.getElementById('flashcards-results');
-        resultsDiv.innerHTML = `
-            <h4>Flashcards Complete!</h4>
-            <p>You've completed ${this.currentFlashcards.length} flashcards.</p>
-            <div class="flashcards-results-actions">
-                ${hasMoreContent ? `<button class="btn btn--success" id="generate-more-flashcards-btn">Generate More Flashcards</button>` : ''}
-                <button class="btn btn--primary" id="retry-flashcards-btn">Try Again</button>
-                <button class="btn btn--secondary" id="load-saved-flashcards-btn">Saved Flashcards</button>
-                <button class="btn btn--outline" id="new-flashcards-btn">Generate New</button>
-                <button class="btn btn--tertiary" id="save-flashcards-btn">Save Flashcards</button>
-            </div>
-        `;
-        
-        // Re-attach event listeners
-        if (hasMoreContent) {
-            document.getElementById('generate-more-flashcards-btn').addEventListener('click', () => this.generateMoreFlashcardsAndContinue());
-        }
-        document.getElementById('retry-flashcards-btn').addEventListener('click', () => this.retryFlashcards());
-        document.getElementById('load-saved-flashcards-btn').addEventListener('click', () => this.loadSavedFlashcards());
-        document.getElementById('new-flashcards-btn').addEventListener('click', () => this.newFlashcards());
-        document.getElementById('save-flashcards-btn').addEventListener('click', () => this.saveFlashcards());
+        // Instead of showing a results screen, simply return to the flashcards
+        // options panel, mirroring the quiz completion behaviour.
+        this.resetFlashcardsState();
     }
 
     async saveFlashcards() {
