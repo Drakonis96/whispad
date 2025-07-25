@@ -9,14 +9,42 @@ echo "Iniciando servicios..."
 mkdir -p /var/log/nginx
 mkdir -p /var/lib/nginx
 
-# Generar certificado SSL autofirmado si no existe
-if [ ! -f /etc/nginx/certs/selfsigned.crt ]; then
+# Rutas por defecto del certificado
+CERT_PATH="/etc/nginx/certs/selfsigned.crt"
+KEY_PATH="/etc/nginx/certs/selfsigned.key"
+
+# Usar Let's Encrypt si se definen las variables
+if [ -n "$LETSENCRYPT_DOMAIN" ] && [ -n "$LETSENCRYPT_EMAIL" ]; then
+    CERT_PATH="/etc/letsencrypt/live/${LETSENCRYPT_DOMAIN}/fullchain.pem"
+    KEY_PATH="/etc/letsencrypt/live/${LETSENCRYPT_DOMAIN}/privkey.pem"
+    if [ ! -f "$CERT_PATH" ]; then
+        echo "Obteniendo certificado de Let's Encrypt para $LETSENCRYPT_DOMAIN..."
+        certbot certonly --standalone --non-interactive --agree-tos \
+            -m "$LETSENCRYPT_EMAIL" -d "$LETSENCRYPT_DOMAIN"
+    else
+        # Renovar si queda menos de 30 días para el vencimiento
+        EXP_DATE=$(openssl x509 -enddate -noout -in "$CERT_PATH" | cut -d= -f2)
+        EXP_SEC=$(date -d "$EXP_DATE" +%s)
+        NOW_SEC=$(date +%s)
+        DAYS_LEFT=$(( (EXP_SEC - NOW_SEC) / 86400 ))
+        if [ "$DAYS_LEFT" -le 30 ]; then
+            echo "Renovando certificado de Let's Encrypt..."
+            certbot certonly --standalone --non-interactive --agree-tos --force-renewal \
+                -m "$LETSENCRYPT_EMAIL" -d "$LETSENCRYPT_DOMAIN"
+        fi
+    fi
+fi
+
+# Generar certificado SSL autofirmado si no existe el elegido
+if [ ! -f "$CERT_PATH" ]; then
     echo "Generando certificado SSL autofirmado..."
     mkdir -p /etc/nginx/certs
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout /etc/nginx/certs/selfsigned.key \
         -out /etc/nginx/certs/selfsigned.crt \
         -subj "/CN=localhost"
+    CERT_PATH="/etc/nginx/certs/selfsigned.crt"
+    KEY_PATH="/etc/nginx/certs/selfsigned.key"
 fi
 
 # Crear y configurar directorios persistentes
@@ -31,6 +59,12 @@ chmod 777 /app/saved_notes /app/saved_audios
 echo "Configurando permisos de archivos estáticos..."
 chmod -R 755 /usr/share/nginx/html
 chown -R www-data:www-data /usr/share/nginx/html
+
+# Preparar configuración de nginx con las rutas correctas
+export SSL_CERT_PATH="$CERT_PATH"
+export SSL_KEY_PATH="$KEY_PATH"
+envsubst '$SSL_CERT_PATH $SSL_KEY_PATH' < /etc/nginx/nginx.conf.template > /etc/nginx/sites-available/default
+ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # Verificar que nginx esté configurado correctamente
 echo "Verificando configuración de nginx..."

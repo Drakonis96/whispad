@@ -22,6 +22,8 @@ services:
 
       - BACKEND_PORT=8000
       - CORS_ORIGINS=https://localhost:5037,https://127.0.0.1:5037
+      - LETSENCRYPT_DOMAIN=${LETSENCRYPT_DOMAIN:-}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-}
       - DEBUG=False
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     ffmpeg \
     openssl \
+    certbot \
     && rm -rf /var/lib/apt/lists/*
 
 # Configurar git-lfs
@@ -58,9 +59,8 @@ RUN if [ -f "whisper.cpp-main/build/bin/whisper-cli" ]; then \
     fi
 
 # Configurar nginx
-COPY nginx.conf /etc/nginx/sites-available/default
-RUN rm -f /etc/nginx/sites-enabled/default && \
-    ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+RUN rm -f /etc/nginx/sites-enabled/default
 
 # Copiar archivos estáticos al directorio que nginx puede servir
 RUN mkdir -p /usr/share/nginx/html && \
