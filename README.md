@@ -17,9 +17,10 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 5. [Installing from the Terminal](#installing-from-the-terminal)
 6. [API Key Configuration](#api-key-configuration)
 7. [Speaker Diarization Setup](#speaker-diarization-setup)
-8. [Usage Guide](#usage-guide)
-9. [Screenshots](#screenshots)
-10. [Contributors](#contributors)
+8. [HTTPS with Let's Encrypt](#https-with-lets-encrypt)
+9. [Usage Guide](#usage-guide)
+10. [Screenshots](#screenshots)
+11. [Contributors](#contributors)
 
 ## Main Features
 - Real-time voice-to-text transcription from the browser.
@@ -101,6 +102,25 @@ If you prefer not to use Docker, you can also run it directly with Python:
    ```
 6. Open `index.html` in your browser or serve the folder with `python -m http.server 5037` and visit `https://localhost:5037`.
 7. Log in with **admin** using the password from `ADMIN_PASSWORD` the first time you access the app.
+
+## HTTPS with Let's Encrypt
+To access WhisPad with a valid HTTPS certificate, provide a public domain and email address.
+Set the variables `LETSENCRYPT_DOMAIN` and `LETSENCRYPT_EMAIL` when starting the container
+and make sure port **80** is reachable from the internet. On first start the
+container will automatically run **certbot** and configure Nginx with the generated
+certificate.
+The certificate is checked on each start and renewed automatically when less than
+30 days remain before expiration.
+
+Example:
+```bash
+LETSENCRYPT_DOMAIN=yourdomain.com \
+LETSENCRYPT_EMAIL=you@example.com \
+docker compose up
+```
+
+The domain must point to your server. If obtaining the certificate fails, the
+app will fall back to a self‑signed certificate.
 
 ## API Key Configuration
 Copy `env.example` to `.env` and add your API keys:

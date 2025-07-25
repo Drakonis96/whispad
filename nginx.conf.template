@@ -2,8 +2,8 @@ server {
     listen 5037 ssl;
     server_name localhost;
 
-    ssl_certificate     /etc/nginx/certs/selfsigned.crt;
-    ssl_certificate_key /etc/nginx/certs/selfsigned.key;
+    ssl_certificate     ${SSL_CERT_PATH};
+    ssl_certificate_key ${SSL_KEY_PATH};
     
     # Configuración básica
     client_max_body_size 4G;  # Para subida de archivos de audio y modelos grandes
