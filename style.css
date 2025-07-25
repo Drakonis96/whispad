@@ -1383,6 +1383,11 @@ select.form-control {
     grid-row: 2;
 }
 
+#tabularize-settings-btn {
+    grid-column: 1;
+    grid-row: 3;
+}
+
 #prompt-sidebar-toggle {
     grid-column: 2;
     grid-row: 1;
@@ -5039,3 +5044,6 @@ select.form-control {
         max-height: calc(98vh - 100px);
     }
 }
+
+.ai-table{border-collapse:collapse;margin:10px 0;width:100%;}
+.ai-table th,.ai-table td{border:1px solid #ccc;padding:4px;}
