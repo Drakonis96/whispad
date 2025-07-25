@@ -6803,7 +6803,28 @@ class NotesApp {
             if (inOl) { html += '</ol>'; inOl = false; }
         };
 
-        for (let line of lines) {
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+
+            if (/\[R\d+-C\d+\s*\/\/\s*.*\]/.test(line)) {
+                let rcText = line;
+                while (i + 1 < lines.length && /\[R\d+-C\d+\s*\/\/\s*.*\]/.test(lines[i + 1])) {
+                    rcText += '\n' + lines[i + 1];
+                    i++;
+                }
+                closeLists();
+                html += this.convertRCToTable(rcText);
+                continue;
+            }
+
+            const tableInfo = this.parseMarkdownTable(lines, i);
+            if (tableInfo) {
+                closeLists();
+                html += tableInfo.html;
+                i = tableInfo.nextIndex - 1;
+                continue;
+            }
+
             if (/^\s*-\s+/.test(line)) {
                 if (!inUl) { closeLists(); html += '<ul>'; inUl = true; }
                 html += `<li>${line.replace(/^\s*-\s+/, '')}</li>`;
@@ -6897,6 +6918,10 @@ class NotesApp {
                         // Los li se procesan en processListItems
                         result += content;
                         break;
+                    case 'table':
+                        const mdTable = this.tableToMarkdown(child);
+                        if (mdTable.trim()) result += `${mdTable}\n\n`;
+                        break;
                     case 'div':
                         if (content.trim()) result += `${content.trim()}\n`;
                         break;
@@ -6929,6 +6954,54 @@ class NotesApp {
         }
         
         return result;
+    }
+
+    tableToMarkdown(tableElement) {
+        const rows = Array.from(tableElement.querySelectorAll('tr'));
+        if (rows.length === 0) return '';
+
+        const getCells = (row) => Array.from(row.children).map(c => this.processNode(c).trim());
+
+        const headerCells = getCells(rows[0]);
+        const colCount = headerCells.length;
+        const lines = [];
+        lines.push('| ' + headerCells.join(' | ') + ' |');
+        lines.push('|' + Array(colCount).fill('---').join('|') + '|');
+        for (let i = 1; i < rows.length; i++) {
+            const cells = getCells(rows[i]);
+            lines.push('| ' + cells.join(' | ') + ' |');
+        }
+        return lines.join('\n');
+    }
+
+    parseMarkdownTable(lines, index) {
+        const splitRow = (row) => {
+            row = row.trim();
+            if (row.startsWith('|')) row = row.slice(1);
+            if (row.endsWith('|')) row = row.slice(0, -1);
+            return row.split('|').map(c => c.trim());
+        };
+
+        if (index + 1 >= lines.length) return null;
+        const header = splitRow(lines[index]);
+        const separator = lines[index + 1].trim();
+        if (!/^\s*\|?(\s*:?-+:?\s*\|)+\s*$/.test(separator)) return null;
+
+        const rows = [];
+        let i = index + 2;
+        while (i < lines.length && lines[i].includes('|')) {
+            rows.push(splitRow(lines[i]));
+            i++;
+        }
+
+        let html = '<table class="ai-table"><tbody>';
+        html += '<tr>' + header.map(h => `<th>${h}</th>`).join('') + '</tr>';
+        for (const r of rows) {
+            html += '<tr>' + r.map(c => `<td>${c}</td>`).join('') + '</tr>';
+        }
+        html += '</tbody></table>';
+
+        return { html, nextIndex: i };
     }
 
 

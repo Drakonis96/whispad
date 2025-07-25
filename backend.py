@@ -14,6 +14,7 @@ import re
 from datetime import datetime
 import shutil
 from markdownify import markdownify
+from bs4 import BeautifulSoup
 from whisper_cpp_wrapper import WhisperCppWrapper
 from sensevoice_wrapper import get_sensevoice_wrapper
 
@@ -2286,10 +2287,27 @@ def html_to_markdown(html_content):
     if not html_content:
         return ""
 
-    # Use markdownify for a robust conversion that preserves headings and
-    # lists. The custom bullet style ensures compatibility with the
-    # markdown parser on the frontend.
-    markdown = markdownify(html_content, heading_style="ATX", bullets="-")
+    # First convert <table> elements to Markdown to ensure they round-trip
+    soup = BeautifulSoup(html_content, "html.parser")
+
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        if not rows:
+            table.decompose()
+            continue
+        header_cells = [c.get_text(strip=True) for c in rows[0].find_all(["th", "td"])]
+        col_count = len(header_cells)
+        lines = ["| " + " | ".join(header_cells) + " |"]
+        lines.append("|" + "|".join(["---"] * col_count) + "|")
+        for r in rows[1:]:
+            cells = [c.get_text(strip=True) for c in r.find_all(["td", "th"])]
+            lines.append("| " + " | ".join(cells) + " |")
+        table.replace_with("\n".join(lines))
+
+    # Use markdownify for a robust conversion that preserves headings and lists
+    # The custom bullet style ensures compatibility with the markdown parser on
+    # the frontend.
+    markdown = markdownify(str(soup), heading_style="ATX", bullets="-")
 
     # Normalise whitespace so the resulting markdown is easier to process
     markdown = re.sub(r"\s+\n", "\n", markdown)
