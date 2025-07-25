@@ -18,6 +18,7 @@ mermaid-py
 markdownify
 beautifulsoup4
 markitdown[pdf]
+WeasyPrint
 # Dependencies for speaker diarization
 pyannote.audio
 torchaudio
