@@ -532,7 +532,17 @@ class NotesApp {
         });
         
         document.getElementById('download-btn').addEventListener('click', () => {
-            this.downloadCurrentNote();
+            this.showExportModal();
+        });
+
+        document.getElementById('confirm-export').addEventListener('click', () => {
+            const format = document.querySelector('input[name="export-format"]:checked').value;
+            this.downloadCurrentNote(format);
+            this.hideExportModal();
+        });
+
+        document.getElementById('cancel-export').addEventListener('click', () => {
+            this.hideExportModal();
         });
         
         document.getElementById('delete-btn').addEventListener('click', () => {
@@ -2562,31 +2572,50 @@ class NotesApp {
         }
     }
 
-    downloadCurrentNote() {
+    downloadCurrentNote(format = 'markdown') {
         if (!this.currentNote) return;
-        
+
         const title = document.getElementById('note-title').value.trim() || 'Untitled Note';
         const content = document.getElementById('editor').innerHTML;
-        
-        // Convertir HTML a Markdown
-        const markdownContent = this.htmlToMarkdown(content, title);
-        
-        // Crear el archivo para descarga
-        const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        
-        // Crear elemento de descarga temporal
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${this.sanitizeFilename(title)}.md`;
-        document.body.appendChild(a);
-        a.click();
-        
-        // Limpiar
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        this.showNotification('Note downloaded successfully');
+
+        const container = document.createElement('div');
+        container.innerHTML = content;
+        container.querySelectorAll('p').forEach(p => p.style.textAlign = 'justify');
+
+        if (format === 'markdown') {
+            const markdownContent = this.htmlToMarkdown(container.innerHTML, title);
+            const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.sanitizeFilename(title)}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showNotification('Note exported as Markdown');
+        } else if (format === 'pdf') {
+            const opt = {
+                margin: 10,
+                filename: `${this.sanitizeFilename(title)}.pdf`,
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(container).save();
+            this.showNotification('Note exported as PDF');
+        } else if (format === 'word') {
+            const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${container.innerHTML}</body></html>`;
+            const blob = window.htmlDocx.asBlob(html);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${this.sanitizeFilename(title)}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showNotification('Note exported as Word');
+        }
     }
 
     async downloadAllNotes() {
@@ -2619,6 +2648,22 @@ class NotesApp {
 
     hideRestoreModal() {
         const modal = document.getElementById('restore-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    showExportModal() {
+        if (!this.currentNote) {
+            this.showNotification('Please select a note first', 'error');
+            return;
+        }
+        const modal = document.getElementById('export-modal');
+        this.hideMobileFab();
+        modal.classList.add('active');
+    }
+
+    hideExportModal() {
+        const modal = document.getElementById('export-modal');
         modal.classList.remove('active');
         this.showMobileFab();
     }

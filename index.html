@@ -228,7 +228,7 @@
                                 <i class="fas fa-save"></i>&nbsp;<span id="save-text">Save</span>
                             </button>
                             <button class="btn btn--outline btn--sm" id="download-btn">
-                                <i class="fas fa-download"></i>&nbsp;<span id="download-text">Download</span>
+                                <i class="fas fa-download"></i>&nbsp;<span id="download-text">Export</span>
                             </button>
                             <button class="btn btn--outline btn--sm" id="delete-btn">
                                 <i class="fas fa-trash"></i>&nbsp;<span id="delete-text">Delete</span>
@@ -1083,6 +1083,22 @@
         </div>
     </div>
 
+    <!-- Export note modal -->
+    <div class="modal" id="export-modal">
+        <div class="modal-content">
+            <h3>Select export format</h3>
+            <div class="modal-body">
+                <label><input type="radio" name="export-format" value="markdown" checked> Markdown</label><br>
+                <label><input type="radio" name="export-format" value="pdf"> PDF</label><br>
+                <label><input type="radio" name="export-format" value="word"> Word</label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn--outline" id="cancel-export">Cancel</button>
+                <button class="btn btn--primary" id="confirm-export">Export</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Audio files modal -->
     <div class="modal" id="audio-modal">
         <div class="modal-content">
@@ -1447,6 +1463,8 @@
     </div> <!-- end app-content -->
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.9.2/dist/html2pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
     <script src="/backend-api.js"></script>
     <script src="/app.js"></script>
 </body>
