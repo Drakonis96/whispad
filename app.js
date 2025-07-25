@@ -339,16 +339,8 @@ class NotesApp {
                 currentMobileContainer.style.display = 'flex';
             } else {
                 buttons.forEach(btn => {
-                    if (btn && btn.parentNode !== currentHeaderActions && document.body.contains(btn) && currentHeaderActions.contains(currentHamburger)) {
-                        try {
-                            currentHeaderActions.insertBefore(btn, currentHamburger);
-                        } catch (error) {
-                            console.warn('Could not move button back to header:', error);
-                            // Fallback: append to header actions if insertBefore fails
-                            if (btn.parentNode !== currentHeaderActions) {
-                                currentHeaderActions.appendChild(btn);
-                            }
-                        }
+                    if (btn && btn.parentNode !== currentHeaderActions && document.body.contains(btn)) {
+                        currentHeaderActions.appendChild(btn);
                     }
                 });
                 currentMobileContainer.style.display = 'none';
