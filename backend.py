@@ -4297,17 +4297,27 @@ def delete_note():
                 except Exception as e:
                     print(f"Error leyendo metadatos {filename}: {e}")
                     continue
-        
+
+        # Delete associated study items
+        deleted_count = 0
+        try:
+            from db import delete_study_items_by_note_id
+            deleted_count = delete_study_items_by_note_id(username, note_id)
+        except Exception as e:
+            print(f"Error deleting study items for note {note_id}: {e}")
+
         if deleted_file:
             return jsonify({
                 "success": True,
                 "message": "Nota eliminada correctamente del servidor",
-                "filename": deleted_file
+                "filename": deleted_file,
+                "deleted_study_items": deleted_count
             })
         else:
             return jsonify({
                 "success": True,
-                "message": "Nota no encontrada en el servidor (puede no haberse guardado previamente)"
+                "message": "Nota no encontrada en el servidor (puede no haberse guardado previamente)",
+                "deleted_study_items": deleted_count
             })
         
     except Exception as e:
@@ -6132,6 +6142,7 @@ def generate_quiz():
     
     data = request.get_json() or {}
     note_content = data.get('content', '')
+    note_id = data.get('note_id')
     difficulty = data.get('difficulty', 'medium')
     num_questions = data.get('num_questions', 5)
     
@@ -6309,7 +6320,8 @@ def generate_quiz():
                         item_type='quiz',
                         items=quiz_data['questions'],
                         source_content=note_content,
-                        base_title=base_title
+                        base_title=base_title,
+                        note_id=note_id
                     )
                     
                     # Return the first ID as study_id for compatibility
@@ -6349,6 +6361,7 @@ def generate_flashcards():
     
     data = request.get_json() or {}
     note_content = data.get('content', '')
+    note_id = data.get('note_id')
     num_cards = data.get('num_cards', 10)
     
     if not note_content:
@@ -6514,7 +6527,8 @@ def generate_flashcards():
                         item_type='flashcards',
                         items=flashcards_data['flashcards'],
                         source_content=note_content,
-                        base_title=base_title
+                        base_title=base_title,
+                        note_id=note_id
                     )
                     
                     # Return the first ID as study_id for compatibility

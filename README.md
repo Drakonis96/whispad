@@ -33,6 +33,7 @@ WhisPad is a transcription and note management tool designed so anyone can turn 
 - Download or upload local (.bin) whisper.cpp models directly from the interface.
 - Upload audio files which are automatically transcribed and stored alongside your notes.
 - Export all notes in a ZIP file with one click.
+- Deleting a note automatically removes its related quizzes and flashcards.
 - Mobile-friendly interface.
 - User login with per-user note folders and admin management tools.
 - Admin has access to all providers and can manage which ones are available for each user.
