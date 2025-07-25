@@ -11485,43 +11485,41 @@ class StudyManager {
     renderSavedItem(item) {
         const date = new Date(item.created_at || item.timestamp).toLocaleDateString();
         const itemId = item.id || item.filename;
-        
-        // Handle individual items vs sets
-        let itemCount = item.item_count || 0;
-        let itemLabel = 'items';
-        
-        if (item.type === 'quiz' || item.type === 'quiz_individual') {
-            if (item.type === 'quiz_individual') {
-                // Individual question
-                itemCount = 1;
-                itemLabel = 'question';
+
+        // Determine a preview question or flashcard front
+        const displayType = item.type.replace('_individual', '');
+        let previewText = '';
+
+        if (displayType === 'quiz') {
+            if (item.content?.question) {
+                const q = item.content.question;
+                previewText = q.question || q;
             } else {
-                // Set of questions
                 const questions = item.content?.questions || item.questions || [];
-                itemCount = questions.length || itemCount;
-                itemLabel = itemCount === 1 ? 'question' : 'questions';
+                if (questions.length > 0) {
+                    const q = questions[0];
+                    previewText = q.question || q;
+                }
             }
-        } else if (item.type === 'flashcards' || item.type === 'flashcards_individual') {
-            if (item.type === 'flashcards_individual') {
-                // Individual flashcard
-                itemCount = 1;
-                itemLabel = 'card';
+        } else if (displayType === 'flashcards') {
+            if (item.content?.flashcard) {
+                const fc = item.content.flashcard;
+                previewText = fc.front || fc.concept || fc.question || '';
             } else {
-                // Set of flashcards
                 const flashcards = item.content?.flashcards || item.flashcards || [];
-                itemCount = flashcards.length || itemCount;
-                itemLabel = itemCount === 1 ? 'card' : 'cards';
+                if (flashcards.length > 0) {
+                    const fc = flashcards[0];
+                    previewText = fc.front || fc.concept || fc.question || '';
+                }
             }
         }
-        
-        // Clean up the display type for UI
-        const displayType = item.type.replace('_individual', '');
-        
+
         return `
             <div class="saved-item">
                 <div class="saved-item-info">
                     <div class="saved-item-title">${item.title}</div>
-                    <div class="saved-item-meta">${date} • ${itemCount} ${itemLabel}</div>
+                    <div class="saved-item-question">${previewText}</div>
+                    <div class="saved-item-meta">${date}</div>
                 </div>
                 <div class="saved-item-actions">
                     <button class="btn btn--outline btn--sm" onclick="studyManager.reviewItem('${itemId}', '${displayType}')">

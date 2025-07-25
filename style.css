@@ -4844,6 +4844,11 @@ select.form-control {
     margin-bottom: var(--space-4);
 }
 
+.saved-item-question {
+    margin-bottom: var(--space-4);
+    color: var(--color-text-secondary);
+}
+
 .saved-item-meta {
     font-size: 0.85rem;
     color: var(--color-text-secondary);
