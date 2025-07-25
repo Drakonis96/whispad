@@ -10693,7 +10693,8 @@ class StudyManager {
                 body: JSON.stringify({
                     content: currentChunk,
                     difficulty: level,
-                    num_questions: 10
+                    num_questions: 10,
+                    note_id: this.currentNote.id
                 })
             });
 
@@ -10779,7 +10780,8 @@ class StudyManager {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     content: currentChunk,
-                    num_cards: 10
+                    num_cards: 10,
+                    note_id: this.currentNote.id
                 })
             });
 
@@ -11016,7 +11018,8 @@ class StudyManager {
                 body: JSON.stringify({
                     content: currentChunk,
                     difficulty: level,
-                    num_questions: 10
+                    num_questions: 10,
+                    note_id: this.currentNote.id
                 })
             });
 

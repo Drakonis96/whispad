@@ -53,6 +53,7 @@ def init_db():
                 title TEXT NOT NULL,
                 content JSONB NOT NULL,
                 source_content TEXT,
+                note_id TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE
@@ -67,9 +68,15 @@ def init_db():
         )
         conn.execute(
             """
-            CREATE INDEX IF NOT EXISTS idx_study_items_created_at 
+            CREATE INDEX IF NOT EXISTS idx_study_items_created_at
             ON study_items (created_at DESC)
             """
+        )
+        conn.execute(
+            "ALTER TABLE study_items ADD COLUMN IF NOT EXISTS note_id TEXT"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_study_items_note_id ON study_items(note_id)"
         )
         conn.commit()
 
@@ -255,23 +262,23 @@ def get_user_preference(username: str, preference_key: str):
 
 
 # Study Items functions
-def save_study_item(username: str, item_type: str, title: str, content: dict, source_content: str = None):
+def save_study_item(username: str, item_type: str, title: str, content: dict, source_content: str = None, note_id: str = None):
     """Save a quiz or flashcard set to the database."""
     with pool.connection() as conn:
         cur = conn.execute(
             """
-            INSERT INTO study_items (username, type, title, content, source_content)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO study_items (username, type, title, content, source_content, note_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING id
             """,
-            [username, item_type, title, json.dumps(content), source_content]
+            [username, item_type, title, json.dumps(content), source_content, note_id]
         )
         study_id = cur.fetchone()[0]
         conn.commit()
         return study_id
 
 
-def save_individual_study_items(username: str, item_type: str, items: list, source_content: str = None, base_title: str = None):
+def save_individual_study_items(username: str, item_type: str, items: list, source_content: str = None, base_title: str = None, note_id: str = None):
     """Save individual questions or flashcards as separate study items."""
     saved_ids = []
     with pool.connection() as conn:
@@ -293,11 +300,11 @@ def save_individual_study_items(username: str, item_type: str, items: list, sour
             
             cur = conn.execute(
                 """
-                INSERT INTO study_items (username, type, title, content, source_content)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO study_items (username, type, title, content, source_content, note_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                [username, item_type, title, json.dumps(content), source_content]
+                [username, item_type, title, json.dumps(content), source_content, note_id]
             )
             study_id = cur.fetchone()[0]
             saved_ids.append(study_id)
@@ -408,6 +415,17 @@ def delete_all_study_items_by_type(username: str, study_type: str):
         cur = conn.execute(
             "DELETE FROM study_items WHERE username=%s AND type=%s",
             [username, study_type]
+        )
+        conn.commit()
+        return cur.rowcount
+
+
+def delete_study_items_by_note_id(username: str, note_id: str):
+    """Delete all study items associated with a specific note."""
+    with pool.connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM study_items WHERE username=%s AND note_id=%s",
+            [username, note_id],
         )
         conn.commit()
         return cur.rowcount
