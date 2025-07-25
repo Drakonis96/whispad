@@ -122,6 +122,14 @@ const configuracionMejoras = {
         prompt: "",
         visible: false,
         custom: true
+    },
+    tabularize: {
+        nombre: "Tabularize",
+        descripcion: "Convert text into a table",
+        icono: "\uD83D\uDCCB",
+        prompt: "",
+        visible: false,
+        custom: true
     }
 };
 
@@ -202,7 +210,9 @@ class NotesApp {
             ollamaPort: '11434',
             ollamaModels: '',
             translationEnabled: false,
-            translationLanguage: 'en'
+            translationLanguage: 'en',
+            tabularizeEnabled: false,
+            tabularizeLanguage: 'en'
         };
         
         // Visible styles configuration
@@ -226,6 +236,7 @@ class NotesApp {
         await this.loadConfig();
         this.loadStylesConfig();
         this.updateTranslationStyle();
+        this.updateTabularizeStyle();
         this.storeDefaultLanguageOptions();
         await this.loadNotes();
         this.setupEventListeners();
@@ -621,6 +632,24 @@ class NotesApp {
 
         document.getElementById('translation-enabled').addEventListener('change', (e) => {
             const container = document.getElementById('translation-language-container');
+            container.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        // Tabularize settings
+        document.getElementById('tabularize-settings-btn').addEventListener('click', () => {
+            this.showTabularizeModal();
+        });
+
+        document.getElementById('cancel-tabularize').addEventListener('click', () => {
+            this.hideTabularizeModal();
+        });
+
+        document.getElementById('save-tabularize').addEventListener('click', () => {
+            this.saveTabularizeConfig();
+        });
+
+        document.getElementById('tabularize-enabled').addEventListener('change', (e) => {
+            const container = document.getElementById('tabularize-language-container');
             container.style.display = e.target.checked ? 'block' : 'none';
         });
         
@@ -1348,6 +1377,45 @@ class NotesApp {
         this.updateAIButtons();
         this.hideTranslationModal();
         this.showNotification('Translation settings saved');
+    }
+
+    showTabularizeModal() {
+        const modal = document.getElementById('tabularize-modal');
+        const enabled = document.getElementById('tabularize-enabled');
+        const language = document.getElementById('tabularize-language');
+        enabled.checked = this.config.tabularizeEnabled === true;
+        language.value = this.config.tabularizeLanguage || 'en';
+        document.getElementById('tabularize-language-container').style.display = enabled.checked ? 'block' : 'none';
+        this.hideMobileFab();
+        modal.classList.add('active');
+    }
+
+    hideTabularizeModal() {
+        const modal = document.getElementById('tabularize-modal');
+        modal.classList.remove('active');
+        this.showMobileFab();
+    }
+
+    saveTabularizeConfig() {
+        const enabled = document.getElementById('tabularize-enabled').checked;
+        const languageSelect = document.getElementById('tabularize-language');
+        const language = languageSelect.value;
+        this.config.tabularizeEnabled = enabled;
+        this.config.tabularizeLanguage = language;
+        const storageKey = `notes-app-config-${currentUser}`;
+        localStorage.setItem(storageKey, JSON.stringify(this.config));
+
+        authFetch('/api/user-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(this.config)
+        }).catch(err => {
+            console.error('Error saving config on server:', err);
+        });
+        this.updateTabularizeStyle();
+        this.updateAIButtons();
+        this.hideTabularizeModal();
+        this.showNotification('Tabularize settings saved');
     }
 
     renderStylesConfig() {
@@ -7865,6 +7933,9 @@ class NotesApp {
         if (action === 'translation') {
             this.updateTranslationStyle();
         }
+        if (action === 'tabularize') {
+            this.updateTabularizeStyle();
+        }
         console.log('improveText called with action:', action);
         console.log('selectedText:', this.selectedText);
         console.log('selectedRange:', this.selectedRange);
@@ -7999,7 +8070,11 @@ class NotesApp {
                 improvedText = this.applyAIImprovement(textToImprove, action);
                 // Para el fallback, simular el proceso de generación
                 tempSpan.className = 'ai-generating-text';
-                tempSpan.textContent = improvedText;
+                if (action === 'tabularize') {
+                    tempSpan.innerHTML = improvedText;
+                } else {
+                    tempSpan.textContent = improvedText;
+                }
                 
                 // Después de un momento, cambiar a texto completado
                 setTimeout(() => {
@@ -8042,7 +8117,11 @@ class NotesApp {
             
             // Restaurar el texto original si algo falló
             if (tempSpan && tempSpan.parentNode) {
-                tempSpan.textContent = textToImprove;
+                if (action === 'tabularize') {
+                    tempSpan.innerHTML = textToImprove;
+                } else {
+                    tempSpan.textContent = textToImprove;
+                }
                 tempSpan.className = '';
                 tempSpan.style.backgroundColor = '#ffebee';
                 tempSpan.style.color = '#c62828';
@@ -8127,6 +8206,9 @@ class NotesApp {
                                 if (action === 'diarization_fix') {
                                     finalText = this.formatDiarizationTags(finalText);
                                     tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else if (action === 'tabularize') {
+                                    finalText = this.convertRCToTable(finalText);
+                                    tempElement.innerHTML = finalText;
                                 } else {
                                     tempElement.textContent = finalText;
                                 }
@@ -8154,6 +8236,8 @@ class NotesApp {
             let finalResult = this.cleanAIResponse(state.improvedText);
             if (action === 'diarization_fix') {
                 finalResult = this.formatDiarizationTags(finalResult);
+            } else if (action === 'tabularize') {
+                finalResult = this.convertRCToTable(finalResult);
             }
             console.log('Returning final result:', finalResult);
             return finalResult;
@@ -8226,6 +8310,9 @@ class NotesApp {
                                 if (action === 'diarization_fix') {
                                     finalText = this.formatDiarizationTags(finalText);
                                     tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else if (action === 'tabularize') {
+                                    finalText = this.convertRCToTable(finalText);
+                                    tempElement.innerHTML = finalText;
                                 } else {
                                     tempElement.textContent = finalText;
                                 }
@@ -8257,6 +8344,8 @@ class NotesApp {
             let finalResult = this.cleanAIResponse(state.improvedText);
             if (action === 'diarization_fix') {
                 finalResult = this.formatDiarizationTags(finalResult);
+            } else if (action === 'tabularize') {
+                finalResult = this.convertRCToTable(finalResult);
             }
             console.log('Returning final Gemini result:', finalResult);
             return finalResult;
@@ -8372,6 +8461,9 @@ class NotesApp {
                                 if (action === 'diarization_fix') {
                                     finalText = this.formatDiarizationTags(finalText);
                                     tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else if (action === 'tabularize') {
+                                    finalText = this.convertRCToTable(finalText);
+                                    tempElement.innerHTML = finalText;
                                 } else {
                                     tempElement.textContent = finalText;
                                 }
@@ -8403,6 +8495,8 @@ class NotesApp {
             let finalResult = this.cleanAIResponse(state.improvedText);
             if (action === 'diarization_fix') {
                 finalResult = this.formatDiarizationTags(finalResult);
+            } else if (action === 'tabularize') {
+                finalResult = this.convertRCToTable(finalResult);
             }
             console.log('Returning final OpenRouter result:', finalResult);
             return finalResult;
@@ -8463,6 +8557,9 @@ class NotesApp {
                                 if (action === 'diarization_fix') {
                                     finalText = this.formatDiarizationTags(finalText);
                                     tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else if (action === 'tabularize') {
+                                    finalText = this.convertRCToTable(finalText);
+                                    tempElement.innerHTML = finalText;
                                 } else {
                                     tempElement.textContent = finalText;
                                 }
@@ -8485,6 +8582,8 @@ class NotesApp {
             let finalResult = this.cleanAIResponse(state.improvedText);
             if (action === 'diarization_fix') {
                 finalResult = this.formatDiarizationTags(finalResult);
+            } else if (action === 'tabularize') {
+                finalResult = this.convertRCToTable(finalResult);
             }
             console.log('Returning final Groq result:', finalResult);
             return finalResult;
@@ -8536,6 +8635,9 @@ class NotesApp {
                                 if (action === 'diarization_fix') {
                                     finalText = this.formatDiarizationTags(finalText);
                                     tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else if (action === 'tabularize') {
+                                    finalText = this.convertRCToTable(finalText);
+                                    tempElement.innerHTML = finalText;
                                 } else {
                                     tempElement.textContent = finalText;
                                 }
@@ -8556,6 +8658,8 @@ class NotesApp {
             let finalResult = this.cleanAIResponse(state.improvedText);
             if (action === 'diarization_fix') {
                 finalResult = this.formatDiarizationTags(finalResult);
+            } else if (action === 'tabularize') {
+                finalResult = this.convertRCToTable(finalResult);
             }
             return finalResult;
         } catch (error) {
@@ -8606,6 +8710,9 @@ class NotesApp {
                                 if (action === 'diarization_fix') {
                                     finalText = this.formatDiarizationTags(finalText);
                                     tempElement.innerHTML = finalText.replace(/\n/g, '<br>');
+                                } else if (action === 'tabularize') {
+                                    finalText = this.convertRCToTable(finalText);
+                                    tempElement.innerHTML = finalText;
                                 } else {
                                     tempElement.textContent = finalText;
                                 }
@@ -8697,6 +8804,39 @@ class NotesApp {
             }
         }
         return result.trim();
+    }
+
+    convertRCToTable(text) {
+        if (!text) return '';
+        const regex = /\[R(\d+)-C(\d+)\s*\/\/\s*([^\]]*)\]/g;
+        const table = {};
+        let maxRow = 0;
+        let maxCol = 0;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const r = parseInt(match[1], 10);
+            const c = parseInt(match[2], 10);
+            maxRow = Math.max(maxRow, r);
+            maxCol = Math.max(maxCol, c);
+            if (!table[r]) table[r] = {};
+            table[r][c] = match[3].trim();
+        }
+        if (maxRow === 0 || maxCol === 0) return text;
+        let html = '<table class="ai-table"><tbody>';
+        for (let r = 1; r <= maxRow; r++) {
+            html += '<tr>';
+            for (let c = 1; c <= maxCol; c++) {
+                const val = (table[r] && table[r][c]) ? table[r][c] : '';
+                if (r === 1) {
+                    html += `<th>${val}</th>`;
+                } else {
+                    html += `<td>${val}</td>`;
+                }
+            }
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        return html;
     }
 
     // Handle streaming chunks that may contain <think>...</think> segments
@@ -8857,6 +8997,9 @@ class NotesApp {
             },
             diarization_fix: (texto) => {
                 return this.formatDiarizationTags(texto);
+            },
+            tabularize: (texto) => {
+                return this.convertRCToTable(texto);
             }
         };
         
@@ -9569,6 +9712,26 @@ class NotesApp {
                 }
             }
             style.prompt = `You are a professional translator. Translate the following text into ${langName}, preserving original line breaks, formatting, and punctuation. Respond ONLY with the translated text, without additional explanations.`;
+            style.visible = true;
+        } else {
+            style.visible = false;
+        }
+    }
+
+    updateTabularizeStyle() {
+        const style = this.stylesConfig.tabularize;
+        if (!style) return;
+        if (this.config.tabularizeEnabled) {
+            const code = this.config.tabularizeLanguage || 'en';
+            let langName = code;
+            const select = document.getElementById('tabularize-language');
+            if (select) {
+                const opt = select.querySelector(`option[value="${code}"]`);
+                if (opt) {
+                    langName = opt.textContent;
+                }
+            }
+            style.prompt = `Convert the following text into a markdown table in ${langName}. Output each cell as [R001-C001 // content] without additional explanations.`;
             style.visible = true;
         } else {
             style.visible = false;

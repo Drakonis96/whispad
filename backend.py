@@ -808,6 +808,7 @@ def improve_text_openai(text, improvement_type, model, custom_prompt=None):
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -866,6 +867,7 @@ def improve_text_google(text, improvement_type, model, custom_prompt=None):
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -916,6 +918,7 @@ def improve_text_openai_stream(text, improvement_type, model, custom_prompt=None
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1004,6 +1007,7 @@ def improve_text_google_stream(text, improvement_type, model, custom_prompt=None
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1087,6 +1091,7 @@ def improve_text_openrouter(text, improvement_type, model, custom_prompt=None):
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1164,6 +1169,7 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
         
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1255,6 +1261,7 @@ def improve_text_groq(text, improvement_type, model, custom_prompt=None):
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1311,6 +1318,7 @@ def improve_text_groq_stream(text, improvement_type, model, custom_prompt=None):
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1379,6 +1387,7 @@ def improve_text_lmstudio(text, improvement_type, model, host, port, custom_prom
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1444,6 +1453,7 @@ def improve_text_lmstudio_stream(text, improvement_type, model, host, port, cust
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1507,6 +1517,7 @@ def improve_text_ollama(text, improvement_type, model, host, port, custom_prompt
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
@@ -1552,6 +1563,7 @@ def improve_text_ollama_stream(text, improvement_type, model, host, port, custom
             'expand': f"Expand the following text by adding more details and relevant context. Remove any interjections or expressions typical of spoken language (mmm, ahhh, eh, um, etc.) and expressions of hesitation when speaking or thinking aloud. Respond ONLY with the expanded text, without additional explanations:\n\n{text}",
             'remove_emoji': f"Remove every single emoji from this text. You MUST NOT change nothing from the text, just remove the emojis. Respond ONLY with the improved text, without additional explanations:\n\n{text}",
             'diarization_fix': f"Correct the speaker diarization in this transcript. Some speaker tags may be incorrectly placed. You MUST NOT modify the text content, only adjust the position of the speaker tags or the text itself. Keep the tags in the format [SPEAKER X]. Respond ONLY with the fixed diarization text, without additional explanations:\n\n{text}",
+            'tabularize': f"Convert the following text into a table using the pattern [R001-C001 // Cell]. Respond ONLY with these cells in row-major order:\n\n{text}",
         }
 
         prompt = prompts.get(improvement_type, f"Improve the following text: {text}")
