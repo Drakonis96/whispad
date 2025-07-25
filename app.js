@@ -10606,7 +10606,7 @@ class StudyManager {
 
         // Saved items modal buttons
         document.getElementById('open-saved-questions-btn').addEventListener('click', () => {
-            this.showSavedQuestions();
+            this.showSavedQuizzes();
         });
         document.getElementById('open-saved-flashcards-btn').addEventListener('click', () => {
             this.showSavedFlashcards();
