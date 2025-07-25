@@ -4520,6 +4520,39 @@ def upload_pdf():
     except Exception as e:
         return jsonify({"error": f"Error processing file: {str(e)}"}), 500
 
+@app.route('/api/export-pdf', methods=['POST'])
+def export_pdf():
+    """Generate a PDF from provided HTML and title"""
+    try:
+        username = get_current_username()
+        if not username:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json() or {}
+        title = data.get('title', 'Untitled')
+        html_content = data.get('html', '')
+        if not html_content:
+            return jsonify({"error": "html required"}), 400
+
+        from weasyprint import HTML, CSS
+
+        full_html = f"<h1 style='text-align:center'>{title}</h1>" + html_content
+        css = CSS(string="""
+            body { font-family: Arial, sans-serif; }
+            p { text-align: justify; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; }
+            th { background: #f2f2f2; }
+        """)
+        pdf_io = io.BytesIO()
+        HTML(string=full_html).write_pdf(pdf_io, stylesheets=[css])
+        pdf_io.seek(0)
+        filename = sanitize_filename(f"{title}.pdf")
+        return send_file(pdf_io, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+    except Exception as e:
+        return jsonify({"error": f"Error generating PDF: {str(e)}"}), 500
+
 def _transcribe_bytes(audio_bytes, filename, language, provider, model=None,
                       detect_emotion=True, detect_events=True, use_itn=True,
                       enable_speaker_diarization=False):

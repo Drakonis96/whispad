@@ -2595,14 +2595,30 @@ class NotesApp {
             URL.revokeObjectURL(url);
             this.showNotification('Note exported as Markdown');
         } else if (format === 'pdf') {
-            const opt = {
-                margin: 10,
-                filename: `${this.sanitizeFilename(title)}.pdf`,
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            html2pdf().set(opt).from(container).save();
-            this.showNotification('Note exported as PDF');
+            authFetch('/api/export-pdf', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, html: container.innerHTML })
+            })
+            .then(async resp => {
+                if (!resp.ok) {
+                    throw new Error(`HTTP ${resp.status}`);
+                }
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${this.sanitizeFilename(title)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                this.showNotification('Note exported as PDF');
+            })
+            .catch(err => {
+                console.error('Error exporting PDF:', err);
+                this.showNotification('Error exporting PDF', 'error');
+            });
         } else if (format === 'word') {
             const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${container.innerHTML}</body></html>`;
             const blob = window.htmlDocx.asBlob(html);
