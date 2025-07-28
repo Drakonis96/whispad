@@ -28,7 +28,15 @@ except ImportError as e:
     def get_speaker_diarization_wrapper():
         return None
 
-from mermaid import Mermaid
+try:
+    from mermaid import Mermaid
+except Exception as e:  # noqa: F401
+    print(f"Warning: Mermaid diagrams not available: {e}")
+    class Mermaid:
+        def __init__(self, *args, **kwargs):
+            pass
+        def add(self, *args, **kwargs):
+            pass
 from concept_graph import build_graph, build_concept_graph
 import ast
 import string
@@ -1994,12 +2002,19 @@ def save_note():
 
             safe_filename = generate_safe_filename(title)
             new_filename = sanitize_filename(f"{safe_filename}.md")
-            new_filepath = os.path.join(saved_notes_dir, new_filename)
-            if not is_path_within_directory(saved_notes_dir, new_filepath):
-                return jsonify({"error": "Invalid file path"}), 400
 
             # Buscar archivo existente para esta nota
             existing_filepath = find_existing_note_file(saved_notes_dir, note_id)
+
+            # Determine base directory for the new file
+            if existing_filepath:
+                base_dir = os.path.dirname(existing_filepath)
+            else:
+                base_dir = saved_notes_dir
+
+            new_filepath = os.path.join(base_dir, new_filename)
+            if not is_path_within_directory(saved_notes_dir, new_filepath):
+                return jsonify({"error": "Invalid file path"}), 400
 
             if existing_filepath and existing_filepath != new_filepath:
                 # Si el nuevo nombre ya existe y no es el archivo actual, agregar sufijo
@@ -2008,7 +2023,7 @@ def save_note():
                     while True:
                         name_without_ext = os.path.splitext(new_filename)[0]
                         temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
-                        temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        temp_filepath = os.path.join(base_dir, temp_filename)
                         if not is_path_within_directory(saved_notes_dir, temp_filepath):
                             return jsonify({"error": "Invalid file path"}), 400
                         if not os.path.exists(temp_filepath):
@@ -2035,7 +2050,7 @@ def save_note():
                     while True:
                         name_without_ext = os.path.splitext(new_filename)[0]
                         temp_filename = sanitize_filename(f"{name_without_ext}-{counter}.md")
-                        temp_filepath = os.path.join(saved_notes_dir, temp_filename)
+                        temp_filepath = os.path.join(base_dir, temp_filename)
                         if not is_path_within_directory(saved_notes_dir, temp_filepath):
                             return jsonify({"error": "Invalid file path"}), 400
                         if not os.path.exists(temp_filepath):
