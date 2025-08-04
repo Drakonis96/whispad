@@ -1276,6 +1276,7 @@ select.form-control {
     line-height: 1.4;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -1308,12 +1309,38 @@ select.form-control {
     padding: var(--space-16) var(--space-20);
     display: flex;
     gap: var(--space-32);
+    overflow-x: auto;
+    min-width: fit-content;
+}
+
+.toolbar::-webkit-scrollbar {
+    height: 3px;
+}
+
+.toolbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.toolbar::-webkit-scrollbar-thumb {
+    background: rgba(var(--color-primary-rgb), 0.3);
+    border-radius: 3px;
+}
+
+.toolbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--color-primary-rgb), 0.5);
 }
 
 .toolbar-section {
     display: flex;
     flex-direction: column;
     gap: var(--space-12);
+    min-width: 0;
+    flex-shrink: 1;
+}
+
+#transcription-section {
+    flex-shrink: 0;
+    min-width: fit-content;
 }
 
 .section-header {
@@ -1344,73 +1371,67 @@ select.form-control {
     font-weight: var(--font-weight-medium);
 }
 
-.transcription-controls {
+/* New horizontal transcription controls */
+.transcription-controls-horizontal {
     display: flex;
     align-items: center;
-    gap: var(--space-16);
+    gap: var(--space-8);
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: var(--space-8) 0;
+    min-width: fit-content;
+}
+
+.transcription-controls-horizontal::-webkit-scrollbar {
+    height: 3px;
+}
+
+.transcription-controls-horizontal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.transcription-controls-horizontal::-webkit-scrollbar-thumb {
+    background: rgba(var(--color-primary-rgb), 0.3);
+    border-radius: 3px;
+}
+
+.transcription-controls-horizontal::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--color-primary-rgb), 0.5);
+}
+
+.transcription-btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    font-size: var(--font-size-xs);
+    padding: var(--space-6) var(--space-12);
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: fit-content;
+}
+
+/* Legacy transcription controls (remove these) */
+.transcription-controls {
+    display: none;
 }
 
 .transcription-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(3, auto);
-    column-gap: var(--space-16);
-    row-gap: var(--space-8);
+    display: none;
 }
 
 .transcription-grid button {
-    width: 100%;
+    display: none;
 }
 
 @media (max-width: 768px) {
-    .transcription-grid {
-        display: none;
+    /* Show text labels on buttons in mobile */
+    .transcription-controls-horizontal .transcription-btn span {
+        display: inline;
     }
-    #record-text,
-    #upload-audio-text,
+    
     .recording-status .status-text {
         display: none;
     }
-}
-
-#styles-config-btn {
-    grid-column: 1;
-    grid-row: 1;
-}
-
-#translation-settings-btn {
-    grid-column: 1;
-    grid-row: 2;
-}
-
-#tabularize-settings-btn {
-    grid-column: 1;
-    grid-row: 3;
-}
-
-#prompt-sidebar-toggle {
-    grid-column: 2;
-    grid-row: 1;
-}
-
-#chat-sidebar-toggle {
-    grid-column: 2;
-    grid-row: 2;
-}
-
-#graph-btn {
-    grid-column: 3;
-    grid-row: 1;
-}
-
-#files-btn {
-    grid-column: 2;
-    grid-row: 3;
-}
-
-#concept-graph-btn {
-    grid-column: 3;
-    grid-row: 2;
 }
 
 .recording-status {
@@ -1419,6 +1440,12 @@ select.form-control {
     gap: var(--space-8);
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
+    padding: var(--space-6) var(--space-12);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background-color: var(--color-background-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .recording-indicator {
@@ -1440,14 +1467,15 @@ select.form-control {
     100% { opacity: 1; }
 }
 
-.ai-controls {
+/* Legacy AI Controls (for sidebar if still used elsewhere) */
+.sidebar .ai-controls {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-8);
     margin-bottom: var(--space-12);
 }
 
-.ai-controls .btn {
+.sidebar .ai-controls .btn {
     display: flex;
     align-items: center;
     gap: var(--space-4);
@@ -1455,7 +1483,7 @@ select.form-control {
     padding: var(--space-6) var(--space-12);
 }
 
-.ai-controls .keep-original-label {
+.sidebar .ai-controls .keep-original-label {
     display: flex;
     align-items: center;
     gap: var(--space-4);
@@ -1588,6 +1616,60 @@ select.form-control {
     display: flex;
     gap: var(--space-8);
     align-items: center;
+}
+
+/* AI Enhancement Toolbar */
+.ai-enhancement-toolbar {
+    padding: var(--space-12) var(--space-20);
+    border-bottom: 1px solid var(--color-border);
+    background-color: rgba(var(--color-primary-rgb), 0.02);
+    overflow-x: auto;
+    white-space: nowrap;
+    position: relative;
+}
+
+.ai-enhancement-toolbar::-webkit-scrollbar {
+    height: 3px;
+}
+
+.ai-enhancement-toolbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.ai-enhancement-toolbar::-webkit-scrollbar-thumb {
+    background: rgba(var(--color-primary-rgb), 0.3);
+    border-radius: 3px;
+}
+
+.ai-enhancement-toolbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--color-primary-rgb), 0.5);
+}
+
+.ai-controls-horizontal {
+    display: flex;
+    gap: var(--space-8);
+    align-items: center;
+    min-width: fit-content;
+}
+
+.ai-controls-horizontal .btn {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    font-size: var(--font-size-xs);
+    padding: var(--space-6) var(--space-12);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ai-controls-horizontal .keep-original-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    font-size: var(--font-size-xs);
+    margin-bottom: 0;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .format-btn {
@@ -2084,6 +2166,22 @@ select.form-control {
         flex-direction: column;
         gap: var(--space-16);
     }
+
+    /* Transcription Tools responsive */
+    .transcription-controls-horizontal {
+        gap: var(--space-6);
+        padding: var(--space-6) 0;
+    }
+
+    .transcription-btn {
+        font-size: var(--font-size-xs);
+        padding: var(--space-4) var(--space-8);
+    }
+
+    .recording-status {
+        padding: var(--space-4) var(--space-8);
+        font-size: var(--font-size-xs);
+    }
     
     .ai-controls {
         justify-content: flex-start;
@@ -2091,6 +2189,20 @@ select.form-control {
         flex-wrap: nowrap;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+    }
+
+    /* AI Enhancement Toolbar responsive */
+    .ai-enhancement-toolbar {
+        padding: var(--space-8) var(--space-12);
+    }
+
+    .ai-controls-horizontal {
+        gap: var(--space-6);
+    }
+
+    .ai-controls-horizontal .btn {
+        font-size: var(--font-size-xs);
+        padding: var(--space-4) var(--space-8);
     }
     
     .editor-header {
@@ -5060,3 +5172,195 @@ select.form-control {
 
 .ai-table{border-collapse:collapse;margin:10px 0;width:100%;}
 .ai-table th,.ai-table td{border:1px solid #ccc;padding:4px;}
+
+/* Focus Modal Styles */
+.focus-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.focus-modal.active {
+    display: flex;
+    opacity: 1;
+}
+
+.focus-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+}
+
+.focus-modal-content {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: var(--color-background);
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: var(--space-24);
+    box-sizing: border-box;
+}
+
+.focus-close-btn {
+    position: absolute;
+    top: var(--space-16);
+    right: var(--space-16);
+    width: 40px;
+    height: 40px;
+    border: none;
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--font-size-lg);
+    z-index: 10001;
+    box-shadow: var(--shadow-sm);
+    transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.focus-close-btn:hover {
+    background-color: var(--color-error);
+    color: white;
+    transform: scale(1.05);
+}
+
+.focus-editor-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
+    gap: var(--space-16);
+}
+
+.focus-editor-content {
+    flex: 1;
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.focus-editor {
+    flex: 1;
+    padding: var(--space-24);
+    border: none;
+    outline: none;
+    font-family: var(--font-family);
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-relaxed);
+    color: var(--color-text);
+    background-color: transparent;
+    overflow-y: auto;
+    min-height: 200px;
+}
+
+.focus-editor:empty:before {
+    content: "Focus on your writing...";
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.focus-ai-enhancement-toolbar {
+    background-color: var(--color-surface);
+    border-radius: var(--radius-lg);
+    padding: var(--space-16);
+    box-shadow: var(--shadow-sm);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.focus-ai-enhancement-toolbar::-webkit-scrollbar {
+    height: 3px;
+}
+
+.focus-ai-enhancement-toolbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.focus-ai-enhancement-toolbar::-webkit-scrollbar-thumb {
+    background: rgba(var(--color-primary-rgb), 0.3);
+    border-radius: 3px;
+}
+
+.focus-ai-enhancement-toolbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--color-primary-rgb), 0.5);
+}
+
+.focus-ai-enhancement-toolbar .ai-controls-horizontal {
+    display: flex;
+    gap: var(--space-12);
+    align-items: center;
+    min-width: fit-content;
+    white-space: nowrap;
+}
+
+.focus-ai-enhancement-toolbar .ai-controls-horizontal .btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Responsive design for focus modal */
+@media (max-width: 768px) {
+    .focus-modal-content {
+        padding: var(--space-16);
+    }
+    
+    .focus-close-btn {
+        top: var(--space-12);
+        right: var(--space-12);
+        width: 36px;
+        height: 36px;
+        font-size: var(--font-size-base);
+    }
+    
+    .focus-editor {
+        padding: var(--space-16);
+        font-size: var(--font-size-sm);
+    }
+    
+    .focus-ai-enhancement-toolbar .ai-controls-horizontal {
+        gap: var(--space-8);
+    }
+    
+    .focus-ai-enhancement-toolbar .ai-controls-horizontal .btn {
+        font-size: var(--font-size-xs);
+        padding: var(--space-6) var(--space-8);
+    }
+}
+
+/* Hide scrollbar in focus mode for cleaner look */
+.focus-editor::-webkit-scrollbar {
+    width: 8px;
+}
+
+.focus-editor::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.focus-editor::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
+}
+
+.focus-editor::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-secondary);
+}
