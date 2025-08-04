@@ -246,8 +246,7 @@ class NotesApp {
         this.updateAIButtons();
         
         // Load view mode preference and initialize folders
-        this.loadViewModePreference();
-        await this.loadFolderStructure();
+        await this.loadViewModePreference();
         
         // Verificar estado del backend
         await this.checkBackendStatus();
@@ -851,12 +850,12 @@ class NotesApp {
         }
 
         // View mode toggle buttons
-        document.getElementById('folder-view-btn').addEventListener('click', () => {
-            this.setViewMode('folder');
+        document.getElementById('folder-view-btn').addEventListener('click', async () => {
+            await this.setViewMode('folder');
         });
 
-        document.getElementById('list-view-btn').addEventListener('click', () => {
-            this.setViewMode('list');
+        document.getElementById('list-view-btn').addEventListener('click', async () => {
+            await this.setViewMode('list');
         });
 
         // New folder button
@@ -996,6 +995,15 @@ class NotesApp {
                 // Quitar indicador visual cuando no hay texto seleccionado
                 btn.style.boxShadow = '';
                 btn.title = btn.title.replace(' - Texto seleccionado', '');
+            }
+        });
+        
+        // Also update focus mode AI buttons if they exist
+        document.querySelectorAll('#focus-ai-controls .ai-btn').forEach(btn => {
+            if (btn.id !== 'focus-undo-ai-btn') {
+                btn.disabled = disabled;
+                btn.style.opacity = disabled ? '0.5' : '1';
+                btn.style.boxShadow = disabled ? '' : '0 0 0 2px var(--color-primary)';
             }
         });
         
@@ -1585,7 +1593,12 @@ class NotesApp {
     }
 
     updateAIButtons() {
-        const aiControlsContainer = document.querySelector('.ai-controls');
+        const aiControlsContainer = document.querySelector('.ai-controls-horizontal');
+        
+        if (!aiControlsContainer) {
+            console.warn('AI controls container not found');
+            return;
+        }
         
         // Remover botones existentes (excepto el botón de deshacer)
         const aiButtons = aiControlsContainer.querySelectorAll('.ai-btn:not(#undo-ai-btn)');
@@ -1617,6 +1630,283 @@ class NotesApp {
         
         // Actualizar estado de los botones
         this.updateAIButtonsState();
+        
+        // Also update focus mode AI buttons
+        this.updateFocusAIButtons();
+    }
+    
+    updateFocusAIButtons() {
+        const focusAiControlsContainer = document.querySelector('#focus-ai-controls');
+        
+        if (!focusAiControlsContainer) {
+            return;
+        }
+        
+        // Remove existing buttons (except undo and keep original)
+        const focusAiButtons = focusAiControlsContainer.querySelectorAll('.ai-btn:not(#focus-undo-ai-btn)');
+        focusAiButtons.forEach(btn => btn.remove());
+        
+        // Recreate buttons based on styles configuration
+        const focusUndoBtn = document.getElementById('focus-undo-ai-btn');
+        
+        Object.entries(this.stylesConfig).forEach(([key, style]) => {
+            if (style.visible) {
+                const button = document.createElement('button');
+                button.className = 'btn btn--secondary btn--sm ai-btn';
+                button.setAttribute('data-action', key);
+                button.setAttribute('title', style.descripcion);
+                safeSetInnerHTML(button, `
+                    <span class="ai-icon">${style.icono}</span>
+                    ${style.nombre}
+                `);
+                
+                // Insert before the undo button
+                focusAiControlsContainer.insertBefore(button, focusUndoBtn);
+            }
+        });
+    }
+    
+    // Focus mode specific AI improvement function
+    async improveTextForFocus(action, selectedText, selectedRange, keepOriginal) {
+        if (action === 'translation') {
+            this.updateTranslationStyle();
+        }
+        if (action === 'tabularize') {
+            this.updateTabularizeStyle();
+        }
+        
+        console.log('Focus mode AI improvement:', action, selectedText, selectedRange);
+        
+        // Verificar configuración según el modelo seleccionado
+        const provider = this.config.postprocessProvider;
+        const model = this.config.postprocessModel;
+        if (!provider || !model) {
+            this.showNotification('Please, select a post-processing provider and model', 'error');
+            return false;
+        }
+
+        const isGemini = provider === 'google';
+        const isOpenAI = provider === 'openai';
+        const isOpenRouter = provider === 'openrouter';
+        const isGroq = provider === 'groq';
+        const isLmStudio = provider === 'lmstudio';
+        const isOllama = provider === 'ollama';
+
+        // Verificar que el backend esté disponible
+        const backendAvailable = await this.checkBackendStatus();
+        if (!backendAvailable) {
+            return false;
+        }
+
+        // Verificar APIs disponibles según el proveedor
+        if (isOpenAI && !this.availableAPIs?.openai) {
+            this.showNotification('OpenAI API not configured in backend', 'warning');
+            return false;
+        }
+
+        if (isGemini && !this.availableAPIs?.google) {
+            this.showNotification('Google API not configured in backend', 'warning');
+            this.showConfigModal();
+            return false;
+        }
+
+        if (isOpenRouter && !this.availableAPIs?.openrouter) {
+            this.showNotification('OpenRouter API not configured in backend', 'warning');
+            this.showConfigModal();
+            return false;
+        }
+        
+        if (isGroq && !this.availableAPIs?.groq) {
+            this.showNotification('Groq API not configured in backend', 'warning');
+            this.showConfigModal();
+            return false;
+        }
+
+        if (isLmStudio && !this.config.lmstudioHost) {
+            this.showNotification('LM Studio host not configured', 'warning');
+            this.showConfigModal();
+            return false;
+        }
+
+        if (isOllama && !this.config.ollamaHost) {
+            this.showNotification('Ollama host not configured', 'warning');
+            this.showConfigModal();
+            return false;
+        }
+
+        let textToImprove = selectedText;
+        let improvedText = '';
+        const focusEditor = document.getElementById('focus-editor');
+
+        try {
+            // Disable focus mode AI buttons during processing
+            document.querySelectorAll('#focus-ai-controls .ai-btn').forEach(btn => {
+                if (btn.id !== 'focus-undo-ai-btn') {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                }
+            });
+
+            // Show notification
+            this.showNotification('🤖 Processing with AI...', 'info');
+
+            // Create a temporary element for streaming like in regular mode
+            let tempSpan;
+            let rangeToReplace;
+            
+            try {
+                // Create a temporary span for streaming with visual styling
+                tempSpan = document.createElement('span');
+                tempSpan.className = 'ai-generating-text';
+                tempSpan.style.padding = '2px 4px';
+                tempSpan.style.borderRadius = '3px';
+                tempSpan.style.border = '1px dashed #1976d2';
+                tempSpan.textContent = '⏳ Improving...';
+                
+                rangeToReplace = selectedRange.cloneRange();
+                
+                if (!keepOriginal) {
+                    // Replace the selected text with the temporary element
+                    rangeToReplace.deleteContents();
+                    const fragment = document.createDocumentFragment();
+                    fragment.appendChild(tempSpan);
+                    fragment.appendChild(document.createElement('br'));
+                    fragment.appendChild(document.createElement('br'));
+                    rangeToReplace.insertNode(fragment);
+                } else {
+                    // Insert after the selected text
+                    rangeToReplace.collapse(false);
+                    const fragment = document.createDocumentFragment();
+                    fragment.appendChild(document.createElement('br'));
+                    fragment.appendChild(document.createElement('br'));
+                    fragment.appendChild(tempSpan);
+                    fragment.appendChild(document.createElement('br'));
+                    fragment.appendChild(document.createElement('br'));
+                    rangeToReplace.insertNode(fragment);
+                }
+                
+                // Clear selection but keep reference
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                
+                console.log('Calling AI provider:', provider, 'with text:', textToImprove);
+
+                // Call appropriate streaming provider
+                if (isOpenAI) {
+                    improvedText = await this.improveWithOpenAIStream(textToImprove, action, tempSpan);
+                } else if (isGemini) {
+                    improvedText = await this.improveWithGeminiStream(textToImprove, action, tempSpan);
+                } else if (isOpenRouter) {
+                    improvedText = await this.improveWithOpenRouterStream(textToImprove, action, tempSpan);
+                } else if (isGroq) {
+                    improvedText = await this.improveWithGroqStream(textToImprove, action, tempSpan);
+                } else if (isLmStudio) {
+                    improvedText = await this.improveWithLmStudioStream(textToImprove, action, tempSpan);
+                } else if (isOllama) {
+                    improvedText = await this.improveWithOllamaStream(textToImprove, action, tempSpan);
+                } else {
+                    // Fallback to local AI improvement
+                    improvedText = this.applyAIImprovement(textToImprove, action);
+                    // For the fallback, simulate the process of generation
+                    tempSpan.className = 'ai-generating-text';
+                    if (action === 'tabularize') {
+                        tempSpan.innerHTML = improvedText;
+                    } else {
+                        tempSpan.textContent = improvedText;
+                    }
+                    
+                    // After a moment, change to completed text
+                    setTimeout(() => {
+                        tempSpan.className = 'ai-generated-text';
+                        setTimeout(() => {
+                            tempSpan.className = '';
+                        }, 1000);
+                    }, 500);
+                }
+                
+                // Remove visual styles from temporary element when finished
+                if (tempSpan) {
+                    tempSpan.className = 'ai-generated-text';
+                    tempSpan.style.border = '';
+                    tempSpan.style.padding = '';
+                    tempSpan.style.borderRadius = '';
+                    
+                    // After a brief delay, remove all AI classes
+                    setTimeout(() => {
+                        tempSpan.className = '';
+                    }, 1000);
+                }
+                
+            } catch (streamError) {
+                console.warn('Streaming failed, falling back to non-streaming:', streamError);
+                
+                // Fallback to non-streaming versions
+                if (isOpenAI) {
+                    improvedText = await this.improveWithOpenAI(textToImprove, action);
+                } else if (isGemini) {
+                    improvedText = await this.improveWithGemini(textToImprove, action);
+                } else if (isOpenRouter) {
+                    improvedText = await this.improveWithOpenRouter(textToImprove, action);
+                } else if (isGroq) {
+                    improvedText = await this.improveWithGroq(textToImprove, action);
+                } else if (isLmStudio) {
+                    improvedText = await this.improveWithLmStudio(textToImprove, action);
+                } else if (isOllama) {
+                    improvedText = await this.improveWithOllama(textToImprove, action);
+                } else {
+                    // Fallback to local AI improvement
+                    improvedText = this.applyAIImprovement(textToImprove, action);
+                }
+                
+                // For non-streaming fallback, update the temp element manually
+                if (tempSpan) {
+                    let finalText = this.cleanAIResponse(improvedText);
+                    if (action === 'diarization_fix') {
+                        finalText = this.formatDiarizationTags(finalText);
+                        tempSpan.innerHTML = finalText.replace(/\n/g, '<br>');
+                    } else if (action === 'tabularize') {
+                        finalText = this.convertRCToTable(finalText);
+                        tempSpan.innerHTML = finalText;
+                    } else {
+                        tempSpan.textContent = finalText;
+                    }
+                    
+                    tempSpan.className = 'ai-generated-text';
+                    tempSpan.style.border = '';
+                    tempSpan.style.padding = '';
+                    tempSpan.style.borderRadius = '';
+                    
+                    setTimeout(() => {
+                        tempSpan.className = '';
+                    }, 1000);
+                }
+            }
+
+            console.log('AI response:', improvedText);
+
+            // For streaming, the text is already processed and placed in the DOM
+            // We just need to handle success/failure notifications
+            if (improvedText) {
+                this.showNotification('✅ Text improved successfully!', 'success');
+                return true;
+            } else {
+                this.showNotification('❌ Could not improve text', 'error');
+                return false;
+            }
+
+        } catch (error) {
+            console.error('Error improving text in focus mode:', error);
+            this.showNotification('❌ Error improving text: ' + error.message, 'error');
+            return false;
+        } finally {
+            // Re-enable focus mode AI buttons
+            document.querySelectorAll('#focus-ai-controls .ai-btn').forEach(btn => {
+                if (btn.id !== 'focus-undo-ai-btn') {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                }
+            });
+        }
     }
     
     saveToStorage() {
@@ -1630,12 +1920,12 @@ class NotesApp {
 
     // === FOLDER MANAGEMENT FUNCTIONS ===
     
-    loadViewModePreference() {
+    async loadViewModePreference() {
         const storageKey = `notes-app-view-mode-${currentUser}`;
         const savedMode = localStorage.getItem(storageKey);
         const mode = savedMode || 'folder'; // Default to folder view
         
-        this.setViewMode(mode);
+        await this.setViewMode(mode);
     }
     
     async loadFolderStructure() {
@@ -1648,6 +1938,7 @@ class NotesApp {
             const data = await response.json();
             this.folderStructure = data.structure || [];
             
+            // Always render the folder tree if we're in folder mode
             if (this.currentViewMode === 'folder') {
                 this.renderFolderTree();
                 // Update tag filter to include tags from folder structure
@@ -1656,10 +1947,15 @@ class NotesApp {
         } catch (error) {
             console.error('Error loading folder structure:', error);
             this.folderStructure = [];
+            
+            // Even if there's an error, render the folder tree (will show empty state)
+            if (this.currentViewMode === 'folder') {
+                this.renderFolderTree();
+            }
         }
     }
     
-    setViewMode(mode) {
+    async setViewMode(mode) {
         this.currentViewMode = mode;
         
         // Update button states
@@ -1674,7 +1970,7 @@ class NotesApp {
         if (mode === 'folder') {
             notesList.style.display = 'none';
             folderTree.style.display = 'block';
-            this.loadFolderStructure();
+            await this.loadFolderStructure();
         } else {
             notesList.style.display = 'block';
             folderTree.style.display = 'none';
@@ -1688,11 +1984,19 @@ class NotesApp {
     
     renderFolderTree() {
         const container = document.getElementById('folder-tree');
-        if (!container) return;
+        if (!container) {
+            console.warn('Folder tree container not found');
+            return;
+        }
         
         // Only render folder view if we're in folder mode
         if (this.currentViewMode !== 'folder') {
             return;
+        }
+
+        // Ensure folder structure is initialized
+        if (!this.folderStructure) {
+            this.folderStructure = [];
         }
         
         if (!this.folderStructure.length) {
@@ -1712,7 +2016,8 @@ class NotesApp {
             filteredStructure = this.filterFolderStructure(this.folderStructure);
         }
         
-        container.innerHTML = this.renderFolderItems(filteredStructure);
+        const renderedContent = this.renderFolderItems(filteredStructure);
+        container.innerHTML = renderedContent;
         this.attachFolderEventListeners();
     }
     
@@ -10458,6 +10763,217 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.getElementById('user-btn').classList.remove('hidden');
+
+    // Focus Modal Functionality
+    const focusBtn = document.getElementById('focus-btn');
+    const focusModal = document.getElementById('focus-modal');
+    const focusCloseBtn = document.getElementById('focus-close-btn');
+    const focusEditor = document.getElementById('focus-editor');
+    const originalEditor = document.getElementById('editor');
+    const focusBackdrop = focusModal.querySelector('.focus-modal-backdrop');
+
+    // Variables to store focus mode state
+    let focusOriginalContent = '';
+    let focusAiHistory = [];
+    let focusSyncTimeout = null;
+
+    // Open focus modal
+    focusBtn.addEventListener('click', () => {
+        if (originalEditor) {
+            // Store original content and copy to focus editor
+            focusOriginalContent = originalEditor.innerHTML;
+            focusEditor.innerHTML = focusOriginalContent;
+            
+            // Update focus mode AI buttons to match current configuration
+            if (window.notesApp) {
+                window.notesApp.updateFocusAIButtons();
+                // Initialize button states (disabled by default)
+                setTimeout(() => {
+                    document.querySelectorAll('#focus-ai-controls .ai-btn').forEach(btn => {
+                        btn.disabled = true;
+                        btn.style.opacity = '0.5';
+                        btn.style.boxShadow = '';
+                    });
+                }, 50);
+            }
+            
+            // Show modal with animation
+            focusModal.style.display = 'flex';
+            setTimeout(() => {
+                focusModal.classList.add('active');
+                focusEditor.focus();
+            }, 10);
+        }
+    });
+
+    // Close focus modal function
+    function closeFocusModal() {
+        focusModal.classList.remove('active');
+        setTimeout(() => {
+            focusModal.style.display = 'none';
+            // Sync content back to original editor
+            if (originalEditor && focusEditor.innerHTML !== focusOriginalContent) {
+                originalEditor.innerHTML = focusEditor.innerHTML;
+                // Trigger input event to update app state
+                originalEditor.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }, 300);
+    }
+
+    // Close modal on close button click
+    focusCloseBtn.addEventListener('click', closeFocusModal);
+
+    // Close modal on backdrop click
+    focusBackdrop.addEventListener('click', closeFocusModal);
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && focusModal.classList.contains('active')) {
+            e.preventDefault();
+            closeFocusModal();
+        }
+    });
+
+    // Auto-sync content changes with debouncing
+    focusEditor.addEventListener('input', () => {
+        if (focusSyncTimeout) {
+            clearTimeout(focusSyncTimeout);
+        }
+        focusSyncTimeout = setTimeout(() => {
+            if (originalEditor) {
+                originalEditor.innerHTML = focusEditor.innerHTML;
+                originalEditor.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        }, 1000); // Sync every 1 second of inactivity
+    });
+
+    // Focus mode AI enhancement functionality
+    const focusAiButtons = document.querySelectorAll('#focus-ai-controls .ai-btn');
+    const focusKeepOriginal = document.getElementById('focus-keep-original');
+    const focusUndoBtn = document.getElementById('focus-undo-ai-btn');
+
+    // Add selection change handler for focus mode
+    let focusSelectedText = '';
+    let focusSelectedRange = null;
+    
+    function updateFocusSelection() {
+        const selection = window.getSelection();
+        focusSelectedText = selection.toString().trim();
+        
+        console.log('Focus selection updated:', focusSelectedText);
+        
+        if (focusSelectedText && selection.rangeCount > 0) {
+            // Check if selection is within the focus editor
+            const range = selection.getRangeAt(0);
+            if (focusEditor.contains(range.commonAncestorContainer)) {
+                focusSelectedRange = range.cloneRange();
+                // Enable AI buttons
+                document.querySelectorAll('#focus-ai-controls .ai-btn').forEach(btn => {
+                    if (btn.id !== 'focus-undo-ai-btn') {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.boxShadow = '0 0 0 2px var(--color-primary)';
+                    }
+                });
+                console.log('Focus AI buttons enabled');
+            } else {
+                focusSelectedRange = null;
+            }
+        } else {
+            focusSelectedRange = null;
+            // Disable AI buttons
+            document.querySelectorAll('#focus-ai-controls .ai-btn').forEach(btn => {
+                if (btn.id !== 'focus-undo-ai-btn') {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.boxShadow = '';
+                }
+            });
+            console.log('Focus AI buttons disabled');
+        }
+    }
+    
+    // Add event listeners for focus editor
+    focusEditor.addEventListener('mouseup', updateFocusSelection);
+    focusEditor.addEventListener('keyup', updateFocusSelection);
+    document.addEventListener('selectionchange', () => {
+        if (document.activeElement === focusEditor || focusEditor.contains(document.activeElement)) {
+            updateFocusSelection();
+        }
+    });
+
+    // Use event delegation for dynamically created buttons
+    document.getElementById('focus-ai-controls').addEventListener('click', async (e) => {
+        const btn = e.target.closest('.ai-btn');
+        if (!btn || btn.id === 'focus-undo-ai-btn') return;
+        
+        const action = btn.getAttribute('data-action');
+        console.log('Focus AI button clicked:', action);
+        
+        if (!focusSelectedText || !focusSelectedRange) {
+            alert('Please select text to improve with AI.');
+            console.log('No text selected in focus mode');
+            return;
+        }
+
+        const originalContent = focusEditor.innerHTML;
+        const originalButtonContent = btn.innerHTML;
+        
+        try {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="ai-icon">⏳</span>&nbsp;Processing...';
+
+            console.log('Calling improveTextForFocus with:', {
+                action,
+                selectedText: focusSelectedText,
+                selectedRange: focusSelectedRange,
+                keepOriginal: focusKeepOriginal.checked
+            });
+
+            // Use the same AI processing as normal mode
+            const result = await window.notesApp.improveTextForFocus(action, focusSelectedText, focusSelectedRange, focusKeepOriginal.checked);
+            
+            console.log('AI processing result:', result);
+            
+            if (result) {
+                // Store in focus AI history for undo
+                focusAiHistory.push({
+                    before: originalContent,
+                    after: focusEditor.innerHTML,
+                    action: action
+                });
+
+                // Enable undo button
+                focusUndoBtn.disabled = false;
+
+                // Limit history to last 10 operations
+                if (focusAiHistory.length > 10) {
+                    focusAiHistory.shift();
+                }
+            }
+        } catch (error) {
+            console.error('AI processing error in focus mode:', error);
+            alert('Error processing text with AI: ' + error.message);
+        } finally {
+            // Reset button
+            const config = window.notesApp.stylesConfig[action];
+            btn.disabled = false;
+            btn.innerHTML = originalButtonContent;
+            updateFocusSelection(); // Update button states
+        }
+    });
+
+    // Focus mode undo functionality
+    focusUndoBtn.addEventListener('click', () => {
+        if (focusAiHistory.length > 0) {
+            const lastChange = focusAiHistory.pop();
+            focusEditor.innerHTML = lastChange.before;
+            
+            if (focusAiHistory.length === 0) {
+                focusUndoBtn.disabled = true;
+            }
+        }
+    });
 });
 
 // Study Modal Functionality

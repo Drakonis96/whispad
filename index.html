@@ -66,6 +66,9 @@
             </div>
         </div>
         <div class="header-actions">
+            <button class="btn btn--outline btn--sm" id="focus-btn" title="Focus mode">
+                <i class="fas fa-expand"></i>&nbsp;<span class="header-btn-text">Focus</span>
+            </button>
             <button class="btn btn--outline btn--sm admin-only" id="upload-models-btn" title="Manage whisper.cpp models">
                 <i class="fas fa-download"></i>&nbsp;<span class="header-btn-text">Models</span>
             </button>
@@ -140,82 +143,49 @@
         <div class="main-content">
             <!-- Top toolbar -->
             <div class="toolbar">
-                <div class="toolbar-section collapsible" id="transcription-section">
+                <div class="toolbar-section" id="transcription-section">
                     <div class="section-header">
                         <h3>Transcription Tools</h3>
-                        <button class="collapse-toggle" aria-label="Toggle transcription tools">
-                            <i class="fas fa-chevron-up"></i>
+                    </div>
+                    <div class="transcription-controls-horizontal">
+                        <button class="btn btn--primary btn--sm transcription-btn" id="record-btn">
+                            <i class="fas fa-microphone" id="record-icon"></i>&nbsp;<span id="record-text">Record</span>
                         </button>
-                    </div>
-                    <div class="transcription-controls section-content">
-                    <button class="btn btn--primary" id="record-btn">
-                        <i class="fas fa-microphone" id="record-icon"></i>&nbsp;<span id="record-text">Record</span>
-                    </button>
-                    <button class="btn btn--secondary btn--sm" id="upload-audio-btn" title="Upload audio file">
-                        <i class="fas fa-file-audio"></i>&nbsp;<span id="upload-audio-text">Upload Audio</span>
-                    </button>
-                    <input type="file" id="upload-audio-input" accept=".mp3,.wav" style="display:none">
-                    <div class="recording-status" id="recording-status">
-                        <span class="status-text">Ready to record</span>
-                        <div class="recording-indicator" id="recording-indicator"></div>
-                    </div>
-                    <div class="transcription-grid">
-                        <button class="btn btn--outline btn--sm" id="styles-config-btn" title="Configure enhancement styles">
+                        <button class="btn btn--secondary btn--sm transcription-btn" id="upload-audio-btn" title="Upload audio file">
+                            <i class="fas fa-file-audio"></i>&nbsp;<span id="upload-audio-text">Upload Audio</span>
+                        </button>
+                        <input type="file" id="upload-audio-input" accept=".mp3,.wav" style="display:none">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="styles-config-btn" title="Configure enhancement styles">
                             <i class="fas fa-palette"></i>&nbsp;Styles
                         </button>
-                        <button class="btn btn--outline btn--sm" id="translation-settings-btn" title="Translation settings">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="translation-settings-btn" title="Translation settings">
                             <i class="fas fa-language"></i>&nbsp;Translation
                         </button>
-                        <button class="btn btn--outline btn--sm" id="tabularize-settings-btn" title="Tabularize settings">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="tabularize-settings-btn" title="Tabularize settings">
                             <i class="fas fa-table"></i>&nbsp;Tabularize
                         </button>
-                        <button class="btn btn--outline btn--sm" id="prompt-sidebar-toggle" title="Custom prompt">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="prompt-sidebar-toggle" title="Custom prompt">
                             <i class="fas fa-terminal"></i>&nbsp;Prompt
                         </button>
-                        <button class="btn btn--outline btn--sm" id="chat-sidebar-toggle" title="Chat assistant">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="chat-sidebar-toggle" title="Chat assistant">
                             <i class="fas fa-comments"></i>&nbsp;Chat
                         </button>
-                        <button class="btn btn--outline btn--sm" id="files-btn" title="Files">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="files-btn" title="Files">
                             <i class="fas fa-folder"></i>&nbsp;Files
                         </button>
-                        <button class="btn btn--outline btn--sm" id="graph-btn" title="Graph view">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="graph-btn" title="Graph view">
                             <i class="fas fa-project-diagram"></i>&nbsp;Graph
                         </button>
-                        <button class="btn btn--outline btn--sm" id="concept-graph-btn" title="Concept map">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="concept-graph-btn" title="Concept map">
                             <i class="fas fa-network-wired"></i>&nbsp;Concept
                         </button>
-                        <button class="btn btn--outline btn--sm" id="study-btn" title="Study mode - Quiz and Flashcards">
+                        <button class="btn btn--outline btn--sm transcription-btn" id="study-btn" title="Study mode - Quiz and Flashcards">
                             <i class="fas fa-graduation-cap"></i>&nbsp;Study
                         </button>
-                    </div>
-                    </div>
-                </div>
-
-                <div class="toolbar-section collapsible" id="ai-section">
-                    <div class="section-header">
-                        <h3>AI Enhancement</h3>
-                        <button class="collapse-toggle" aria-label="Toggle AI enhancement">
-                            <i class="fas fa-chevron-up"></i>
-                        </button>
-                    </div>
-                    <div class="ai-controls section-content" id="ai-controls">
-                        <button class="btn btn--secondary btn--sm ai-btn" data-action="clarity" title="Improve text clarity">
-                            <span class="ai-icon">✨</span>&nbsp;Clarity
-                        </button>
-                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academic_v2" title="Academic improvement with minimal changes, preserving author's words">
-                            <span class="ai-icon">🔍</span>&nbsp;Academic v2
-                        </button>
-                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expand" title="Expand ideas and add details">
-                            <span class="ai-icon">🔍</span>&nbsp;Expand
-                        </button>
-                        <button class="btn btn--outline btn--sm" id="undo-ai-btn" title="Undo last AI change" disabled>
-                            <span class="ai-icon">↶</span>&nbsp;Undo
-                        </button>
-                        <label class="checkbox-label keep-original-label">
-                            <input type="checkbox" id="keep-original">
-                            <span class="checkmark"></span>
-                            Keep original
-                        </label>
+                        <div class="recording-status" id="recording-status">
+                            <span class="status-text">Ready to record</span>
+                            <div class="recording-indicator" id="recording-indicator"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -287,6 +257,29 @@
                     <button class="format-btn" data-format="ol" title="Numbered list">
                         <i class="fas fa-list-ol"></i>
                     </button>
+                </div>
+
+                <!-- AI Enhancement Toolbar -->
+                <div class="ai-enhancement-toolbar">
+                    <div class="ai-controls-horizontal" id="ai-controls">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="clarity" title="Improve text clarity">
+                            <span class="ai-icon">✨</span>&nbsp;Clarity
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academic_v2" title="Academic improvement with minimal changes, preserving author's words">
+                            <span class="ai-icon">🔍</span>&nbsp;Academic v2
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expand" title="Expand ideas and add details">
+                            <span class="ai-icon">🔍</span>&nbsp;Expand
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="undo-ai-btn" title="Undo last AI change" disabled>
+                            <span class="ai-icon">↶</span>&nbsp;Undo
+                        </button>
+                        <label class="checkbox-label keep-original-label">
+                            <input type="checkbox" id="keep-original">
+                            <span class="checkmark"></span>
+                            Keep original
+                        </label>
+                    </div>
                 </div>
                 
                 <div class="editor-content">
@@ -1500,6 +1493,44 @@
             </div>
         </div>
     </div>
+
+    <!-- Focus Modal -->
+    <div class="focus-modal" id="focus-modal">
+        <div class="focus-modal-backdrop"></div>
+        <div class="focus-modal-content">
+            <button class="focus-close-btn" id="focus-close-btn" title="Exit focus mode">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="focus-editor-container">
+                <div class="focus-editor-content">
+                    <div class="focus-editor" id="focus-editor" contenteditable="true"></div>
+                </div>
+                <!-- AI Enhancement Toolbar for Focus Mode -->
+                <div class="focus-ai-enhancement-toolbar">
+                    <div class="ai-controls-horizontal" id="focus-ai-controls">
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="clarity" title="Improve text clarity">
+                            <span class="ai-icon">✨</span>&nbsp;Clarity
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="academic_v2" title="Academic improvement with minimal changes, preserving author's words">
+                            <span class="ai-icon">🔍</span>&nbsp;Academic v2
+                        </button>
+                        <button class="btn btn--secondary btn--sm ai-btn" data-action="expand" title="Expand ideas and add details">
+                            <span class="ai-icon">🔍</span>&nbsp;Expand
+                        </button>
+                        <button class="btn btn--outline btn--sm" id="focus-undo-ai-btn" title="Undo last AI change" disabled>
+                            <span class="ai-icon">↶</span>&nbsp;Undo
+                        </button>
+                        <label class="checkbox-label keep-original-label">
+                            <input type="checkbox" id="focus-keep-original">
+                            <span class="checkmark"></span>
+                            Keep original
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
