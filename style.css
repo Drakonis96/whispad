@@ -5247,6 +5247,8 @@ select.form-control {
     margin: 0 auto;
     width: 100%;
     gap: var(--space-16);
+    overflow-y: auto;
+    min-height: 0;
 }
 
 .focus-editor-content {
@@ -5286,6 +5288,9 @@ select.form-control {
     box-shadow: var(--shadow-sm);
     overflow-x: auto;
     white-space: nowrap;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
 }
 
 .focus-ai-enhancement-toolbar::-webkit-scrollbar {
