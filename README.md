@@ -204,19 +204,23 @@ Here are some screenshots of WhisPad in action:
 </p>
 
 <p align="center">
-  <img src="screenshots/screenshot2.png" alt="Editing notes" width="700"/>
+  <img src="screenshots/screenshot2.png" alt="Graph tool" width="700"/>
 </p>
 
 <p align="center">
-  <img src="screenshots/screenshot3.png" alt="Manage whisper models" width="700"/>
+  <img src="screenshots/screenshot3.png" alt="Concept diagram tool" width="700"/>
 </p>
 
 <p align="center">
-  <img src="screenshots/screenshot4.png" alt="Transcribed notes list" width="700"/>
+  <img src="screenshots/screenshot4.png" alt="Configuration" width="700"/>
 </p>
 
 <p align="center">
-  <img src="screenshots/screenshot5.png" alt="Transcribed notes list" width="700"/>
+  <img src="screenshots/screenshot5.png" alt="Integrated Transcription Models Downloader" width="700"/>
+</p>
+
+<p align="center">
+  <img src="screenshots/screenshot6.png" alt="User Management" width="700"/>
 </p>
 
 ## Contributors
