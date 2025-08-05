@@ -9824,7 +9824,9 @@ class NotesApp {
                 { value: 'qwen/qwen3-32b', text: 'Qwen3 32B' },
                 { value: 'moonshotai/kimi-k2-instruct', text: 'Kimi K2 Instruct' },
                 { value: 'meta-llama/llama-4-scout-17b-16e-instruct', text: 'Llama 4 Scout 17B 16e' },
-                { value: 'meta-llama/llama-4-maverick-17b-128e-instruct', text: 'Llama 4 Maverick 17B 128e' }
+                { value: 'meta-llama/llama-4-maverick-17b-128e-instruct', text: 'Llama 4 Maverick 17B 128e' },
+                { value: 'openai/gpt-oss-120b', text: 'GPT-OSS 120B' },
+                { value: 'openai/gpt-oss-20b', text: 'GPT-OSS 20B' }
             ],
             'lmstudio': (this.config.lmstudioModels ? this.config.lmstudioModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : []),
             'ollama': (this.config.ollamaModels ? this.config.ollamaModels.split(',').map(m => ({ value: m.trim(), text: m.trim() })) : [])
