@@ -1248,6 +1248,28 @@ def improve_text_openrouter_stream(text, improvement_type, model, custom_prompt=
     
     return Response(generate(), mimetype='text/event-stream', headers={'Cache-Control': 'no-cache'})
 
+# Helper to build Groq payloads with support for GPT-OSS models
+def _build_groq_payload(messages, model, stream=False, temperature=1, top_p=1,
+                        max_tokens=1000, reasoning_effort="medium"):
+    payload = {
+        'model': model,
+        'messages': messages,
+        'stream': stream
+    }
+    if model.startswith('openai/gpt-oss'):
+        payload.update({
+            'max_completion_tokens': max_tokens,
+            'temperature': temperature,
+            'top_p': top_p,
+            'reasoning_effort': reasoning_effort
+        })
+    else:
+        payload.update({
+            'max_tokens': max_tokens,
+            'temperature': temperature
+        })
+    return payload
+
 def improve_text_groq(text, improvement_type, model, custom_prompt=None):
     """Mejorar texto usando Groq"""
     if not GROQ_API_KEY:
@@ -1280,17 +1302,12 @@ def improve_text_groq(text, improvement_type, model, custom_prompt=None):
         'Content-Type': 'application/json'
     }
 
-    payload = {
-        'model': model,
-        'messages': [
-            {
-                'role': 'user',
-                'content': prompt
-            }
-        ],
-        'max_tokens': 1000,
-        'temperature': 0.7
-    }
+    payload = _build_groq_payload(
+        [{'role': 'user', 'content': prompt}],
+        model,
+        temperature=0.7,
+        max_tokens=1000
+    )
 
     response = requests.post('https://api.groq.com/openai/v1/chat/completions', headers=headers, json=payload)
 
@@ -1337,15 +1354,13 @@ def improve_text_groq_stream(text, improvement_type, model, custom_prompt=None):
         'Content-Type': 'application/json'
     }
 
-    payload = {
-        'model': model,
-        'messages': [
-            { 'role': 'user', 'content': prompt }
-        ],
-        'max_tokens': 1000,
-        'temperature': 0.7,
-        'stream': True
-    }
+    payload = _build_groq_payload(
+        [{'role': 'user', 'content': prompt}],
+        model,
+        stream=True,
+        temperature=0.7,
+        max_tokens=1000
+    )
 
     def generate():
         try:
@@ -1720,7 +1735,14 @@ def chat_groq_stream(messages, model):
 
     url = 'https://api.groq.com/openai/v1/chat/completions'
     headers = { 'Authorization': f'Bearer {GROQ_API_KEY}', 'Content-Type': 'application/json' }
-    payload = { 'model': model, 'messages': messages, 'stream': True }
+    payload = _build_groq_payload(
+        messages,
+        model,
+        stream=True,
+        temperature=1,
+        top_p=1,
+        max_tokens=8192
+    )
 
     def generate():
         try:
@@ -2659,13 +2681,15 @@ def generate_mindmap_groq(note_md, topic, model):
         'Authorization': f'Bearer {GROQ_API_KEY}',
         'Content-Type': 'application/json'
     }
-    payload = {
-        'model': model,
-        'messages': [
+    payload = _build_groq_payload(
+        [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': user_msg}
-        ]
-    }
+        ],
+        model,
+        temperature=0.7,
+        max_tokens=1000
+    )
     resp = requests.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
         return None, 'Groq error'
@@ -2889,13 +2913,15 @@ def generate_diagram_groq(note_md, diagram_type, model):
         'Authorization': f'Bearer {GROQ_API_KEY}',
         'Content-Type': 'application/json'
     }
-    payload = {
-        'model': model,
-        'messages': [
+    payload = _build_groq_payload(
+        [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': note_md}
-        ]
-    }
+        ],
+        model,
+        temperature=0.7,
+        max_tokens=1000
+    )
     resp = requests.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
         return None, 'Groq error'
