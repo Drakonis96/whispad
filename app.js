@@ -9811,7 +9811,7 @@ class NotesApp {
         postprocessModelSelect.appendChild(placeholder);
         
         // Definir modelos por proveedor
-        const openrouterModels = [
+        const baseOpenrouterModels = [
             { value: 'google/gemma-3-27b-it:free', text: 'Gemma 3 27B IT (Free)' },
             { value: 'google/gemini-2.0-flash-exp:free', text: 'Gemini 2.0 Flash Exp (Free)' },
             { value: 'meta-llama/llama-4-maverick:free', text: 'Llama 4 Maverick (Free)' },
@@ -9821,7 +9821,14 @@ class NotesApp {
             { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' },
             { value: 'moonshotai/kimi-k2:free', text: 'Kimi K2 (Free)' }
         ];
+        const openrouterModels = [...baseOpenrouterModels];
         if (this.config.showOpenRouterPaidModels) {
+            baseOpenrouterModels.forEach(m => {
+                openrouterModels.push({
+                    value: m.value.replace(':free', ''),
+                    text: m.text.replace(' (Free)', ' (Paid)')
+                });
+            });
             openrouterModels.push(
                 { value: 'openai/gpt-oss-20b', text: 'GPT-OSS 20B (OpenAI)' },
                 { value: 'openai/gpt-oss-120b', text: 'GPT-OSS 120B (OpenAI)' }

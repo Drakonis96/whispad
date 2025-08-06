@@ -159,7 +159,9 @@ OPENROUTER_FREE_MODELS = [
     "moonshotai/kimi-k2:free",
 ]
 
-OPENROUTER_PAID_MODELS = [
+# Paid models include all non-free variants of the above plus
+# additional explicitly paid-only models.
+OPENROUTER_PAID_MODELS = [model.replace(":free", "") for model in OPENROUTER_FREE_MODELS] + [
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
 ]
