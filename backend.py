@@ -148,6 +148,36 @@ SESSIONS = {}
 ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
 ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama", "groq"]
 
+OPENROUTER_FREE_MODELS = [
+    "google/gemma-3-27b-it:free",
+    "google/gemini-2.0-flash-exp:free",
+    "meta-llama/llama-4-maverick:free",
+    "meta-llama/llama-4-scout:free",
+    "deepseek/deepseek-chat-v3-0324:free",
+    "qwen/qwen3-32b:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "moonshotai/kimi-k2:free",
+]
+
+OPENROUTER_PAID_MODELS = [
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+]
+
+
+def user_allows_openrouter_paid_models(username: str) -> bool:
+    """Check user config to see if paid OpenRouter models are allowed."""
+    try:
+        user_dir = os.path.join('user_data', username)
+        config_file = os.path.join(user_dir, 'config.json')
+        if os.path.exists(config_file):
+            with open(config_file, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            return cfg.get('showOpenRouterPaidModels', False)
+    except Exception:
+        pass
+    return False
+
 from argon2 import PasswordHasher, exceptions as argon2_exceptions
 from argon2.low_level import Type
 from db import (
@@ -693,6 +723,8 @@ def improve_text():
                 elif provider == 'google':
                     return chat_google_stream(messages, model)
                 elif provider == 'openrouter':
+                    if model in OPENROUTER_PAID_MODELS and not user_allows_openrouter_paid_models(username):
+                        return jsonify({"error": "OpenRouter paid models are disabled"}), 403
                     return chat_openrouter_stream(messages, model)
                 elif provider == 'groq':
                     return chat_groq_stream(messages, model)
@@ -771,6 +803,8 @@ def improve_text():
                 model = data.get('model')
                 if not model:
                     return jsonify({"error": "Model not specified"}), 400
+                if model in OPENROUTER_PAID_MODELS and not user_allows_openrouter_paid_models(username):
+                    return jsonify({"error": "OpenRouter paid models are disabled"}), 403
                 return improve_text_openrouter(text, improvement_type, model, custom_prompt)
             elif provider == 'groq':
                 model = data.get('model')
@@ -3004,6 +3038,8 @@ def generate_mindmap():
         elif provider == 'google':
             tree, err = generate_mindmap_google(note, topic, model)
         elif provider == 'openrouter':
+            if model in OPENROUTER_PAID_MODELS and not user_allows_openrouter_paid_models(username):
+                return jsonify({"error": "OpenRouter paid models are disabled"}), 403
             tree, err = generate_mindmap_openrouter(note, topic, model)
         elif provider == 'groq':
             tree, err = generate_mindmap_groq(note, topic, model)
@@ -3056,6 +3092,8 @@ def generate_diagram():
             elif provider == 'google':
                 tree, err = generate_mindmap_google(note, topic, model)
             elif provider == 'openrouter':
+                if model in OPENROUTER_PAID_MODELS and not user_allows_openrouter_paid_models(username):
+                    return jsonify({"error": "OpenRouter paid models are disabled"}), 403
                 tree, err = generate_mindmap_openrouter(note, topic, model)
             elif provider == 'groq':
                 tree, err = generate_mindmap_groq(note, topic, model)
@@ -3085,6 +3123,8 @@ def generate_diagram():
         elif provider == 'google':
             tree, err = generate_diagram_google(note, diagram_type, model)
         elif provider == 'openrouter':
+            if model in OPENROUTER_PAID_MODELS and not user_allows_openrouter_paid_models(username):
+                return jsonify({"error": "OpenRouter paid models are disabled"}), 403
             tree, err = generate_diagram_openrouter(note, diagram_type, model)
         elif provider == 'groq':
             tree, err = generate_diagram_groq(note, diagram_type, model)
