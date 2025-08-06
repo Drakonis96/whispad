@@ -202,6 +202,7 @@ class NotesApp {
             maxTokens: 1000,
             topP: 0.95,
             responseStyle: 'balanced',
+            showOpenRouterPaidModels: false,
             showMobileRecordButton: true,
             lmstudioHost: '127.0.0.1',
             lmstudioPort: '1234',
@@ -1131,6 +1132,7 @@ class NotesApp {
         const maxTokens = parseInt(document.getElementById('max-tokens').value);
         const topP = parseFloat(document.getElementById('top-p-range').value);
         const responseStyle = document.getElementById('response-style').value;
+        const showOpenRouterPaidModels = document.getElementById('show-openrouter-paid-models').checked;
         const showMobileRecordButton = document.getElementById('show-mobile-record').checked;
         const lmstudioHost = document.getElementById('lmstudio-host').value.trim();
         const lmstudioPort = document.getElementById('lmstudio-port').value.trim();
@@ -1160,6 +1162,7 @@ class NotesApp {
             maxTokens,
             topP,
             responseStyle,
+            showOpenRouterPaidModels,
             showMobileRecordButton,
             lmstudioHost,
             lmstudioPort,
@@ -1272,6 +1275,7 @@ class NotesApp {
         document.getElementById('max-tokens').value = this.config.maxTokens || 1000;
         document.getElementById('top-p-range').value = this.config.topP || 0.95;
         document.getElementById('response-style').value = this.config.responseStyle || 'balanced';
+        document.getElementById('show-openrouter-paid-models').checked = this.config.showOpenRouterPaidModels === true;
         document.getElementById('show-mobile-record').checked = this.config.showMobileRecordButton !== false;
         document.getElementById('lmstudio-host').value = this.config.lmstudioHost || '127.0.0.1';
         document.getElementById('lmstudio-port').value = this.config.lmstudioPort || '1234';
@@ -9784,6 +9788,14 @@ class NotesApp {
                 this.toggleSenseVoiceOptions();
             });
         }
+
+        const openrouterPaidCheckbox = document.getElementById('show-openrouter-paid-models');
+        if (openrouterPaidCheckbox) {
+            openrouterPaidCheckbox.addEventListener('change', (e) => {
+                this.config.showOpenRouterPaidModels = e.target.checked;
+                this.updateModelOptions();
+            });
+        }
     }
     
     updateModelOptions() {
@@ -9799,6 +9811,23 @@ class NotesApp {
         postprocessModelSelect.appendChild(placeholder);
         
         // Definir modelos por proveedor
+        const openrouterModels = [
+            { value: 'google/gemma-3-27b-it:free', text: 'Gemma 3 27B IT (Free)' },
+            { value: 'google/gemini-2.0-flash-exp:free', text: 'Gemini 2.0 Flash Exp (Free)' },
+            { value: 'meta-llama/llama-4-maverick:free', text: 'Llama 4 Maverick (Free)' },
+            { value: 'meta-llama/llama-4-scout:free', text: 'Llama 4 Scout (Free)' },
+            { value: 'deepseek/deepseek-chat-v3-0324:free', text: 'DeepSeek Chat v3 (Free)' },
+            { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
+            { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' },
+            { value: 'moonshotai/kimi-k2:free', text: 'Kimi K2 (Free)' }
+        ];
+        if (this.config.showOpenRouterPaidModels) {
+            openrouterModels.push(
+                { value: 'openai/gpt-oss-20b', text: 'GPT-OSS 20B (OpenAI)' },
+                { value: 'openai/gpt-oss-120b', text: 'GPT-OSS 120B (OpenAI)' }
+            );
+        }
+
         const modelsByProvider = {
             'openai': [
                 { value: 'gpt-4o-mini', text: 'GPT-4o Mini (OpenAI)' },
@@ -9809,16 +9838,7 @@ class NotesApp {
             'google': [
                 { value: 'gemini-2.0-flash', text: 'Gemini 2.0 Flash (Google)' }
             ],
-            'openrouter': [
-                { value: 'google/gemma-3-27b-it:free', text: 'Gemma 3 27B IT (Free)' },
-                { value: 'google/gemini-2.0-flash-exp:free', text: 'Gemini 2.0 Flash Exp (Free)' },
-                { value: 'meta-llama/llama-4-maverick:free', text: 'Llama 4 Maverick (Free)' },
-                { value: 'meta-llama/llama-4-scout:free', text: 'Llama 4 Scout (Free)' },
-                { value: 'deepseek/deepseek-chat-v3-0324:free', text: 'DeepSeek Chat v3 (Free)' },
-                { value: 'qwen/qwen3-32b:free', text: 'Qwen 3 32B (Free)' },
-                { value: 'mistralai/mistral-small-3.1-24b-instruct:free', text: 'Mistral Small 3.1 24B (Free)' },
-                { value: 'moonshotai/kimi-k2:free', text: 'Kimi K2 (Free)' }
-            ],
+            'openrouter': openrouterModels,
             'groq': [
                 { value: 'deepseek-r1-distill-llama-70b', text: 'DeepSeek R1 Distill Llama 70B' },
                 { value: 'qwen/qwen3-32b', text: 'Qwen3 32B' },
