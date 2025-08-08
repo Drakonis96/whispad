@@ -1,5 +1,5 @@
 # Dockerfile unificado para nginx + python backend
-FROM python:3.11-slim
+FROM python:3.16.3-slim
 
 # Instalar nginx, build tools y dependencias del sistema
 RUN apt-get update && apt-get install -y \
