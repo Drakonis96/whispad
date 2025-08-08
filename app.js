@@ -13053,8 +13053,9 @@ class StudyManager {
     }
 }
 
-// Initialize study manager
+// Initialize study manager and make it globally accessible
 const studyManager = new StudyManager();
+window.studyManager = studyManager;
 
 // Actualizar botones de formato cuando cambia la selección
 document.addEventListener('selectionchange', () => {
@@ -13087,6 +13088,178 @@ document.addEventListener('keydown', async (e) => {
                     await window.notesApp.createNewNote();
                 }
                 break;
+        }
+    }
+});
+
+// Generic ESC key handler for all modals
+// Note: Focus modal has its own ESC handler and is not affected by this
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && window.notesApp) {
+        // Check for Config modal
+        const configModal = document.getElementById('config-modal');
+        if (configModal && configModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideConfigModal();
+            return;
+        }
+        
+        // Check for Models (upload-model-modal) modal
+        const modelsModal = document.getElementById('upload-model-modal');
+        if (modelsModal && modelsModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideUploadModelsModal();
+            return;
+        }
+        
+        // Check for Users modal
+        const usersModal = document.getElementById('user-modal');
+        if (usersModal && usersModal.classList.contains('active')) {
+            e.preventDefault();
+            usersModal.classList.remove('active');
+            return;
+        }
+        
+        // Check for Styles modal
+        const stylesModal = document.getElementById('styles-config-modal');
+        if (stylesModal && stylesModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideStylesConfigModal();
+            return;
+        }
+        
+        // Check for Translation modal
+        const translationModal = document.getElementById('translation-modal');
+        if (translationModal && translationModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideTranslationModal();
+            return;
+        }
+        
+        // Check for Tabularize modal
+        const tabularizeModal = document.getElementById('tabularize-modal');
+        if (tabularizeModal && tabularizeModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideTabularizeModal();
+            return;
+        }
+        
+        // Check for Graph modal
+        const graphModal = document.getElementById('graph-modal');
+        if (graphModal && graphModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideGraphModal();
+            return;
+        }
+        
+        // Check for Concept Graph modal
+        const conceptGraphModal = document.getElementById('concept-graph-modal');
+        if (conceptGraphModal && conceptGraphModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideConceptGraphModal();
+            return;
+        }
+        
+        // Check for Study modal
+        const studyModal = document.getElementById('study-modal');
+        if (studyModal && studyModal.classList.contains('active')) {
+            e.preventDefault();
+            if (window.studyManager) {
+                window.studyManager.closeStudyModal();
+            }
+            return;
+        }
+        
+        // Check for Audio modal
+        const audioModal = document.getElementById('audio-modal');
+        if (audioModal && audioModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideAudioModal();
+            return;
+        }
+        
+        // Check for Export modal
+        const exportModal = document.getElementById('export-modal');
+        if (exportModal && exportModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideExportModal();
+            return;
+        }
+        
+        // Check for Restore modal
+        const restoreModal = document.getElementById('restore-modal');
+        if (restoreModal && restoreModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideRestoreModal();
+            return;
+        }
+        
+        // Check for Upload PDF modal
+        const uploadPdfModal = document.getElementById('upload-pdf-modal');
+        if (uploadPdfModal && uploadPdfModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideUploadPdfModal();
+            return;
+        }
+        
+        // Check for Delete modal
+        const deleteModal = document.getElementById('delete-modal');
+        if (deleteModal && deleteModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideDeleteModal();
+            return;
+        }
+        
+        // Check for Delete Audio modal
+        const deleteAudioModal = document.getElementById('delete-audio-modal');
+        if (deleteAudioModal && deleteAudioModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideDeleteAudioModal();
+            return;
+        }
+        
+        // Check for Create Folder modal
+        const createFolderModal = document.getElementById('create-folder-modal');
+        if (createFolderModal && createFolderModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideCreateFolderModal();
+            return;
+        }
+        
+        // Check for Move Note modal
+        const moveNoteModal = document.getElementById('move-note-modal');
+        if (moveNoteModal && moveNoteModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideMoveNoteModal();
+            return;
+        }
+        
+        // Check for Move Folder modal
+        const moveFolderModal = document.getElementById('move-folder-modal');
+        if (moveFolderModal && moveFolderModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideMoveFolderModal();
+            return;
+        }
+        
+        // Check for Saved Questions modal
+        const savedQuestionsModal = document.getElementById('saved-questions-modal');
+        if (savedQuestionsModal && savedQuestionsModal.classList.contains('active')) {
+            e.preventDefault();
+            if (window.studyManager) {
+                window.studyManager.hideSavedQuestionsModal();
+            }
+            return;
+        }
+        
+        // Check for Saved Flashcards modal
+        const savedFlashcardsModal = document.getElementById('saved-flashcards-modal');
+        if (savedFlashcardsModal && savedFlashcardsModal.classList.contains('active')) {
+            e.preventDefault();
+            if (window.studyManager) {
+                window.studyManager.hideSavedFlashcardsModal();
+            }
+            return;
         }
     }
 });
