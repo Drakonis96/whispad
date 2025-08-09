@@ -4,6 +4,255 @@ This file tracks all changes made to the WhisPad application with detailed versi
 
 ---
 
+## Version 0.7.12.0 - Provider Renaming with Complete Migration Infrastructure
+**Date**: August 9, 2025  
+**Type**: Major Feature - Breaking Changes + Migration System  
+**Impact**: Critical - Complete Provider Renaming with Automated Migration
+
+### Changes Made
+
+#### 1. **Provider Renaming Strategy**
+- **Purpose**: Implement consistent provider naming scheme for better technical accuracy
+- **Changes**: 
+  - `openai` → `openai-api` (OpenAI Whisper API)
+  - `local` → `whisper-cpp` (whisper.cpp C++ implementation)  
+  - `sensevoice` → `funasr` (FunASR Python framework)
+
+#### 2. **Complete Migration Infrastructure Created**
+- **Directory Created**: `migrations/` - Comprehensive migration system
+- **Purpose**: Provide safe, automated migration for provider renaming breaking changes
+
+#### 3. **Database Migration System**
+```sql
+-- migrations/0.7.12_provider_rename.sql
+-- Atomic transaction-based migration with backup creation
+UPDATE users SET transcription_providers = array_replace(
+    array_replace(
+        array_replace(transcription_providers, 'openai', 'openai-api'),
+        'local', 'whisper-cpp'
+    ), 'sensevoice', 'funasr'
+);
+```
+
+#### 4. **Python Compatibility Layer**
+- **File Created**: `provider_compatibility.py` (150+ lines)
+- **Features**: 
+  - Provider name migration functions
+  - User configuration migration
+  - Display name mapping
+  - Backward compatibility support
+  - Validation and rollback functions
+
+#### 5. **Automated Migration Scripts**
+- **`execute_migration.py`**: Complete automated migration executor with logging
+- **`migrate_user_configs.py`**: User configuration and metadata file migration
+- **`rollback_0.7.12_provider_rename.sql`**: Safe rollback procedures
+
+#### 6. **Comprehensive Documentation**
+- **`migration_guide.md`**: 200+ line comprehensive migration guide
+- **`README.md`**: Migration directory documentation and quick start
+- **Step-by-step instructions**: Prerequisites, execution, validation, rollback
+
+#### 7. **Safety Features Implemented**
+- **Automatic Backups**: Database and file backups before migration
+- **Transaction Safety**: Atomic database operations with rollback capability  
+- **Validation Checks**: Multi-step verification of migration success
+- **Detailed Logging**: Complete audit trail of all migration operations
+- **Emergency Rollback**: Multiple rollback options for recovery
+
+#### 8. **Files Analysis Completed**
+**Comprehensive analysis identified all files requiring updates:**
+- **Backend**: `backend.py` (6,713 lines) - 100+ provider references
+- **Frontend**: `app.js` (13,093 lines) - 50+ provider references  
+- **Database**: `db.py` - User provider arrays and preferences
+- **UI**: `index.html` - Provider selection dropdowns
+- **API**: `backend-api.js` - Provider parameter handling
+- **AI Files**: `ai_reprocess*.py`, `ai_suggestions.py` - Provider routing
+- **Tests**: Multiple test files with hardcoded provider names
+
+#### 9. **Migration Execution Completed**
+**Status: COMPLETED** - All application code updated with new provider names
+
+**Core Application Updates:**
+- **backend.py**: Provider constants and routing logic updated (100+ references)
+- **app.js**: Provider validation, streaming logic, UI functions updated (50+ references)
+- **index.html**: Provider dropdown options and form elements updated
+- **backend-api.js**: API function names and parameter handling updated
+
+**Key Function Updates:**
+- `transcribeAudioSenseVoice` → `transcribeAudioFunASR`
+- `transcribeWithSenseVoice` → `transcribeWithFunASR`
+- `toggleSenseVoiceOptions` → `toggleFunASROptions`
+- `updateLanguageOptionsForSenseVoice` → `updateLanguageOptionsForFunASR`
+
+**Configuration Updates:**
+- Constants: `TRANSCRIPTION_PROVIDERS`, `PROVIDER_LABELS` updated
+- HTML IDs: `sensevoice-options` → `funasr-options`, `sensevoice-enable-streaming` → `funasr-enable-streaming`
+- Model downloads: `data-model="sensevoice"` → `data-model="funasr"`
+
+#### 10. **Migration Execution Workflow**
+```bash
+# Automated execution
+cd migrations
+python execute_migration.py
+
+# Manual steps (if preferred)
+1. Database backup creation
+2. SQL migration execution  
+3. Config file migration
+4. Application code updates
+5. Testing and validation
+```
+
+#### 12. **Technical Benefits**
+- **Consistent Naming**: Framework-based naming (whisper-cpp, funasr) vs model-based
+- **Technical Accuracy**: Clear distinction between API services and local frameworks
+- **Future Extensibility**: Better foundation for additional FunASR models
+- **Professional Architecture**: Industry-standard migration practices
+- **Development Workflow**: Complete integration guide for future provider additions
+- **Documentation Standards**: Accurate technical descriptions and maintained architecture docs
+
+#### 13. **User Experience Improvements**
+- **Automated Migration**: Minimal manual intervention required
+- **Safe Rollback**: Multiple recovery options if issues arise
+- **Clear Documentation**: Comprehensive guides and troubleshooting
+- **Transparent Process**: Detailed logging and validation at each step
+- **Consistent Interface**: Updated provider names reflect actual technology stack
+- **Future-Ready**: Provider integration workflow ensures consistent future additions
+
+#### 11. **Documentation & Workflow Creation**
+**Provider Integration Workflow Documentation:**
+- **File Created**: `analysis/PROVIDER_WORKFLOW.md` - Comprehensive provider integration guide
+- **Purpose**: Complete checklist and workflow for adding new transcription providers
+- **Content**: 
+  - Reference implementation from completed provider renaming
+  - Phase-by-phase integration workflow (Planning → Backend → Frontend → UI → Documentation)
+  - File update checklist with specific code locations
+  - Naming conventions and code patterns
+  - Testing procedures and validation steps
+  - Common pitfalls and development tips
+
+**Architecture Documentation Updates:**
+- **File Updated**: `analysis/ARCHITECTURE_ANALYSIS.md` - Provider names and descriptions corrected
+- **Provider Matrix**: Updated all provider support tables with new naming
+- **Technical Accuracy**: Corrected provider descriptions (FunASR vs SenseVoice)
+- **Future Reference**: Accurate system state documentation for ongoing development
+
+### Migration Files Created
+```
+migrations/
+├── 0.7.12_provider_rename.sql          # Database migration
+├── rollback_0.7.12_provider_rename.sql # Database rollback
+├── provider_compatibility.py           # Compatibility layer (150+ lines)
+├── migrate_user_configs.py             # Config migration (200+ lines)  
+├── execute_migration.py                # Automated executor (300+ lines)
+├── migration_guide.md                  # Comprehensive guide (400+ lines)
+└── README.md                           # Migration documentation
+```
+
+### Breaking Changes
+- **Provider Names**: All provider identifiers changed (breaking API compatibility)
+- **Database Schema**: User provider arrays require migration
+- **User Configurations**: Saved user preferences need migration
+- **Frontend UI**: Provider selection options require updates
+- **API Parameters**: All transcription API calls need provider parameter updates
+
+### Testing Recommendations
+**Critical Migration Testing:**
+1. **Database Migration**: Verify provider arrays updated correctly
+2. **User Configurations**: Check saved preferences migrated
+3. **Provider Functionality**: Test each renamed provider works
+4. **UI Components**: Verify dropdowns show new provider names
+5. **API Compatibility**: Test all transcription endpoints
+6. **Rollback Procedures**: Verify rollback works if needed
+7. **New Installation**: Test clean install with new provider names
+
+### Files Modified
+- [`migrations/`](../migrations/) - **Created**: Complete migration infrastructure directory
+- [`migrations/0.7.12_provider_rename.sql`](../migrations/0.7.12_provider_rename.sql) - **Created**: Database migration script
+- [`migrations/rollback_0.7.12_provider_rename.sql`](../migrations/rollback_0.7.12_provider_rename.sql) - **Created**: Database rollback script  
+- [`migrations/provider_compatibility.py`](../migrations/provider_compatibility.py) - **Created**: Python compatibility layer (150+ lines)
+- [`migrations/migrate_user_configs.py`](../migrations/migrate_user_configs.py) - **Created**: Configuration migration script (200+ lines)
+- [`migrations/execute_migration.py`](../migrations/execute_migration.py) - **Created**: Automated migration executor (300+ lines)
+- [`migrations/migration_guide.md`](../migrations/migration_guide.md) - **Created**: Comprehensive migration guide (400+ lines)
+- [`migrations/README.md`](../migrations/README.md) - **Created**: Migration directory documentation
+- [`backend.py`](../backend.py) - **Modified**: Provider constants and routing logic updated (100+ references)
+- [`app.js`](../app.js) - **Modified**: Provider validation, streaming logic, UI functions updated (50+ references)
+- [`index.html`](../index.html) - **Modified**: Provider dropdown options and form elements updated
+- [`backend-api.js`](../backend-api.js) - **Modified**: API function names and parameter handling updated
+- [`analysis/ARCHITECTURE_ANALYSIS.md`](./ARCHITECTURE_ANALYSIS.md) - **Modified**: Updated provider names and technical descriptions
+- [`analysis/PROVIDER_WORKFLOW.md`](./PROVIDER_WORKFLOW.md) - **Created**: Comprehensive provider integration workflow guide
+- [`analysis/CHANGELOG.md`](./CHANGELOG.md) - **Modified**: Added this comprehensive migration entry
+
+#### File Paths (Absolute)
+```
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\0.7.12_provider_rename.sql
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\rollback_0.7.12_provider_rename.sql
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\provider_compatibility.py
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\migrate_user_configs.py
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\execute_migration.py
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\migration_guide.md
+c:\Users\Lawes\Desktop\whispad\whispad\migrations\README.md
+c:\Users\Lawes\Desktop\whispad\whispad\backend.py
+c:\Users\Lawes\Desktop\whispad\whispad\app.js
+c:\Users\Lawes\Desktop\whispad\whispad\index.html
+c:\Users\Lawes\Desktop\whispad\whispad\backend-api.js
+c:\Users\Lawes\Desktop\whispad\whispad\analysis\ARCHITECTURE_ANALYSIS.md
+c:\Users\Lawes\Desktop\whispad\whispad\analysis\PROVIDER_WORKFLOW.md
+c:\Users\Lawes\Desktop\whispad\whispad\analysis\CHANGELOG.md
+```
+
+---
+
+## Version 0.7.11.5.1 - SenseVoice vs whisper.cpp Technical Clarification
+**Date**: August 8, 2025  
+**Type**: Documentation Enhancement  
+**Impact**: Architecture Understanding Improvement
+
+### Changes Made
+
+#### 1. **SenseVoice Technology Clarification**
+- **File Modified**: `analysis/ARCHITECTURE_ANALYSIS.md` (lines ~175-185)
+- **Location**: SenseVoice section in Transcription Providers
+- **Purpose**: Clarify that SenseVoice uses FunASR framework, not whisper.cpp
+
+#### 2. **Technology Stack Update**
+- **File Modified**: `analysis/ARCHITECTURE_ANALYSIS.md` (lines ~40-48)
+- **Location**: Technology Stack section
+- **Purpose**: Distinguish between whisper.cpp (C++) and SenseVoice (Python/FunASR) systems
+
+#### 3. **Enhanced Documentation**
+```markdown
+**Note**: SenseVoice and whisper.cpp are completely separate transcription systems:
+- **whisper.cpp**: C++ implementation of OpenAI Whisper models (.bin format)
+- **SenseVoice**: Python-based FunASR framework with emotion/event detection
+```
+
+#### 4. **Technical Clarifications Added**
+- **Framework**: SenseVoice built on FunASR (Alibaba's speech recognition toolkit)
+- **Technology Stack**: Python-based with PyTorch, separate from whisper.cpp C++ implementation
+- **Model Format**: SenseVoice uses specific models, incompatible with whisper.cpp .bin files
+- **Architecture**: Completely different underlying technologies and execution paths
+
+#### 5. **User Understanding Benefits**
+- **Clear Distinction**: Eliminates confusion between the two transcription systems
+- **Technical Accuracy**: Precise framework identification for each provider
+- **Architecture Clarity**: Better understanding of system components and dependencies
+- **Development Guidance**: Clear separation for future modifications or troubleshooting
+
+### Files Modified
+- [`analysis/ARCHITECTURE_ANALYSIS.md`](./ARCHITECTURE_ANALYSIS.md) - **Modified**: Added SenseVoice vs whisper.cpp technical clarification (version updated to 0.7.11.5.1)
+- [`analysis/CHANGELOG.md`](./CHANGELOG.md) - **Modified**: Added this changelog entry
+
+#### File Paths (Absolute)
+```
+c:\Users\Lawes\Desktop\whispad\whispad\analysis\ARCHITECTURE_ANALYSIS.md
+c:\Users\Lawes\Desktop\whispad\whispad\analysis\CHANGELOG.md
+```
+
+---
+
 ## Version 0.7.11.5 - Comprehensive ESC Key Support for All Modals
 **Date**: August 8, 2025  
 **Type**: Major Feature Enhancement  

@@ -145,8 +145,8 @@ WORKFLOW_WEBHOOK_USER = os.getenv('WORKFLOW_WEBHOOK_USER')
 # ---------- User management with PostgreSQL ---------
 SAVE_LOCK = threading.Lock()
 SESSIONS = {}
-ALL_TRANSCRIPTION_PROVIDERS = ["openai", "local", "sensevoice"]
-ALL_POSTPROCESS_PROVIDERS = ["openai", "google", "openrouter", "lmstudio", "ollama", "groq"]
+ALL_TRANSCRIPTION_PROVIDERS = ["openai-api", "whisper-cpp", "funasr"]
+ALL_POSTPROCESS_PROVIDERS = ["openai-api", "google", "openrouter", "lmstudio", "ollama", "groq"]
 
 OPENROUTER_FREE_MODELS = [
     "google/gemma-3-27b-it:free",
@@ -535,7 +535,7 @@ def transcribe_audio():
         
         # Obtener parámetros del request
         language = request.form.get('language', None)  # None = detección automática
-        provider = request.form.get('provider', 'openai')  # openai o local
+        provider = request.form.get('provider', 'openai-api')  # openai-api, whisper-cpp, or funasr
         enable_speaker_diarization = request.form.get('enable_speaker_diarization', 'false').lower() == 'true'
 
         tp, _ = get_user_providers(username)
@@ -544,7 +544,7 @@ def transcribe_audio():
         model_name = request.form.get('model')
         
         # Verificar disponibilidad del proveedor
-        if provider == 'local':
+        if provider == 'whisper-cpp':
             if not WHISPER_CPP_AVAILABLE:
                 return jsonify({"error": "Whisper.cpp local no está disponible"}), 500
 
@@ -586,19 +586,19 @@ def transcribe_audio():
                 
                 return jsonify({
                     "transcription": transcription,
-                    "provider": "local",
+                    "provider": "whisper-cpp",
                     "model": result.get('model')
                 })
             else:
-                return jsonify({"error": f"Error en transcripción local: {result.get('error', 'Unknown error')}"}), 500
-        
-        elif provider == 'sensevoice':
+                return jsonify({"error": f"Error en transcripción whisper-cpp: {result.get('error', 'Unknown error')}"}), 500
+
+        elif provider == 'funasr':
             # Check SenseVoice availability dynamically
             sensevoice_available = sensevoice_wrapper and sensevoice_wrapper.is_available()
             if not sensevoice_available:
-                return jsonify({"error": "SenseVoice no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
-            
-            # Usar SenseVoice
+                return jsonify({"error": "FunASR no está disponible. Asegúrate de haber descargado el modelo SenseVoiceSmall."}), 500
+
+            # Usar FunASR
             audio_bytes = audio_file.read()
             
             # Obtener opciones adicionales
@@ -635,7 +635,7 @@ def transcribe_audio():
                 
                 response_data = {
                     "transcription": transcription,
-                    "provider": "sensevoice",
+                    "provider": "funasr",
                     "model": result.get('model', 'SenseVoiceSmall'),
                     "language_detected": result.get('language_detected'),
                 }
@@ -648,9 +648,9 @@ def transcribe_audio():
                 
                 return jsonify(response_data)
             else:
-                return jsonify({"error": f"Error en transcripción SenseVoice: {result.get('error', 'Unknown error')}"}), 500
-                
-        else:  # OpenAI
+                return jsonify({"error": f"Error en transcripción FunASR: {result.get('error', 'Unknown error')}"}), 500
+
+        else:  # OpenAI API
             if not OPENAI_API_KEY:
                 return jsonify({"error": "API key de OpenAI no configurada"}), 500
 
@@ -682,7 +682,7 @@ def transcribe_audio():
                 result = response.json()
                 return jsonify({
                     "transcription": result.get('text', ''),
-                    "provider": "openai",
+                    "provider": "openai-api",
                     "model": model_to_use
                 })
             else:
@@ -705,7 +705,7 @@ def improve_text():
 
         # Chat assistant support
         if 'messages' in data:
-            provider = data.get('provider', 'openai')
+            provider = data.get('provider', 'openai-api')
             _, pp = get_user_providers(username)
             if pp and provider not in pp:
                 return jsonify({"error": "Post-process provider not allowed"}), 403
@@ -720,7 +720,7 @@ def improve_text():
                 return jsonify({"error": "Model not specified"}), 400
 
             if stream:
-                if provider == 'openai':
+                if provider == 'openai-api':
                     return chat_openai_stream(messages, model)
                 elif provider == 'google':
                     return chat_google_stream(messages, model)
@@ -749,7 +749,7 @@ def improve_text():
         
         text = data['text']
         improvement_type = data['improvement_type']
-        provider = data.get('provider', 'openai')  # openai o google
+        provider = data.get('provider', 'openai-api')  # openai-api o google
 
         _, pp = get_user_providers(username)
         if pp and provider not in pp:
@@ -758,7 +758,7 @@ def improve_text():
         custom_prompt = data.get('custom_prompt')  # Nuevo parámetro para prompts personalizados
         
         if stream:
-            if provider == 'openai':
+            if provider == 'openai-api':
                 model = data.get('model')
                 if not model:
                     return jsonify({"error": "Model not specified"}), 400
@@ -791,7 +791,7 @@ def improve_text():
             else:
                 return jsonify({"error": "Proveedor no soportado para streaming"}), 400
         else:
-            if provider == 'openai':
+            if provider == 'openai-api':
                 model = data.get('model')
                 if not model:
                     return jsonify({"error": "Model not specified"}), 400
@@ -1884,7 +1884,7 @@ def transcribe_audio_gpt4o():
             return jsonify({"error": "Unauthorized"}), 401
 
         tp, _ = get_user_providers(username)
-        if tp and 'openai' not in tp:
+        if tp and 'openai-api' not in tp:
             return jsonify({"error": "Transcription provider not allowed"}), 403
 
         if not OPENAI_API_KEY:

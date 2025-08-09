@@ -1,7 +1,7 @@
 # WhisPad 0.7.11 - Architecture Analysis
 
-**Last Updated**: August 8, 2025  
-**Version**: 0.7.11.2  
+**Last Updated**: August 9, 2025  
+**Version**: 0.7.12.0  
 **Analysis Date**: Initial comprehensive analysis
 
 ## Table of Contents
@@ -33,9 +33,13 @@ WhisPad is a multi-provider voice transcription and AI-enhanced note management 
 Frontend: Vanilla JavaScript, HTML5, CSS3, D3.js
 Backend: Python Flask, PostgreSQL, Docker
 AI Integration: OpenAI, Google AI, OpenRouter, Groq, LM Studio, Ollama
-Transcription: OpenAI Whisper API, whisper.cpp, SenseVoice
+Transcription: OpenAI Whisper API, whisper.cpp (C++), SenseVoice (FunASR/Python)
 Audio Processing: Web Audio API, pydub, librosa
 ```
+
+**Note**: SenseVoice and whisper.cpp are completely separate transcription systems:
+- **whisper.cpp**: C++ implementation of OpenAI Whisper models (.bin format)
+- **SenseVoice**: Python-based FunASR framework with emotion/event detection
 
 ---
 
@@ -76,9 +80,9 @@ class BackendAPI {
 #### Provider Support Matrix:
 | Provider | Transcription | AI Enhancement | Streaming |
 |----------|---------------|----------------|-----------|
-| OpenAI | ✅ | ✅ | ✅ |
-| SenseVoice | ✅ | ❌ | ✅ |
-| Local Whisper | ✅ | ❌ | ✅ |
+| OpenAI API | ✅ | ✅ | ✅ |
+| FunASR | ✅ | ❌ | ✅ |
+| Whisper.cpp | ✅ | ❌ | ✅ |
 | Google AI | ❌ | ✅ | ✅ (simulated) |
 | OpenRouter | ❌ | ✅ | ✅ |
 | Groq | ❌ | ✅ | ✅ |
@@ -116,12 +120,12 @@ def get_current_username():
 
 ### Transcription Providers
 
-#### 1. OpenAI Whisper API
+#### 1. OpenAI Whisper API (`openai-api`)
 - **Endpoint**: `/api/transcribe`
 - **Models**: whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe
 - **Features**: Auto language detection, custom prompts, streaming (GPT-4o models)
 
-#### 2. Local Whisper.cpp (`whisper_cpp_wrapper.py`)
+#### 2. Local Whisper.cpp (`whisper-cpp`) - `whisper_cpp_wrapper.py`
 ```python
 class WhisperCppWrapper:
     def __init__(self, model_path=None, whisper_cpp_path=None)
@@ -132,16 +136,19 @@ class WhisperCppWrapper:
 - **Compilation**: Dynamic whisper.cpp compilation support
 - **Threading**: Multi-threaded processing (`-t 4`)
 
-#### 3. SenseVoice (`sensevoice_wrapper.py`)
+#### 3. FunASR (`funasr`) - `sensevoice_wrapper.py`
 ```python
 class SenseVoiceWrapper:
     def transcribe_audio_from_bytes(self, audio_bytes, filename, language,
                                    detect_emotion=True, detect_events=True, use_itn=True)
 ```
+- **Framework**: Built on **FunASR** (Alibaba's speech recognition toolkit), NOT whisper.cpp
+- **Technology Stack**: Python-based with PyTorch, completely separate from whisper.cpp C++ implementation  
 - **Languages**: 50+ languages with enhanced Asian language support
 - **Emotion Detection**: 7 categories (Happy, Sad, Angry, Neutral, etc.)
 - **Event Detection**: BGM, Applause, Laughter, Crying, etc.
 - **Model Location**: Multiple cache directory support
+- **Model Format**: Uses FunASR-specific models, incompatible with whisper.cpp .bin files
 
 ### AI Text Enhancement Pipeline
 
@@ -572,8 +579,8 @@ this.config = {
 ```
 
 ### Provider Configuration Matrix
-| Setting | OpenAI | SenseVoice | Local | Google | OpenRouter | LMStudio | Ollama |
-|---------|---------|------------|-------|---------|------------|----------|---------|
+| Setting | OpenAI API | FunASR | Whisper.cpp | Google | OpenRouter | LMStudio | Ollama |
+|---------|------------|--------|-------------|---------|------------|----------|---------|
 | API Key Required | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | Local Processing | ❌ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
 | Model Download | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -586,13 +593,14 @@ this.config = {
 
 ## Change Log
 
-**Current Version**: 0.7.11.2  
-**Last Architecture Update**: August 8, 2025
+**Current Version**: 0.7.12.0  
+**Last Architecture Update**: August 9, 2025
 
 For detailed change history, version updates, and modification tracking, see [`CHANGELOG.md`](./CHANGELOG.md).
 
 ### Architecture Status
-- **System Structure**: Current and documented as of version 0.7.11.2
+- **System Structure**: Current and documented as of version 0.7.12.0
+- **Migration System**: Complete migration infrastructure added for provider renaming
 - **Component Analysis**: Complete with all major modules catalogued
 - **API Documentation**: Up to date with all endpoints and parameters
 - **Database Schema**: Reflects current table structure and relationships
