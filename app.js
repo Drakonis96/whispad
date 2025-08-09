@@ -3,7 +3,7 @@ let authToken = '';
 let currentUser = '';
 let isAdmin = false;
 
-const TRANSCRIPTION_PROVIDERS = ['openai', 'local', 'sensevoice'];
+const TRANSCRIPTION_PROVIDERS = ['openai-api', 'whisper-cpp', 'funasr'];
 const POSTPROCESS_PROVIDERS = ['openai', 'google', 'openrouter', 'groq', 'lmstudio', 'ollama'];
 let allowedTranscriptionProviders = [];
 let allowedPostprocessProviders = [];
@@ -11,9 +11,9 @@ let defaultProviderConfig = {};
 let multiUser = true;
 
 const PROVIDER_LABELS = {
-    openai: 'OpenAI',
-    local: 'Local Whisper',
-    sensevoice: 'SenseVoice',
+    'openai-api': 'OpenAI',
+    'whisper-cpp': 'Local Whisper',
+    funasr: 'FunASR',
     google: 'Google',
     openrouter: 'OpenRouter',
     groq: 'Groq',
@@ -195,7 +195,7 @@ class NotesApp {
             streamingEnabled: true,
             transcriptionPrompt: '',
             chunkDuration: 30,
-            sensevoiceEnableStreaming: false,
+            funasrEnableStreaming: false,
             localEnableStreaming: false,
             // Configuración avanzada de post-procesamiento
             temperature: 0.3,
@@ -1116,12 +1116,12 @@ class NotesApp {
         const transcriptionPrompt = document.getElementById('transcription-prompt').value.trim();
         const chunkDuration = parseInt(document.getElementById('chunk-duration').value);
 
-        // SenseVoice options
+        // FunASR options
         const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
         const detectEvents = document.getElementById('detect-events')?.checked ?? true;
         const useItn = document.getElementById('use-itn')?.checked ?? true;
         const enableSpeakerDiarization = document.getElementById('enable-speaker-diarization')?.checked ?? false;
-        const sensevoiceEnableStreaming = document.getElementById('sensevoice-enable-streaming')?.checked ?? false;
+        const funasrEnableStreaming = document.getElementById('funasr-enable-streaming')?.checked ?? false;
 
         // Local Whisper options
         const localEnableSpeakerDiarization = document.getElementById('local-enable-speaker-diarization')?.checked ?? false;
@@ -1155,7 +1155,7 @@ class NotesApp {
             detectEvents,
             useItn,
             enableSpeakerDiarization,
-            sensevoiceEnableStreaming,
+            funasrEnableStreaming,
             localEnableSpeakerDiarization,
             localEnableStreaming,
             temperature,
@@ -1245,7 +1245,7 @@ class NotesApp {
         document.getElementById('transcription-prompt').value = this.config.transcriptionPrompt || '';
         document.getElementById('chunk-duration').value = this.config.chunkDuration || 30;
         
-        // SenseVoice options
+        // FunASR options
         if (document.getElementById('detect-emotion')) {
             document.getElementById('detect-emotion').checked = this.config.detectEmotion !== false;
         }
@@ -1258,8 +1258,8 @@ class NotesApp {
         if (document.getElementById('enable-speaker-diarization')) {
             document.getElementById('enable-speaker-diarization').checked = this.config.enableSpeakerDiarization === true;
         }
-        if (document.getElementById('sensevoice-enable-streaming')) {
-            document.getElementById('sensevoice-enable-streaming').checked = this.config.sensevoiceEnableStreaming === true;
+        if (document.getElementById('funasr-enable-streaming')) {
+            document.getElementById('funasr-enable-streaming').checked = this.config.funasrEnableStreaming === true;
         }
 
         // Local Whisper options
@@ -1294,8 +1294,8 @@ class NotesApp {
         // Mostrar/ocultar opciones GPT-4o según el modelo seleccionado
         this.updateTranscriptionOptions();
         
-        // Mostrar/ocultar opciones SenseVoice según el proveedor seleccionado
-        this.toggleSenseVoiceOptions();
+        // Mostrar/ocultar opciones FunASR según el proveedor seleccionado
+        this.toggleFunASROptions();
         // Mostrar/ocultar opciones LM Studio según el proveedor seleccionado
         this.toggleLmStudioOptions();
         // Mostrar/ocultar opciones Ollama según el proveedor seleccionado
@@ -6817,9 +6817,9 @@ class NotesApp {
             this.updateTranscriptionConfiguration();
             
             // Show notification about new providers
-            const sensevoiceAvailable = this.availableTranscriptionProviders?.providers?.some(p => p.id === 'sensevoice');
-            if (sensevoiceAvailable) {
-                this.showNotification('SenseVoice model loaded successfully! Now available in transcription options.', 'success');
+            const funasrAvailable = this.availableTranscriptionProviders?.providers?.some(p => p.id === 'funasr');
+            if (funasrAvailable) {
+                this.showNotification('FunASR model loaded successfully! Now available in transcription options.', 'success');
             }
             
         } catch (error) {
@@ -6836,7 +6836,7 @@ class NotesApp {
             this.updateTranscriptionModelOptions();
             
             // Update any other UI elements that depend on providers
-            this.toggleSenseVoiceOptions();
+            this.toggleFunASROptions();
             
             console.log('Transcription configuration updated successfully');
         } catch (error) {
@@ -7670,15 +7670,15 @@ class NotesApp {
             }
             
             // Verificar que las APIs necesarias estén configuradas en el backend
-            if (this.config.transcriptionProvider === 'openai' && !this.availableAPIs?.openai) {
+            if (this.config.transcriptionProvider === 'openai-api' && !this.availableAPIs?.openai) {
                 this.showNotification('OpenAI API not configured in backend', 'warning');
                 return;
             }
             
-            if (this.config.transcriptionProvider === 'sensevoice' && 
+            if (this.config.transcriptionProvider === 'funasr' && 
                 (!this.availableTranscriptionProviders?.providers || 
-                 !this.availableTranscriptionProviders.providers.some(p => p.id === 'sensevoice'))) {
-                this.showNotification('SenseVoice not available. Please download the SenseVoiceSmall model first.', 'warning');
+                 !this.availableTranscriptionProviders.providers.some(p => p.id === 'funasr'))) {
+                this.showNotification('FunASR not available. Please download the SenseVoiceSmall model first.', 'warning');
                 return;
             }
 
@@ -7699,8 +7699,8 @@ class NotesApp {
            this.audioChunks = [];
            const chunkDuration = parseInt(this.config.chunkDuration || 0);
            const useChunkStreaming = chunkDuration > 0 && (
-               (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
-               (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+               (this.config.transcriptionProvider === 'whisper-cpp' && this.config.localEnableStreaming) ||
+               (this.config.transcriptionProvider === 'funasr' && this.config.sensevoiceEnableStreaming)
            );
 
            this.recordingStream = stream;
@@ -7830,12 +7830,12 @@ class NotesApp {
         try {
             let transcription = '';
             
-            if (this.config.transcriptionProvider === 'openai') {
+            if (this.config.transcriptionProvider === 'openai-api') {
                 transcription = await this.transcribeWithOpenAI(audioBlob);
-            } else if (this.config.transcriptionProvider === 'local') {
+            } else if (this.config.transcriptionProvider === 'whisper-cpp') {
                 transcription = await this.transcribeWithLocal(audioBlob);
-            } else if (this.config.transcriptionProvider === 'sensevoice') {
-                transcription = await this.transcribeWithSenseVoice(audioBlob);
+            } else if (this.config.transcriptionProvider === 'funasr') {
+                transcription = await this.transcribeWithFunASR(audioBlob);
             }
             
             if (transcription) {
@@ -7902,18 +7902,18 @@ class NotesApp {
         }
     }
 
-    async transcribeWithSenseVoice(audioBlob) {
+    async transcribeWithFunASR(audioBlob) {
         try {
             console.log('🎯 Using SenseVoice transcription');
             console.log('Language:', this.config.transcriptionLanguage);
             
-            // Get SenseVoice-specific options
+            // Get FunASR-specific options
             const detectEmotion = document.getElementById('detect-emotion')?.checked ?? true;
             const detectEvents = document.getElementById('detect-events')?.checked ?? true;
             const useItn = document.getElementById('use-itn')?.checked ?? true;
             const enableSpeakerDiarization = document.getElementById('enable-speaker-diarization')?.checked ?? false;
             
-            const result = await backendAPI.transcribeAudioSenseVoice(
+            const result = await backendAPI.transcribeAudioFunASR(
                 audioBlob,
                 this.config.transcriptionLanguage,
                 detectEmotion,
@@ -7922,7 +7922,7 @@ class NotesApp {
                 enableSpeakerDiarization
             );
             
-            console.log('SenseVoice transcription result:', result);
+            console.log('FunASR transcription result:', result);
             
             // Display emotion and events information if available
             if (result.emotion) {
@@ -8102,8 +8102,8 @@ class NotesApp {
         }
         const chunkDuration = parseInt(this.config.chunkDuration || 0);
         const useChunkStreaming = chunkDuration > 0 && (
-            (this.config.transcriptionProvider === 'local' && this.config.localEnableStreaming) ||
-            (this.config.transcriptionProvider === 'sensevoice' && this.config.sensevoiceEnableStreaming)
+            (this.config.transcriptionProvider === 'whisper-cpp' && this.config.localEnableStreaming) ||
+            (this.config.transcriptionProvider === 'funasr' && this.config.sensevoiceEnableStreaming)
         );
 
         if (!useChunkStreaming) {
@@ -8123,9 +8123,9 @@ class NotesApp {
             formData.append('use_itn', document.getElementById('use-itn')?.checked ?? true);
             
             // Speaker diarization settings
-            if (this.config.transcriptionProvider === 'sensevoice') {
+            if (this.config.transcriptionProvider === 'funasr') {
                 formData.append('enable_speaker_diarization', document.getElementById('enable-speaker-diarization')?.checked ?? false);
-            } else if (this.config.transcriptionProvider === 'local') {
+            } else if (this.config.transcriptionProvider === 'whisper-cpp') {
                 formData.append('enable_speaker_diarization', document.getElementById('local-enable-speaker-diarization')?.checked ?? false);
             }
             
@@ -8348,12 +8348,12 @@ class NotesApp {
     async transcribeChunk(audioBlob) {
         try {
             let transcription = '';
-            if (this.config.transcriptionProvider === 'openai') {
+            if (this.config.transcriptionProvider === 'openai-api') {
                 transcription = await this.transcribeWithOpenAI(audioBlob);
-            } else if (this.config.transcriptionProvider === 'local') {
+            } else if (this.config.transcriptionProvider === 'whisper-cpp') {
                 transcription = await this.transcribeWithLocal(audioBlob);
-            } else if (this.config.transcriptionProvider === 'sensevoice') {
-                transcription = await this.transcribeWithSenseVoice(audioBlob);
+            } else if (this.config.transcriptionProvider === 'funasr') {
+                transcription = await this.transcribeWithFunASR(audioBlob);
             }
             if (transcription) {
                 this.insertTranscription(transcription);
@@ -9785,7 +9785,7 @@ class NotesApp {
         if (transcriptionProvider) {
             transcriptionProvider.addEventListener('change', () => {
                 this.updateTranscriptionModelOptions();
-                this.toggleSenseVoiceOptions();
+                this.toggleFunASROptions();
             });
         }
 
@@ -10008,22 +10008,22 @@ class NotesApp {
         }
     }
 
-    toggleSenseVoiceOptions() {
+    toggleFunASROptions() {
         const provider = document.getElementById('transcription-provider').value;
-        const sensevoiceOptions = document.getElementById('sensevoice-options');
+        const funasrOptions = document.getElementById('funasr-options');
         const localWhisperOptions = document.getElementById('local-whisper-options');
         
-        if (sensevoiceOptions) {
-            sensevoiceOptions.style.display = provider === 'sensevoice' ? 'block' : 'none';
+        if (funasrOptions) {
+            funasrOptions.style.display = provider === 'funasr' ? 'block' : 'none';
         }
         
         if (localWhisperOptions) {
-            localWhisperOptions.style.display = provider === 'local' ? 'block' : 'none';
+            localWhisperOptions.style.display = provider === 'whisper-cpp' ? 'block' : 'none';
         }
         
-        // Update language options for SenseVoice
-        if (provider === 'sensevoice') {
-            this.updateLanguageOptionsForSenseVoice();
+        // Update language options for FunASR
+        if (provider === 'funasr') {
+            this.updateLanguageOptionsForFunASR();
         } else {
             this.restoreDefaultLanguageOptions();
         }
@@ -10109,7 +10109,7 @@ class NotesApp {
             });
     }
 
-    updateLanguageOptionsForSenseVoice() {
+    updateLanguageOptionsForFunASR() {
         const languageSelect = document.getElementById('transcription-language');
         if (!languageSelect) return;
         
@@ -10119,8 +10119,8 @@ class NotesApp {
         // Clear existing options
         languageSelect.innerHTML = '';
         
-        // SenseVoice supported languages
-        const sensevoiceLanguages = [
+        // FunASR supported languages
+        const funasrLanguages = [
             { value: 'auto', text: 'Auto-detect' },
             { value: 'zh', text: 'Chinese (Mandarin)' },
             { value: 'yue', text: 'Chinese (Cantonese)' },
@@ -10131,7 +10131,7 @@ class NotesApp {
         ];
         
         // Add options
-        sensevoiceLanguages.forEach(lang => {
+        funasrLanguages.forEach(lang => {
             const option = document.createElement('option');
             option.value = lang.value;
             option.textContent = lang.text;
@@ -10139,7 +10139,7 @@ class NotesApp {
         });
         
         // Restore selection if it's supported, otherwise use auto
-        if (sensevoiceLanguages.some(lang => lang.value === currentValue)) {
+        if (funasrLanguages.some(lang => lang.value === currentValue)) {
             languageSelect.value = currentValue;
         } else {
             languageSelect.value = 'auto';
@@ -13053,8 +13053,9 @@ class StudyManager {
     }
 }
 
-// Initialize study manager
+// Initialize study manager and make it globally accessible
 const studyManager = new StudyManager();
+window.studyManager = studyManager;
 
 // Actualizar botones de formato cuando cambia la selección
 document.addEventListener('selectionchange', () => {
@@ -13087,6 +13088,178 @@ document.addEventListener('keydown', async (e) => {
                     await window.notesApp.createNewNote();
                 }
                 break;
+        }
+    }
+});
+
+// Generic ESC key handler for all modals
+// Note: Focus modal has its own ESC handler and is not affected by this
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && window.notesApp) {
+        // Check for Config modal
+        const configModal = document.getElementById('config-modal');
+        if (configModal && configModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideConfigModal();
+            return;
+        }
+        
+        // Check for Models (upload-model-modal) modal
+        const modelsModal = document.getElementById('upload-model-modal');
+        if (modelsModal && modelsModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideUploadModelsModal();
+            return;
+        }
+        
+        // Check for Users modal
+        const usersModal = document.getElementById('user-modal');
+        if (usersModal && usersModal.classList.contains('active')) {
+            e.preventDefault();
+            usersModal.classList.remove('active');
+            return;
+        }
+        
+        // Check for Styles modal
+        const stylesModal = document.getElementById('styles-config-modal');
+        if (stylesModal && stylesModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideStylesConfigModal();
+            return;
+        }
+        
+        // Check for Translation modal
+        const translationModal = document.getElementById('translation-modal');
+        if (translationModal && translationModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideTranslationModal();
+            return;
+        }
+        
+        // Check for Tabularize modal
+        const tabularizeModal = document.getElementById('tabularize-modal');
+        if (tabularizeModal && tabularizeModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideTabularizeModal();
+            return;
+        }
+        
+        // Check for Graph modal
+        const graphModal = document.getElementById('graph-modal');
+        if (graphModal && graphModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideGraphModal();
+            return;
+        }
+        
+        // Check for Concept Graph modal
+        const conceptGraphModal = document.getElementById('concept-graph-modal');
+        if (conceptGraphModal && conceptGraphModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideConceptGraphModal();
+            return;
+        }
+        
+        // Check for Study modal
+        const studyModal = document.getElementById('study-modal');
+        if (studyModal && studyModal.classList.contains('active')) {
+            e.preventDefault();
+            if (window.studyManager) {
+                window.studyManager.closeStudyModal();
+            }
+            return;
+        }
+        
+        // Check for Audio modal
+        const audioModal = document.getElementById('audio-modal');
+        if (audioModal && audioModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideAudioModal();
+            return;
+        }
+        
+        // Check for Export modal
+        const exportModal = document.getElementById('export-modal');
+        if (exportModal && exportModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideExportModal();
+            return;
+        }
+        
+        // Check for Restore modal
+        const restoreModal = document.getElementById('restore-modal');
+        if (restoreModal && restoreModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideRestoreModal();
+            return;
+        }
+        
+        // Check for Upload PDF modal
+        const uploadPdfModal = document.getElementById('upload-pdf-modal');
+        if (uploadPdfModal && uploadPdfModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideUploadPdfModal();
+            return;
+        }
+        
+        // Check for Delete modal
+        const deleteModal = document.getElementById('delete-modal');
+        if (deleteModal && deleteModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideDeleteModal();
+            return;
+        }
+        
+        // Check for Delete Audio modal
+        const deleteAudioModal = document.getElementById('delete-audio-modal');
+        if (deleteAudioModal && deleteAudioModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideDeleteAudioModal();
+            return;
+        }
+        
+        // Check for Create Folder modal
+        const createFolderModal = document.getElementById('create-folder-modal');
+        if (createFolderModal && createFolderModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideCreateFolderModal();
+            return;
+        }
+        
+        // Check for Move Note modal
+        const moveNoteModal = document.getElementById('move-note-modal');
+        if (moveNoteModal && moveNoteModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideMoveNoteModal();
+            return;
+        }
+        
+        // Check for Move Folder modal
+        const moveFolderModal = document.getElementById('move-folder-modal');
+        if (moveFolderModal && moveFolderModal.classList.contains('active')) {
+            e.preventDefault();
+            window.notesApp.hideMoveFolderModal();
+            return;
+        }
+        
+        // Check for Saved Questions modal
+        const savedQuestionsModal = document.getElementById('saved-questions-modal');
+        if (savedQuestionsModal && savedQuestionsModal.classList.contains('active')) {
+            e.preventDefault();
+            if (window.studyManager) {
+                window.studyManager.hideSavedQuestionsModal();
+            }
+            return;
+        }
+        
+        // Check for Saved Flashcards modal
+        const savedFlashcardsModal = document.getElementById('saved-flashcards-modal');
+        if (savedFlashcardsModal && savedFlashcardsModal.classList.contains('active')) {
+            e.preventDefault();
+            if (window.studyManager) {
+                window.studyManager.hideSavedFlashcardsModal();
+            }
+            return;
         }
     }
 });

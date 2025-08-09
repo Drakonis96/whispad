@@ -90,7 +90,7 @@ class BackendAPI {
         }
     }
 
-    async transcribeAudioSenseVoice(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true, enableSpeakerDiarization = false) {
+    async transcribeAudioFunASR(audioBlob, language = 'auto', detectEmotion = true, detectEvents = true, useItn = true, enableSpeakerDiarization = false) {
         try {
             const formData = new FormData();
             
@@ -106,10 +106,10 @@ class BackendAPI {
                 }
             }
             
-            console.log('SenseVoice audio blob type:', audioBlob.type, 'Using filename:', filename);
+            console.log('FunASR audio blob type:', audioBlob.type, 'Using filename:', filename);
             
             formData.append('audio', audioBlob, filename);
-            formData.append('provider', 'sensevoice');
+            formData.append('provider', 'funasr');
             formData.append('detect_emotion', detectEmotion.toString());
             formData.append('detect_events', detectEvents.toString());
             formData.append('use_itn', useItn.toString());
@@ -119,7 +119,7 @@ class BackendAPI {
                 formData.append('language', language);
             }
 
-            console.log('Sending SenseVoice transcription request:', { 
+            console.log('Sending FunASR transcription request:', { 
                 language, 
                 detectEmotion, 
                 detectEvents, 
@@ -135,26 +135,26 @@ class BackendAPI {
 
             if (!response.ok) {
                 const errorData = await response.json();
-                console.error('SenseVoice transcription API error:', errorData);
+                console.error('FunASR transcription API error:', errorData);
                 throw new Error(errorData.error || `HTTP ${response.status}`);
             }
 
             const data = await response.json();
-            console.log('SenseVoice transcription API response:', data);
+            console.log('FunASR transcription API response:', data);
             
             // Check if we have a valid transcription
             if (!data.transcription && data.transcription !== '') {
-                console.error('No transcription field in SenseVoice response:', data);
+                console.error('No transcription field in FunASR response:', data);
                 throw new Error('Invalid response format: missing transcription field');
             }
             
             if (data.transcription.trim() === '') {
-                console.warn('Empty transcription received from SenseVoice');
+                console.warn('Empty transcription received from FunASR');
             }
             
             return data; // Return full data including emotion and events
         } catch (error) {
-            console.error('Error transcribing audio with SenseVoice:', error);
+            console.error('Error transcribing audio with FunASR:', error);
             throw error;
         }
     }
@@ -477,8 +477,8 @@ class BackendAPI {
         try {
             let endpoint = '';
             switch(model) {
-                case 'sensevoice':
-                    endpoint = '/api/download-sensevoice';
+                case 'funasr':
+                    endpoint = '/api/download-funasr';
                     break;
                 default:
                     throw new Error(`Unknown model: ${model}`);

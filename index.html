@@ -31,9 +31,9 @@
                     <input type="password" class="form-control" id="create-password" placeholder="Password" style="margin-top:10px;">
                     <div class="provider-select">
                         <p>Transcription Providers</p>
-                        <label><input type="checkbox" class="create-transcription-provider" value="openai"> OpenAI</label>
-                        <label><input type="checkbox" class="create-transcription-provider" value="local"> Local Whisper</label>
-                        <label><input type="checkbox" class="create-transcription-provider" value="sensevoice"> SenseVoice</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="openai-api"> OpenAI</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="whisper-cpp"> Local Whisper</label>
+                        <label><input type="checkbox" class="create-transcription-provider" value="funasr"> FunASR</label>
                         <p style="margin-top:10px;">Post-process Providers</p>
                         <label><input type="checkbox" class="create-postprocess-provider" value="openai"> OpenAI</label>
                         <label><input type="checkbox" class="create-postprocess-provider" value="google"> Google</label>
@@ -583,9 +583,9 @@
                     <h5>Transcription Provider</h5>
                     <select class="form-control" id="transcription-provider">
                         <option value="" selected>Select provider</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="local">Local Whisper (whisper.cpp)</option>
-                        <option value="sensevoice">SenseVoice (Multilingual + Emotion + Events)</option>
+                        <option value="openai-api">OpenAI</option>
+                        <option value="whisper-cpp">Local Whisper (whisper.cpp)</option>
+                        <option value="funasr">FunASR (Multilingual + Emotion + Events)</option>
                     </select>
                     <small class="form-text text-muted">
                         Local Whisper provides complete privacy - no data leaves your device
@@ -693,8 +693,8 @@
                         </select>
                         <small>How much audio to process at a time</small>
                     </div>
-                    <div class="model-config restricted-option" id="sensevoice-options" style="display: none;">
-                        <label class="form-label">SenseVoice Features</label>
+                    <div class="model-config restricted-option" id="funasr-options" style="display: none;">
+                        <label class="form-label">FunASR Features</label>
                         <div class="checkbox-group">
                             <label class="checkbox-label">
                                 <input type="checkbox" id="detect-emotion" checked>
@@ -717,7 +717,7 @@
                                 Enable Speaker Diarization Support
                             </label>
                             <label class="checkbox-label">
-                                <input type="checkbox" id="sensevoice-enable-streaming">
+                                <input type="checkbox" id="funasr-enable-streaming">
                                 <span class="checkmark"></span>
                                 Enable transcription streaming
                             </label>
@@ -1145,8 +1145,8 @@
             <h4 style="margin-top: 20px;">Advanced Models</h4>
             <p>Download advanced speech recognition models with additional capabilities</p>
             <div class="model-btns">
-                <button class="btn btn--primary model-download-advanced" data-model="sensevoice">
-                    <span style="font-size: 12px;">🎯</span>&nbsp;SenseVoice Small
+                <button class="btn btn--primary model-download-advanced" data-model="funasr">
+                    <span style="font-size: 12px;">🎯</span>&nbsp;FunASR Small
                     <small style="display: block; font-size: 11px; opacity: 0.8;">Multilingual + Emotion + Events</small>
                 </button>
             </div>
